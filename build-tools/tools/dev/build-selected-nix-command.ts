@@ -1,7 +1,14 @@
 import { stripAnsi } from "./build-selected-helpers";
 import { artifactNixPolicyArgs } from "../lib/artifact-nix-policy";
 
-export function selectedNixBuildArgs(opts: { flakeRef: string; showTrace?: boolean }): string[] {
+export type SelectedDerivationOutput = "out" | "provenance";
+
+export function selectedNixBuildArgs(opts: {
+  flakeRef: string;
+  showTrace?: boolean;
+  output?: SelectedDerivationOutput;
+}): string[] {
+  const output = opts.output || "out";
   return [
     "nix",
     "build",
@@ -14,7 +21,7 @@ export function selectedNixBuildArgs(opts: { flakeRef: string; showTrace?: boole
     "--no-link",
     "--print-out-paths",
     ...(opts.showTrace ? ["--show-trace"] : []),
-    opts.flakeRef,
+    `${opts.flakeRef}^${output}`,
   ];
 }
 

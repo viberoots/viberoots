@@ -23,6 +23,8 @@ import { withActiveReviewedRemoteNix } from "../remote-exec/active-reviewed-remo
 import { parseReviewedRemoteBuilders } from "../remote-exec/remote-builder-authority";
 import { enterCanonicalArtifactEntrypoint } from "../dev/canonical-artifact-entrypoint";
 import { runArtifactNix } from "./artifact-command";
+import { verifyRemoteCiToolsSourceIdentity } from "./remote-ci-tools-source-identity";
+import { resolveArtifactRevisionDomains } from "./artifact-revision-domains";
 import {
   opaqueIdentity,
   produceArtifactReproducibilityEvidence,
@@ -35,13 +37,28 @@ import {
   readStoreInventory,
   type StoreInventory,
 } from "./artifact-reproducibility-store-observation";
+import { buildArtifactOutputPair } from "./artifact-reproducibility-output-selection";
 
 const artifactToolsRoot = enterCanonicalArtifactEntrypoint();
 
 async function main(): Promise<void> {
+  const workspaceRoot = process.cwd();
+  const remoteCiTools = required("remote-ci-tools");
   const bundleSourceRoot = required("bundle-source-root");
   const replayBundleSourceRoot = required("replay-bundle-source-root");
   const bundleRoot = path.dirname(bundleSourceRoot);
+  const sourceAuthority = JSON.parse(
+    await fs.readFile(path.join(bundleRoot, "source-authority.json"), "utf8"),
+  ) as { sourceRevision?: unknown };
+  const revisions = await resolveArtifactRevisionDomains({ workspaceRoot, artifactToolsRoot });
+  if (String(sourceAuthority.sourceRevision || "") !== revisions.sourceRevision) {
+    throw new Error("evaluation bundle uses a stale consumer source revision");
+  }
+  const toolClosureSourceIdentity = await verifyRemoteCiToolsSourceIdentity({
+    remoteCiTools,
+    expectedToolSourceRevision: revisions.toolSourceRevision,
+    runNix: async (args) => await runArtifactNix({ args, workspaceRoot, artifactToolsRoot }),
+  });
   if (!bundleSourceRoot.startsWith("/nix/store/") || !bundleSourceRoot.endsWith("/source")) {
     throw new Error("reproducibility production requires an evaluation-bundle source store path");
   }
@@ -77,8 +94,8 @@ async function main(): Promise<void> {
     throw new Error("replayed evaluation bundle changed source root, digest, or matrix binding");
   }
   const flakeRef = binding.flakeRef;
-  const context = { workspaceRoot: process.cwd(), artifactToolsRoot };
-  const evidenceToolEnv = buildCanonicalArtifactEnvironment(process.cwd(), { artifactToolsRoot });
+  const context = { workspaceRoot, artifactToolsRoot };
+  const evidenceToolEnv = buildCanonicalArtifactEnvironment(workspaceRoot, { artifactToolsRoot });
   const system = parseRemoteBuilderSystem(required("system"));
   const policy = required("builder-policy") as RemoteBuilderPolicy;
   const reviewedBuilders = required("reviewed-builders");
@@ -93,7 +110,7 @@ async function main(): Promise<void> {
     ? await readVerifiedOwnedRootCleanupProof(cleanupProof)
     : { status: "not-applicable" as const, ownedRoot: undefined };
   const remoteOptions = {
-    remoteCiTools: required("remote-ci-tools"),
+    remoteCiTools,
     transportFile: required("transport-file"),
     policy,
     expectedSystem: system,
@@ -141,8 +158,22 @@ async function main(): Promise<void> {
           remoteStoreBefore,
           remoteProbePaths,
           operation: async (observedRunNix) => {
-            const outputPath = onlyPath(
-              (await observedRunNix(["build", "--no-link", "--print-out-paths", flakeRef])).stdout,
+            const subjectAuthority =
+              "subject" in binding
+                ? binding.subject
+                : {
+                    kind: "matrix" as const,
+                    matrixDigest: ARTIFACT_REPRODUCIBILITY_MATRIX_DIGEST,
+                    matrixId: binding.matrixId,
+                    artifactFamily: binding.artifactFamily,
+                    recipeDigest: reproducibilityRecipeDigest(binding.matrixId),
+                    bindingDigest: binding.bindingDigest,
+                    target: binding.target,
+                  };
+            const { outputPath, provenanceOutputPath } = await buildArtifactOutputPair(
+              flakeRef,
+              subjectAuthority,
+              observedRunNix,
             );
             await assertReproducibilityNodeArtifact({
               contract: "nodeArtifact" in binding ? binding.nodeArtifact : undefined,
@@ -159,19 +190,10 @@ async function main(): Promise<void> {
                 system,
                 flakeRef,
                 outputPath,
-                subjectAuthority:
-                  "subject" in binding
-                    ? binding.subject
-                    : {
-                        kind: "matrix",
-                        matrixDigest: ARTIFACT_REPRODUCIBILITY_MATRIX_DIGEST,
-                        matrixId: binding.matrixId,
-                        artifactFamily: binding.artifactFamily,
-                        recipeDigest: reproducibilityRecipeDigest(binding.matrixId),
-                        bindingDigest: binding.bindingDigest,
-                        target: binding.target,
-                      },
+                provenanceOutputPath,
+                subjectAuthority,
                 checkoutIdentity,
+                toolSourceRevision: toolClosureSourceIdentity.toolSourceRevision,
                 builderAuthority,
               },
               observedRunNix,
@@ -180,7 +202,7 @@ async function main(): Promise<void> {
           afterOperation: async (produced) =>
             await copyToEvidenceStore({
               storeUri: registry.evidenceStore.storeUri,
-              storePaths: [produced.outputPath],
+              storePaths: [...new Set([produced.outputPath, produced.provenanceOutputPath])],
               awsSharedCredentialsFile: required("evidence-store-aws-credentials-file"),
             }),
           describe: (produced) => ({
@@ -214,14 +236,6 @@ function required(name: string): string {
   const value = getFlagStr(name, "").trim();
   if (!value) throw new Error(`--${name} is required`);
   return value;
-}
-
-function onlyPath(stdout: string): string {
-  const values = stdout.trim().split(/\s+/u).filter(Boolean);
-  if (values.length !== 1 || !values[0]!.startsWith("/nix/store/")) {
-    throw new Error("artifact build must produce exactly one Nix store path");
-  }
-  return values[0]!;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) await main();

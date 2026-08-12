@@ -1,12 +1,15 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { makeFilteredFlakeRef } from "../update-pnpm-hash/filtered-flake";
+import { materializeFilteredViberootsSource } from "../filtered-flake-viberoots-input";
 import { ensureToolchainPathsFiles } from "../toolchain-paths";
 import {
+  buildCanonicalArtifactEnvironment,
   canonicalArtifactToolsRoot,
   MissingGeneratedArtifactToolAuthorityError,
   UnavailableGeneratedArtifactToolAuthorityError,
 } from "../../lib/artifact-environment";
+import { resolveWorkspaceRootsSync } from "../../lib/repo";
 import { ensureArtifactToolsGcRoot } from "./artifact-tools-gc-root";
 
 export type RepairedArtifactToolchainAuthority = {
@@ -39,6 +42,30 @@ export async function repairArtifactToolchainAuthority(
       repoRoot: root,
       storePath: bootstrap.artifactTools.root,
     });
+  }
+  const active = resolveWorkspaceRootsSync({ start: root });
+  if (active.sourceMode === "local" && active.currentPointsToLiveCheckout) {
+    const artifactEnv = buildCanonicalArtifactEnvironment(root, {
+      artifactToolsRoot: canonicalArtifactToolsRoot(root),
+    });
+    const materialized = await materializeFilteredViberootsSource(
+      active.viberootsRoot,
+      artifactEnv,
+    );
+    const finalPaths = await ensureToolchainPathsFiles(root, {
+      refresh: true,
+      artifactToolsFlakeRef: `path:${materialized.storePath}`,
+    });
+    await ensureArtifactToolsGcRoot({
+      repoRoot: root,
+      storePath: finalPaths.artifactTools.root,
+    });
+    return {
+      artifactToolsRoot: finalPaths.artifactTools.root,
+      goBin: finalPaths.go.bin,
+      pythonBin: finalPaths.python.bin,
+      viberootsSource: materialized.storePath,
+    };
   }
   const filtered = await makeFilteredFlakeRef({ repoRoot: root, attr: "remote-worker-tools" });
   try {

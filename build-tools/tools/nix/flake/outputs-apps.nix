@@ -1,18 +1,17 @@
-{ pkgs, zx-wrapper, viberootsRoot, viberootsNodeMods ? null, version, releaseTag, ... }:
+{ pkgs, zx-wrapper, viberootsRoot, viberootsRuntimeRoot, viberootsSourceIdentity, version, releaseTag, ... }:
 let
   zxPackage = if pkgs ? zx then pkgs.zx else pkgs.nodePackages.zx;
   remoteTools = import ./packages/remote-worker-tools.nix {
-    inherit pkgs zx-wrapper viberootsRoot;
-    viberootsNodeModules =
-      if viberootsNodeMods == null then null else viberootsNodeMods.node-modules;
+    inherit pkgs zx-wrapper viberootsRoot viberootsRuntimeRoot viberootsSourceIdentity;
   };
   viberoots = import ../packages/viberoots-command.nix {
     inherit pkgs zx-wrapper version releaseTag;
-    viberootsSrc = viberootsRoot;
+    viberootsSrc = viberootsRuntimeRoot;
     artifactToolsRoot = remoteTools.remote-worker-tools;
   };
   bootstrap = import ./packages/remote-worker-bootstrap.nix {
-    inherit pkgs viberootsRoot;
+    inherit pkgs;
+    viberootsRoot = viberootsRuntimeRoot;
     inherit (remoteTools) remote-worker-tools;
   };
   pnpm11 = import ../pnpm-11.nix { inherit pkgs; };

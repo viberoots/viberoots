@@ -25,11 +25,80 @@ test("Jenkins exposes only an explicitly enabled six-cell protected reproducibil
     viberootsSourcePath("build-tools/tools/ci/prepare-artifact-reproducibility-bundle.ts"),
     "utf8",
   );
+  const patchProducer = await fs.readFile(
+    viberootsSourcePath("build-tools/tools/ci/produce-protected-rust-patch-evidence.ts"),
+    "utf8",
+  );
+  const revisionDomains = await fs.readFile(
+    viberootsSourcePath("build-tools/tools/ci/artifact-revision-domains.ts"),
+    "utf8",
+  );
+  const toolSourceContext = await fs.readFile(
+    viberootsSourcePath("build-tools/tools/nix/flake/per-system-context.nix"),
+    "utf8",
+  );
+  const remoteTools = await fs.readFile(
+    viberootsSourcePath("build-tools/tools/nix/flake/packages/remote-worker-tools.nix"),
+    "utf8",
+  );
+  const patchRunner = await fs.readFile(
+    viberootsSourcePath("build-tools/tools/ci/protected-rust-patch-case-driver.ts"),
+    "utf8",
+  );
+  const patchPhase = await fs.readFile(
+    viberootsSourcePath("build-tools/tools/ci/protected-rust-patch-phase.ts"),
+    "utf8",
+  );
+  const tempConsumer = await fs.readFile(
+    viberootsSourcePath("build-tools/tools/ci/artifact-reproducibility-temp-consumer.ts"),
+    "utf8",
+  );
+  const patchImplementation = `${patchRunner}\n${patchPhase}\n${tempConsumer}`;
+  const patchDefinitions = await fs.readFile(
+    viberootsSourcePath("build-tools/tools/ci/protected-rust-patch-case-definitions.ts"),
+    "utf8",
+  );
   assert.match(jenkins, /VBR_PROTECTED_REPRODUCIBILITY/);
   assert.match(jenkins, /--stage langs-validate/);
   assert.match(jenkins, /values 'aarch64-darwin', 'aarch64-linux', 'x86_64-linux'/);
   assert.match(jenkins, /name 'BUILDER_SLOT'; values 'one', 'two'/);
   assert.match(jenkins, /produce-artifact-reproducibility-matrix-cell\.ts/);
+  assert.match(jenkins, /produce-protected-rust-patch-evidence\.ts/);
+  assert.match(patchDefinitions, /ARTIFACT_REPRODUCIBILITY_MATRIX\.filter/);
+  assert.match(patchDefinitions, /entry\.artifactFamily === "rust"/);
+  assert.match(patchDefinitions, /entry\.systems\.includes\(system\)/);
+  assert.match(patchProducer, /runRemoteBuilderSmoke/);
+  assert.match(patchProducer, /verifyRemoteCiToolsSourceIdentity/);
+  assert.match(cell, /verifyRemoteCiToolsSourceIdentity/);
+  assert.match(revisionDomains, /runGit\(\["rev-parse", "HEAD"\]\)/);
+  assert.match(revisionDomains, /runGit\(\["-C", "viberoots", "rev-parse", "HEAD"\]\)/);
+  assert.match(revisionDomains, /sourceRevision, toolSourceRevision/);
+  assert.match(toolSourceContext, /toolSourceRevision =[\s\S]*viberootsInput\.rev/);
+  assert.match(remoteTools, /remote-ci-tools-source-identity\.v2/);
+  assert.match(patchProducer, /withActiveReviewedRemoteNix/);
+  assert.match(patchProducer, /runProtectedRustPatchCaseDrivers/);
+  assert.doesNotMatch(patchRunner, /runNix\(\[\s*"flake",\s*"lock"/);
+  assert.match(patchRunner, /withArtifactReproducibilityTempConsumer/);
+  assert.match(patchImplementation, /resolveArtifactReproducibilityGraphContract/);
+  assert.match(
+    patchImplementation,
+    /active\.runNix\(\[\s*"store",\s*"add-path",\s*"--name",\s*"viberoots-evaluation-bundle",\s*bundle\.bundlePath,\s*\]\)/,
+  );
+  assert.match(patchImplementation, /active\.runNix\(\[\s*"eval"/);
+  assert.match(patchImplementation, /active\.runNix\(\["path-info", "--derivation", output\]\)/);
+  assert.match(patchImplementation, /active\.runNix\(\["store", "cat"/);
+  assert.match(
+    patchImplementation,
+    /active\.runNix\(\["hash", "path", `\$\{bundleStorePath\}\/source`\]\)/,
+  );
+  assert.doesNotMatch(patchRunner, /productionBinding|compiled-probe|runCommand/);
+  assert.doesNotMatch(patchRunner, /runWithRemoteStore|canonicalArtifact|buck2|\bv\b/);
+  assert.match(patchProducer, /createProtectedRustPatchEvidence/);
+  assert.match(jenkins, /public-rust-patch-\$\{SYSTEM\}-\$\{BUILDER_SLOT\}\.json/);
+  assert.match(
+    jenkins,
+    /archiveArtifacts artifacts: 'buck-out\/reproducibility\/aggregate-observation-paths\.json,buck-out\/reproducibility\/public-rust-patch-\*\.json'/,
+  );
   assert.match(
     jenkins,
     /VBR_REPRODUCIBILITY_REMOTE_CI_TOOLS\}\/share\/viberoots-source\/build-tools\/tools\/ci\/produce-artifact-reproducibility-matrix-cell\.ts/,
@@ -117,6 +186,7 @@ test("Jenkins exposes only an explicitly enabled six-cell protected reproducibil
   assert.ok(jenkins.lastIndexOf("run-stage.sh", aggregateBinding) > aggregateStage);
   assert.match(stage, /reproducibility-matrix-cell/);
   assert.match(stage, /reproducibility-aggregate/);
+  assert.match(cell, /if \(!matrixCase\.systems\.includes\(system\)\) continue;/);
   assert.match(cell, /bundle-one/);
   assert.match(cell, /bundle-two/);
   assert.match(cell, /withArtifactReproducibilityTempConsumer/);
@@ -142,6 +212,8 @@ test("Jenkins exposes only an explicitly enabled six-cell protected reproducibil
   assert.match(producer, /remoteStoreBefore/);
   assert.match(producer, /remoteStoreAfterProbes/);
   assert.match(aggregate, /observation-summary\.json/);
+  assert.match(aggregate, /readProtectedRustPatchEvidence/);
+  assert.match(aggregate, /protectedRustPatchEvidence/);
   assert.match(aggregate, /build-tools\/tools\/nix\/langs\.json/);
   assert.ok(
     aggregate.indexOf("readJson(file") < aggregate.indexOf("signAndVerifyProtectedStore(root"),

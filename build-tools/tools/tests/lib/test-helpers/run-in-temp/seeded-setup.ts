@@ -1,4 +1,5 @@
 import path from "node:path";
+import { sharedCargoFixedSourceCacheRoot } from "../../../../dev/install/cargo-fixed-source-cache";
 import { sharedPnpmStoreHashCacheRoot } from "../../../../dev/update-pnpm-hash/verified-marker";
 import { registerBuckIsolationSync } from "../../../../dev/verify/owned-process-state";
 import { stableBuckIsolation } from "../../../../lib/buck-command-env";
@@ -10,7 +11,7 @@ import { ensureSharedNixTarballCacheRepo } from "../xdg-cache";
 import { initTempRepoFromSeedStore } from "../seed-store";
 import { rsyncRepoTo } from "../rsync";
 import { timeAsync } from "../timing";
-import { ensureToolchainPathsForTempRepo } from "../toolchain-paths";
+import { ensureToolchainSourcesForTempRepo } from "../toolchain-paths";
 import type { RunInTempOptions, SeededTempSetup, TempAllocation } from "./contracts";
 import { LOCAL_FIXTURE_SERVICE_ENV } from "./contracts";
 import {
@@ -23,6 +24,7 @@ import { activeViberootsRootFromWorkspace, prepareFilteredViberootsInput } from 
 import {
   rewriteTempViberootsInput,
   seedStoreViberootsRootIfPresent,
+  seedStoreImmutableViberootsInputIfPresent,
   tempViberootsRootIfPresent,
 } from "./flake-rewrite";
 import { bootstrapTempGit, commitTempFlakeRewrite } from "./git-bootstrap";
@@ -94,6 +96,10 @@ export async function prepareSeededTemp(
       SCAF_ALLOW_LIVE_REPO: "1",
       REPO_ROOT: process.cwd(),
       VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT: sharedPnpmStoreHashCacheRoot(process.env, realHome),
+      VBR_SHARED_CARGO_FIXED_SOURCE_CACHE_ROOT: sharedCargoFixedSourceCacheRoot(
+        process.env,
+        realHome,
+      ),
       HOME: home,
       XDG_CACHE_HOME: activeXdgCacheHome,
     }),
@@ -122,13 +128,19 @@ export async function prepareSeededTemp(
     "runInTemp seedStoreViberootsRoot",
     async () => await seedStoreViberootsRootIfPresent(),
   );
+  const seedStoreImmutableViberootsInput = await timeAsync(
+    "runInTemp seedStoreImmutableViberootsInput",
+    async () => await seedStoreImmutableViberootsInputIfPresent(),
+  );
   const viberootsSourceRoot = tempViberootsRoot || activeViberootsRoot;
   const viberootsInputSourceRoot =
     seedStoreViberootsRoot || tempViberootsRoot || activeViberootsRoot;
-  const viberootsInput = await timeAsync(
-    "runInTemp prepareFilteredViberootsInput",
-    async () => await prepareFilteredViberootsInput(viberootsInputSourceRoot),
-  );
+  const viberootsInput =
+    seedStoreImmutableViberootsInput ||
+    (await timeAsync(
+      "runInTemp prepareFilteredViberootsInput",
+      async () => await prepareFilteredViberootsInput(viberootsInputSourceRoot),
+    ));
   tempSetupEnv.VIBEROOTS_ROOT = viberootsSourceRoot;
   tempSetupEnv.VIBEROOTS_SOURCE_ROOT = viberootsSourceRoot;
   tempSetupEnv.VIBEROOTS_FLAKE_INPUT_ROOT = viberootsInput.storePath;
@@ -176,8 +188,8 @@ export async function prepareSeededTemp(
   await timeAsync("runInTemp ensureWorkspaceRootEnvFile", async () => {
     await ensureWorkspaceRootEnvFile(tmp, viberootsSourceRoot);
   });
-  await timeAsync("runInTemp ensureToolchainPathsForTempRepo", async () => {
-    await ensureToolchainPathsForTempRepo(tmp, $setup);
+  await timeAsync("runInTemp ensureToolchainSourcesForTempRepo", async () => {
+    await ensureToolchainSourcesForTempRepo(tmp);
   });
   await timeAsync("runInTemp rewriteTempViberootsInput after setup", async () => {
     const touched = await rewriteTempViberootsInput(tmp, viberootsInput);

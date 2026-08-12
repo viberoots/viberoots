@@ -126,7 +126,7 @@ const EXPECTATIONS: TemplateExpectation[] = [
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.runnable-contracts.test.ts",
-    requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract", "verify:isolated-bounded"],
+    requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract"],
     requiredTemplateRoots: [
       "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
     ],

@@ -115,7 +115,7 @@ function usesNormalizedFilteredInput(lock: FlakeLock): boolean {
   );
 }
 
-function usesMatchingImmutableInput(
+export function usesMatchingImmutableInput(
   lock: FlakeLock,
   workspaceFlakeDir: string,
   viberootsSource: string,

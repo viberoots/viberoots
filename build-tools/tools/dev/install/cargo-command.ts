@@ -2,6 +2,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runManagedCommand } from "../../lib/managed-command";
 import { languageUpdateTimeoutMs } from "../update-command/languages";
+import { cargoCommandHome } from "./cargo-home";
 
 export async function assertCargoConfigIsolation(
   cargoRoot: string,
@@ -49,7 +50,7 @@ export async function runCargo(
       delete commandEnv[key];
     }
   }
-  const cargoHome = path.join(workspaceRoot, ".viberoots", "workspace", "cargo-home");
+  const cargoHome = cargoCommandHome(workspaceRoot, env);
   await assertCargoConfigIsolation(cwd, cargoHome);
   await fsp.mkdir(cargoHome, { recursive: true });
   const result = await runManagedCommand({

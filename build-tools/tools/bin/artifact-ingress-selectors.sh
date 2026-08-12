@@ -75,13 +75,25 @@ artifact_ingress_reexec_with_devshell() {
   unset VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG
   unset VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS
   unset VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY
-  local direnv_bin root parent tools_root token workspace_root
+  local direnv_bin root parent tools_root token workspace_root explicit_workspace_root
   workspace_root="$(pwd -P)"
-  root="${workspace_root}"
-  while [[ "${root}" != "/" && ! -f "${root}/.envrc" ]]; do
-    parent="${root%/*}"
-    root="${parent:-/}"
-  done
+  explicit_workspace_root="${WORKSPACE_ROOT:-}"
+  if [[ -n "${explicit_workspace_root}" ]]; then
+    explicit_workspace_root="$(cd "${explicit_workspace_root}" 2>/dev/null && pwd -P || true)"
+  fi
+  if [[ -n "${explicit_workspace_root}" && -f "${explicit_workspace_root}/.envrc" ]] && {
+    [[ "${workspace_root}" == "${explicit_workspace_root}" ]] ||
+      [[ "${workspace_root}" == "${explicit_workspace_root}/"* ]]
+  }; then
+    root="${explicit_workspace_root}"
+    workspace_root="${explicit_workspace_root}"
+  else
+    root="${workspace_root}"
+    while [[ "${root}" != "/" && ! -f "${root}/.envrc" ]]; do
+      parent="${root%/*}"
+      root="${parent:-/}"
+    done
+  fi
   if [[ ! -f "${root}/.envrc" ]]; then
     artifact_ingress_capture_effective_netrc "${workspace_root}"
   fi
@@ -153,7 +165,11 @@ artifact_ingress_capture_environment() {
 artifact_ingress_clear_selectors() {
   local name
   for name in ${VBR_ARTIFACT_INGRESS_SELECTORS} ${VBR_ARTIFACT_INGRESS_DYNAMIC_SELECTORS:-}; do
-    unset "${name}"
+    if [[ "${name}" == "WORKSPACE_ROOT" && "${VBR_DEVSHELL_USE_GENERATED_AUTHORITY:-}" == "1" && -n "${VBR_ARTIFACT_INGRESS_VALUE_WORKSPACE_ROOT:-}" ]]; then
+      export WORKSPACE_ROOT="${VBR_ARTIFACT_INGRESS_VALUE_WORKSPACE_ROOT}"
+    else
+      unset "${name}"
+    fi
   done
 }
 
@@ -165,7 +181,11 @@ artifact_ingress_restore_or_remove_selectors() {
     baseline_marker="VBR_DEVSHELL_ARTIFACT_WAS_SET_${name}"
     baseline_value="VBR_DEVSHELL_ARTIFACT_VALUE_${name}"
     captured="${!value:-}"
-    if artifact_ingress_selector_is_canonicalized "${name}"; then
+    if [[ "${name}" == "NIX_CONFIG" && "${VBR_NIX_CACHE_HEALTH_APPLIED:-}" == "1" && "${VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG+x}" == "x" ]] && { [[ "${captured}" == "${VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG}" ]] || artifact_ingress_nix_config_matches_nested_role "${captured}"; }; then
+      unset "${name}"
+    elif [[ ( "${name}" == "VBR_ARTIFACT_TOOLS_ROOT" || "${name}" == "WORKSPACE_ROOT" ) && "${VBR_DEVSHELL_USE_GENERATED_AUTHORITY:-}" == "1" && "${VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED:-}" == "1" && "${!baseline_marker:-}" == "1" && -n "${!baseline_value:-}" ]]; then
+      export "${name}=${!baseline_value}"
+    elif artifact_ingress_selector_is_canonicalized "${name}"; then
       unset "${name}"
     elif [[ "${!marker:-}" == "1" && -n "${captured}" && ( "${VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED:-}" != "1" || "${!baseline_marker:-}" != "1" || "${captured}" != "${!baseline_value:-}" ) ]]; then
       export "${name}=${captured}"

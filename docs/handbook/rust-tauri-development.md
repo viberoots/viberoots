@@ -33,8 +33,43 @@ and `node_asset_stage` contract; `tauri_app` has no second raw WASM input.
 Apple Silicon requires the executable's linker-generated ad-hoc platform envelope in order to
 launch it. The manifest records this as `adhoc-platform`, with no credential, team, or signing
 identity and with both release signing and release admission false. Credentialed signing,
-notarization, remote CSP origins, updater or plugin admission, publication/cache admission, Linux platform promotion,
-independent-builder evidence, and release-hermetic claims remain PR-12 work.
+notarization, remote CSP origins, updater or plugin admission, and Linux platform promotion remain
+outside this deterministic construction route.
+
+The protected reproducibility lane has a dedicated `rust-tauri-darwin-pr12` case. It builds the
+credential-free scaffold on two independent `aarch64-darwin` builders and requires identical Nix
+and semantic artifact identities before the signed aggregate may record the case. Rust's other
+PR-12 cases cover the native, extension, bridge, and WASM families on their declared systems.
+Missing builder records, unsigned aggregate evidence, local-development bundles, untracked inputs,
+development overrides, impure evaluation, or an unsupported system fail before protected cache or
+publication admission.
+
+For this protected case only, `behavior_probe = True` observes the frontend WASM recovered from the
+packaged `.app`; it first requires the path and SHA-256 digest bound by the Tauri artifact manifest,
+then invokes the reserved `viberoots_observed_behavior` export with the pinned WASM runtime.
+Baseline/restored fixtures must return `42` and the reviewed patched fixture must return `43`.
+Arbitrary commands, unpackaged frontend inputs, digest overrides, and other values are rejected.
+Ordinary `tauri_app` targets leave the probe disabled.
+
+This repository does not turn the ad-hoc application into a signed release. A reviewed external
+lane must sign the already qualified deterministic application, notarize or otherwise admit it for
+the target platform, retain provenance and SBOM evidence, and prove the signed result refers to the
+qualified input without placing credentials or nondeterministic signed bytes inside its Nix
+identity. The repository accepts that result only through `admit-tauri-release.ts`, which copies
+and verifies the signed aggregate, release policy, external record, qualified output, and SPDX
+document with the canonical protected-store verifier before parsing them. It hashes the exact
+semantic-manifest and SPDX bytes from their immutable store paths; the source revision, provenance,
+reviewed signer, signed artifact, and reviewed notary ticket must then agree with the qualified
+unsigned identity. Candidate qualification while Rust is experimental is always rejected for
+release admission. Until release administration retains real evidence, the manifest remains
+`releaseSigned:false`, Rust stays experimental, and no signed-release claim is enabled; contract
+fixtures are not product signing evidence.
+
+For backout, disable the signing or publication job and retain both independent-builder records,
+the signed aggregate, and the rejected external evidence. Correct the declared input, platform, or
+signing authority and rerun the complete case. Do not publish one builder's output, reinterpret the
+ad-hoc envelope as a release signature, or add signing credentials to Cargo, Tauri, Buck, Nix, or
+the application bundle.
 
 An application that stores its own credentials in macOS Keychain should not repeatedly ask the user
 to authorize access in a shipped build. That guarantee requires a stable code-signing identity and

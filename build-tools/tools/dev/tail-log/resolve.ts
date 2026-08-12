@@ -1,9 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import process from "node:process";
-import { spawn } from "node:child_process";
-import { resolveToolPath } from "../../lib/tool-paths";
 import { workspaceRoot } from "./paths";
+import { pidAlive } from "./process-liveness";
+
+export { pidAlive, pidAliveWithSignature, pidStartSignature } from "./process-liveness";
 
 function lockPidPath(root: string): string {
   return path.join(root, "buck-out", "tmp", "verify-lock", "pid");
@@ -56,84 +56,15 @@ export type Resolution =
   | { pid: number; logPath: string; active: boolean }
   | { pid: number; logPath: null; error: string; active: boolean };
 
+export type ResolveLatestDependencies = {
+  candidateRoots?: () => Promise<string[]>;
+  pidAlive?: (pid: number) => Promise<boolean>;
+};
+
 function isInt(s: string): boolean {
   return /^[0-9]+$/.test(s);
 }
 
-export async function pidAlive(pid: number): Promise<boolean> {
-  if (!Number.isInteger(pid) || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-  } catch {
-    return false;
-  }
-
-  // `kill(pid, 0)` returns success for zombies (the PID exists but has exited).
-  // For tail-log's "watch until pid ends" semantics we treat zombies as not alive.
-  try {
-    const psPath = await resolveToolPath("ps");
-    const stat = await new Promise<string>((resolve, reject) => {
-      const p = spawn(psPath, ["-p", String(pid), "-o", "stat="], {
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-      let out = "";
-      let err = "";
-      p.stdout?.on("data", (b) => (out += String(b)));
-      p.stderr?.on("data", (b) => (err += String(b)));
-      p.on("error", reject);
-      p.on("exit", (code) => {
-        if (code === 0) {
-          resolve(out.trim());
-          return;
-        }
-        reject(new Error(`ps exited ${code ?? "null"}: ${err.trim()}`));
-      });
-    });
-    if (!stat) return false;
-    // Common formats: "S+", "R+", "Z+", "Z".
-    if (stat.includes("Z")) return false;
-    return true;
-  } catch {
-    // If ps is unavailable but kill(0) succeeded, keep the lock live. In sandboxed
-    // environments /bin/ps can be denied even for same-user processes.
-    return true;
-  }
-}
-
-export async function pidStartSignature(pid: number): Promise<string> {
-  if (!Number.isInteger(pid) || pid <= 0) return "";
-  try {
-    const psPath = await resolveToolPath("ps");
-    const sig = await new Promise<string>((resolve, reject) => {
-      const p = spawn(psPath, ["-p", String(pid), "-o", "lstart="], {
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-      let out = "";
-      let err = "";
-      p.stdout?.on("data", (b) => (out += String(b)));
-      p.stderr?.on("data", (b) => (err += String(b)));
-      p.on("error", reject);
-      p.on("exit", (code) => {
-        if (code === 0) {
-          resolve(out.trim());
-          return;
-        }
-        reject(new Error(`ps exited ${code ?? "null"}: ${err.trim()}`));
-      });
-    });
-    return sig;
-  } catch {
-    return "";
-  }
-}
-
-export async function pidAliveWithSignature(pid: number, expectedSig: string): Promise<boolean> {
-  if (!(await pidAlive(pid))) return false;
-  if (!expectedSig) return true;
-  const sig = await pidStartSignature(pid);
-  if (!sig) return false;
-  return sig === expectedSig;
-}
 async function readText(p: string): Promise<string> {
   try {
     return String(await fs.readFile(p, "utf8")).trim();
@@ -142,9 +73,11 @@ async function readText(p: string): Promise<string> {
   }
 }
 
-async function newestVerifyLog(): Promise<string | null> {
+async function newestVerifyLog(
+  resolveCandidateRoots: () => Promise<string[]> = candidateRoots,
+): Promise<string | null> {
   let best: { p: string; m: number } | null = null;
-  for (const root of await candidateRoots()) {
+  for (const root of await resolveCandidateRoots()) {
     for (const dir of logsDirsFor(root)) {
       try {
         const entries = await fs.readdir(dir);
@@ -163,9 +96,13 @@ async function newestVerifyLog(): Promise<string | null> {
   return await fs.realpath(best.p).catch(() => best.p);
 }
 
-async function bestLiveLock(): Promise<{ pid: number; logPath: string } | null> {
+async function bestLiveLock(
+  dependencies: ResolveLatestDependencies = {},
+): Promise<{ pid: number; logPath: string } | null> {
+  const resolveCandidateRoots = dependencies.candidateRoots ?? candidateRoots;
+  const isPidAlive = dependencies.pidAlive ?? pidAlive;
   let best: { pid: number; logPath: string; mtime: number } | null = null;
-  for (const root of await candidateRoots()) {
+  for (const root of await resolveCandidateRoots()) {
     const pidFiles = lockPidPaths(root);
     const logFiles = lockLogPaths(root);
     for (let i = 0; i < pidFiles.length; i += 1) {
@@ -175,7 +112,7 @@ async function bestLiveLock(): Promise<{ pid: number; logPath: string } | null> 
       const logRaw = await readText(logFile);
       const pid = pidRaw && isInt(pidRaw) ? Number(pidRaw) : 0;
       if (pid <= 0 || !logRaw) continue;
-      if (!(await pidAlive(pid))) continue;
+      if (!(await isPidAlive(pid))) continue;
       const st = await fs.stat(pidFile).catch(() => null);
       const m = st ? st.mtimeMs : 0;
       if (!best || m > best.mtime) {
@@ -188,9 +125,11 @@ async function bestLiveLock(): Promise<{ pid: number; logPath: string } | null> 
   return { pid: best.pid, logPath: best.logPath };
 }
 
-async function bestLatestSymlink(): Promise<string | null> {
+async function bestLatestSymlink(
+  resolveCandidateRoots: () => Promise<string[]> = candidateRoots,
+): Promise<string | null> {
   let best: { p: string; m: number } | null = null;
-  for (const root of await candidateRoots()) {
+  for (const root of await resolveCandidateRoots()) {
     for (const latest of latestSymlinksFor(root)) {
       try {
         const real = await fs.realpath(latest);
@@ -202,14 +141,17 @@ async function bestLatestSymlink(): Promise<string | null> {
   return best?.p ?? null;
 }
 
-export async function resolveLatest(): Promise<Resolution> {
-  const live = await bestLiveLock();
+export async function resolveLatest(
+  dependencies: ResolveLatestDependencies = {},
+): Promise<Resolution> {
+  const resolveCandidateRoots = dependencies.candidateRoots ?? candidateRoots;
+  const live = await bestLiveLock(dependencies);
   if (live) return { pid: live.pid, logPath: live.logPath, active: true };
 
-  const sym = await bestLatestSymlink();
+  const sym = await bestLatestSymlink(resolveCandidateRoots);
   if (sym) return { pid: 0, logPath: sym, active: false };
 
-  const newest = await newestVerifyLog();
+  const newest = await newestVerifyLog(resolveCandidateRoots);
   if (newest) return { pid: 0, logPath: newest, active: false };
   return { pid: 0, logPath: null, error: "no verify logs found", active: false };
 }

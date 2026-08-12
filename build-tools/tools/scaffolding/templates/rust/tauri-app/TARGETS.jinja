@@ -1,5 +1,6 @@
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary")
 load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage", "node_webapp")
-load("@viberoots//build-tools/rust:defs.bzl", "rust_test", "tauri_app")
+load("@viberoots//build-tools/rust:defs.bzl", "rust_test", "rust_wasm_library", "tauri_app")
 
 node_webapp(
     name = "frontend_raw",
@@ -9,8 +10,16 @@ node_webapp(
 node_asset_stage(
     name = "frontend",
     app = ":frontend_raw",
+    assets = [{"src": ":frontend_wasm", "dest": "frontend.wasm"}],
     labels = ["lang:node", "kind:app", "webapp:static"],
     out = "dist",
+)
+
+rust_wasm_library(
+    name = "frontend_wasm",
+    crate = "{{ name }}",
+    default_features = False,
+    srcs = ["src/lib.rs"],
 )
 
 tauri_app(
@@ -20,9 +29,18 @@ tauri_app(
     crate = "{{ name }}",
     frontend_dist = ":frontend",
     resources = [{"src": "help.txt", "dest": "help/help.txt"}],
+    sidecar_deps = [{"src": ":{{ name }}-sidecar", "dest": "bin/{{ name }}-sidecar"}],
     srcs = ["build.rs", "src/lib.rs", "src/main.rs"],
     tauri_config = "tauri.conf.json",
     app_windows = ["main"],
+)
+
+nix_cpp_binary(
+    name = "{{ name }}-sidecar",
+    language_standard = "c11",
+    labels = ["sidecar:reviewed"],
+    srcs = ["sidecar.c"],
+    stl = "none",
 )
 
 rust_test(

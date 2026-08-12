@@ -22,7 +22,7 @@ test("temp consumer composes managed child and owned-tree lifecycle authorities"
   assert.match(owner, /VBR_UPDATE: "1"/u);
   assert.match(owner, /VBR_RUN_INSTALL: "0"/u);
   assert.match(owner, /VBR_DIRENV_ALLOW: "0"/u);
-  assert.match(owner, /VBR_VIBEROOTS_URL: `path:\$\{immutableSource\}`/u);
+  assert.match(owner, /VBR_VIBEROOTS_URL: `path:\$\{reviewedSource\}`/u);
   assert.doesNotMatch(owner, /viberoots\.dev\/bootstrap|bootstrap-url/u);
   assert.match(owner, /GIT_AUTHOR_DATE: "2000-01-01T00:00:00Z"/u);
   assert.match(owner, /GIT_COMMITTER_DATE: "2000-01-01T00:00:00Z"/u);

@@ -79,9 +79,15 @@ async function verifyLockIsLive(root: string): Promise<boolean> {
 }
 
 function optimiseMode(): "auto" | "always" | "off" {
-  const mode = (process.env.VBR_OPTIMISE_MODE || "auto").trim();
-  if (mode === "always" || mode === "off") return mode;
-  return "auto";
+  const mode = (process.env.VBR_OPTIMISE_MODE || "off").trim();
+  if (mode === "always" || mode === "auto") return mode;
+  return "off";
+}
+
+function gcMode(): "auto" | "warn" | "off" {
+  const mode = (process.env.VBR_GC_MODE || "warn").trim();
+  if (mode === "auto" || mode === "off") return mode;
+  return "warn";
 }
 
 function optimiseCooldownMinutes(): number {
@@ -104,7 +110,7 @@ export async function runHousekeeping(opts: {
 }): Promise<void> {
   try {
     const hkEnabled = (process.env.VBR_HOUSEKEEPING || "1").trim() !== "0";
-    const gcMode = (process.env.VBR_GC_MODE || "auto").trim(); // auto | warn | off
+    const activeGcMode = gcMode();
     if (opts.isCI || !hkEnabled) return;
     const verbose = isVbrVerbose();
     const ui = createCommandUi({ verbose });
@@ -175,10 +181,10 @@ export async function runHousekeeping(opts: {
       if (verbose) console.log("[housekeeping] optimise: skipped (cooldown)");
     }
 
-    if (gcMode === "auto" && underPressure && liveVerifyLock) {
+    if (activeGcMode === "auto" && underPressure && liveVerifyLock) {
       if (verbose) console.log("[housekeeping] GC: skipped (verify running)");
       else ui.warn("low disk space: skipping nix GC while verify is running");
-    } else if (gcMode === "auto" && underPressure && (await olderThanMinutes(gcStamp, 10))) {
+    } else if (activeGcMode === "auto" && underPressure && (await olderThanMinutes(gcStamp, 10))) {
       let level = 1;
       try {
         const txt = await fsp.readFile(gcLevelFile, "utf8");
@@ -223,11 +229,11 @@ export async function runHousekeeping(opts: {
       } else {
         ui.ok("housekeeping", `free=${afterPct.toFixed(0)}% (${fmtBytes(afterBytes)})`);
       }
-    } else if (gcMode === "warn" && underPressure) {
+    } else if (activeGcMode === "warn" && underPressure) {
       console.warn(
-        "[housekeeping] low disk free detected; consider: nix-store --gc --max-freed 1G",
+        "[housekeeping] low disk free detected; ordinary builds do not mutate the Nix store. Preview with `viberoots gc --dry-run`, then run `viberoots gc` outside build/verify; use `viberoots gc --optimize` only for explicit deduplication maintenance.",
       );
-    } else if (gcMode === "auto" && !underPressure) {
+    } else if (activeGcMode === "auto" && !underPressure) {
       if (verbose) console.log("[housekeeping] GC: skipped (sufficient free space)");
     }
 

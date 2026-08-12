@@ -232,6 +232,12 @@ Buck's graph. If the application needs broader development watching than an ordi
 binary, publish an explicit application watcher in `run.dev`; do not silently fall back to a
 generic watcher whose file scope is incomplete.
 
+Asset consumers must preserve that same graph authority. Record the exact parent artifact and copy
+its public output instead of rebuilding the consumer importer. Give each staged asset a typed
+`file` or `wasm` role; require an explicit role for extensionless inputs. A raw `export_file` label
+whose target name differs from its source must carry the exact provider source path through graph
+metadata—never reconstruct a filesystem path from the target name.
+
 ### Language contracts and manifest
 
 - The project defines shared TypeScript interfaces in `build-tools/tools/lib/lang-contracts.ts`:

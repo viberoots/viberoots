@@ -179,8 +179,8 @@ async function main() {
       repoRoot: await findRepoRoot(process.cwd()),
     };
     const args = childArgs(ctx);
-    plan = await runDeployChild<NixosSharedHostRemotePlan>(ctx, [...args, "--plan"], "plan");
     if (ctx.planOnly) {
+      plan = await runDeployChild<NixosSharedHostRemotePlan>(ctx, [...args, "--plan"], "plan");
       console.log(
         JSON.stringify(
           { ok: true, ...createJenkinsEnvelope(ctx, plan), remotePlan: plan },
@@ -190,11 +190,13 @@ async function main() {
       );
       return;
     }
-    const remoteExecution = await runDeployChild<NixosSharedHostRemoteDeploySummary>(
+    const deployResult = await runDeployChild<NixosSharedHostRemoteDeploySummary>(
       ctx,
       args,
       "deploy",
     );
+    plan = deployResult.remotePlan;
+    const { remotePlan: _remotePlan, ...remoteExecution } = deployResult;
     console.log(
       JSON.stringify(
         {

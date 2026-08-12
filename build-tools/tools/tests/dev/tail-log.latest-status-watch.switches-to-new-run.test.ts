@@ -6,13 +6,12 @@ import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { buildToolPath } from "../../dev/dev-build/paths";
+import { resolveLatest } from "../../dev/tail-log/resolve";
 
-test("tail-log: latest --status -w switches to the newest verify run (lock-first)", async () => {
+test("tail-log: latest --status -w switches with an inactive latest.log pointer", async () => {
   const ws = await fsp.mkdtemp(path.join(os.tmpdir(), "tail-log-latest-switch-"));
   const logsDir = path.join(ws, "buck-out", "tmp", "verify-logs");
-  const lockDir = path.join(ws, "buck-out", "tmp", "verify-lock");
   await fsp.mkdir(logsDir, { recursive: true });
-  await fsp.mkdir(lockDir, { recursive: true });
 
   const log1 = path.join(logsDir, "verify-1.log");
   await fsp.writeFile(log1, "[verify] buck2 test begin iso=v-1 start_s=1\n", "utf8");
@@ -23,7 +22,7 @@ test("tail-log: latest --status -w switches to the newest verify run (lock-first
     buildToolPath(process.cwd(), "tools/bin/tail-log"),
     ["--status", "-w", "0.05", "--json"],
     {
-      cwd: process.cwd(),
+      cwd: ws,
       env: {
         ...process.env,
         WORKSPACE_ROOT: ws,
@@ -69,28 +68,16 @@ test("tail-log: latest --status -w switches to the newest verify run (lock-first
   const waitTimeoutMs = 15000;
 
   try {
-    await waitFor((o) => o && o.log === log1Real, waitTimeoutMs);
-
-    const sleeper = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
-      stdio: "ignore",
-    });
-    const sleeperExit = new Promise<number>((resolve) => {
-      sleeper.once("exit", (code) => resolve(code ?? -1));
-    });
-    assert.ok(typeof sleeper.pid === "number" && sleeper.pid > 0);
-    await Promise.race([
-      new Promise((r) => setTimeout(r, 50)),
-      sleeperExit.then(() => assert.fail("expected lock holder to still be alive")),
-    ]);
+    await waitFor((o) => o && (o.pid ?? 0) === 0 && o.log === log1Real, waitTimeoutMs);
 
     const log2 = path.join(logsDir, "verify-2.log");
     await fsp.writeFile(log2, "[verify] buck2 test begin iso=v-2 start_s=1\n", "utf8");
     const log2Real = await fsp.realpath(log2);
-    await fsp.writeFile(path.join(lockDir, "pid"), String(sleeper.pid), "utf8");
-    await fsp.writeFile(path.join(lockDir, "log"), log2Real, "utf8");
+    const nextLatest = path.join(logsDir, "latest.next.log");
+    await fsp.symlink(log2, nextLatest);
+    await fsp.rename(nextLatest, path.join(logsDir, "latest.log"));
 
-    await waitFor((o) => o && o.pid === sleeper.pid && o.log === log2Real, waitTimeoutMs);
-    sleeper.kill("SIGTERM");
+    await waitFor((o) => o && (o.pid ?? 0) === 0 && o.log === log2Real, waitTimeoutMs);
   } finally {
     tailLog.kill("SIGTERM");
     // Avoid hangs if the process already exited before we attach an exit listener.
@@ -101,6 +88,41 @@ test("tail-log: latest --status -w switches to the newest verify run (lock-first
       ),
     ]).catch(() => {});
   }
+});
+
+test("tail-log: latest resolver switches live lock logs with injected liveness", async () => {
+  const ws = await fsp.mkdtemp(path.join(os.tmpdir(), "tail-log-lock-switch-"));
+  const logsDir = path.join(ws, "buck-out", "tmp", "verify-logs");
+  const lockDir = path.join(ws, "buck-out", "tmp", "verify-lock");
+  await fsp.mkdir(logsDir, { recursive: true });
+  await fsp.mkdir(lockDir, { recursive: true });
+
+  const log1 = path.join(logsDir, "verify-1.log");
+  const log2 = path.join(logsDir, "verify-2.log");
+  await fsp.writeFile(log1, "[verify] buck2 test begin iso=v-1 start_s=1\n", "utf8");
+  await fsp.writeFile(log2, "[verify] buck2 test begin iso=v-2 start_s=1\n", "utf8");
+  const log1Real = await fsp.realpath(log1);
+  const log2Real = await fsp.realpath(log2);
+  const lockPid = 4242;
+  const dependencies = {
+    candidateRoots: async () => [ws],
+    pidAlive: async (pid: number) => pid === lockPid,
+  };
+
+  await fsp.writeFile(path.join(lockDir, "pid"), String(lockPid), "utf8");
+  await fsp.writeFile(path.join(lockDir, "log"), log1Real, "utf8");
+  assert.deepEqual(await resolveLatest(dependencies), {
+    pid: lockPid,
+    logPath: log1Real,
+    active: true,
+  });
+
+  await fsp.writeFile(path.join(lockDir, "log"), log2Real, "utf8");
+  assert.deepEqual(await resolveLatest(dependencies), {
+    pid: lockPid,
+    logPath: log2Real,
+    active: true,
+  });
 });
 
 test("tail-log: latest status finds hidden workspace test logs", async () => {
@@ -124,7 +146,7 @@ test("tail-log: latest status finds hidden workspace test logs", async () => {
     buildToolPath(process.cwd(), "tools/bin/tail-log"),
     ["--status", "--json"],
     {
-      cwd: process.cwd(),
+      cwd: ws,
       env: {
         ...process.env,
         WORKSPACE_ROOT: ws,

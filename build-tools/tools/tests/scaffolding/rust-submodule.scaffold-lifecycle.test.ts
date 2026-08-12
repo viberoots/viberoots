@@ -55,10 +55,9 @@ test(
             ...process.env,
             GIT_ALLOW_PROTOCOL: "file",
             WORKSPACE_ROOT: consumer,
-            VBR_NIX_CACHE_POLICY: "off",
           },
           stdio: "pipe",
-        })`nix run --accept-flake-config path:${workspaceFlake}#viberoots -- use-submodule --workspace-root ${consumer} --url file://${source} --trust-url --no-direnv`;
+        })`nix run --option eval-cache false --accept-flake-config path:${workspaceFlake}#viberoots -- use-submodule --workspace-root ${consumer} --url file://${source} --trust-url --no-direnv`;
 
         assert.match(
           await fs.readFile(path.join(consumer, ".gitmodules"), "utf8"),
@@ -84,15 +83,14 @@ test(
           env: {
             ...commandEnv(consumer),
             GIT_ALLOW_PROTOCOL: "file",
-            VBR_NIX_CACHE_POLICY: "off",
           },
         })`viberoots init-consumer --mode submodule --workspace-root ${consumer} --source viberoots --no-direnv`;
-        for (let attempt = 0; attempt < 2; attempt++) {
+        for (let pass = 0; pass < 2; pass++) {
           await $({
             cwd: consumer,
-            env: { ...process.env, WORKSPACE_ROOT: consumer, VBR_NIX_CACHE_POLICY: "off" },
+            env: { ...process.env, WORKSPACE_ROOT: consumer },
             stdio: "pipe",
-          })`nix run --accept-flake-config path:${workspaceFlake}#viberoots -- init-workspace`;
+          })`nix run --option eval-cache false --accept-flake-config path:${workspaceFlake}#viberoots -- init-workspace`;
         }
         const filteredInput = path.join(workspaceFlake, "viberoots-flake-input");
         await fs.access(path.join(filteredInput, ".source-fingerprint"));
@@ -108,10 +106,7 @@ test(
         await fs.symlink(sourcePrelude, path.join(workspaceFlake, "prelude"));
         await fs.access(path.join(workspaceFlake, "prelude/prelude.bzl"));
         await fs.rm(path.join(consumer, ".envrc"), { force: true });
-        const lifecycleEnv = (extra: NodeJS.ProcessEnv = {}) => ({
-          ...commandEnv(consumer, extra),
-          VBR_NIX_CACHE_POLICY: "off",
-        });
+        const lifecycleEnv = (extra: NodeJS.ProcessEnv = {}) => commandEnv(consumer, extra);
         const shapes = [
           ["cli", "rust_sub_cli"],
           ["lib", "rust_sub_lib"],
@@ -157,10 +152,10 @@ test(
         // so this successful build is also an actual extension-import smoke test.
         await $({ cwd: consumer, env: lifecycleEnv() })`b ${buildTargets}`;
         await $({ cwd: consumer, env: lifecycleEnv() })`
-          v //projects/apps/rust_sub_cli:rust_sub_cli-test
+          v --seed-mode=never //projects/apps/rust_sub_cli:rust_sub_cli-test
         `;
         await $({ cwd: consumer, env: lifecycleEnv() })`
-          v //projects/libs/rust_sub_lib:rust_sub_lib-test
+          v --seed-mode=never //projects/libs/rust_sub_lib:rust_sub_lib-test
         `;
 
         const run = await $({ cwd: consumer, env: lifecycleEnv() })`

@@ -1,4 +1,11 @@
-load("@viberoots//build-tools/rust:defs.bzl", "rust_cxx_bridge_library")
+load("@viberoots//build-tools/rust:defs.bzl", "rust_c_ffi_library", "rust_cxx_bridge_library")
+
+rust_c_ffi_library(
+    name = "{{ name }}-c",
+    crate = "{{ name }}",
+    binding_config = "bindings-c.json",
+    srcs = ["src/lib.rs"],
+)
 
 rust_cxx_bridge_library(
     name = "{{ name }}",

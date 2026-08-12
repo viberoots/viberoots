@@ -28,6 +28,7 @@ source_snapshot(
     srcs = [
         "Cargo.lock",
         "Cargo.toml",
+        "src/lib.rs",
         "src/main.rs",
     ],
     destination_prefix = "projects/fixtures/rust-remote-ready",

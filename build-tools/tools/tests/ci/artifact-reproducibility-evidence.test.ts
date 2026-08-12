@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { assertArtifactReproducibilityEvidence } from "../../lib/artifact-reproducibility-evidence";
 import { artifactReproducibilityEvidenceFixture } from "./artifact-reproducibility.fixture";
 
-test("evidence v4 requires one exact builder and subject authority", () => {
+test("evidence v5 requires one exact builder and subject authority", () => {
   const evidence = artifactReproducibilityEvidenceFixture();
   assert.doesNotThrow(() => assertArtifactReproducibilityEvidence(evidence));
   assert.throws(
@@ -43,7 +43,7 @@ test("evidence v4 requires one exact builder and subject authority", () => {
   );
 });
 
-test("evidence v4 requires one replay-proven evaluation-bundle authority", () => {
+test("evidence v5 requires one replay-proven evaluation-bundle authority", () => {
   const evidence = artifactReproducibilityEvidenceFixture();
   assert.throws(
     () =>

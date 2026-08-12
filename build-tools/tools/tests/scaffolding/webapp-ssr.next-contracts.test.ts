@@ -90,6 +90,9 @@ test(
         await fsp.access(path.join(appRoot, "app", "wasm-producer", "payload.txt"));
         const { outPath, importer } = await buildSelectedSsr(tmp, _$, label, "next");
         await assertSsrAdapterConformance({ label, outPath, importer, framework: "next" });
+        const packagedNodeModules = path.join(outPath, "node_modules");
+        await fsp.access(packagedNodeModules);
+        assert.match(await fsp.realpath(packagedNodeModules), /^\/nix\/store\//u);
         const artifactOut = await buildBuckOutput(
           tmp,
           _$,

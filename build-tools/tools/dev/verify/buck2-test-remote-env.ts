@@ -21,7 +21,11 @@ const REMOTE_SAFE_PATH_ENV = new Set([
   "SSL_CERT_FILE",
 ]);
 
-const GENERATED_REMOTE_NIX_ENV = new Set(["NIX_PNPM_FETCH_TIMEOUT", "NIX_PNPM_INSTALL_TIMEOUT"]);
+const GENERATED_REMOTE_NIX_ENV = new Set([
+  "NIX_PNPM_FETCH_TIMEOUT",
+  "NIX_PNPM_INSTALL_TIMEOUT",
+  "VBR_ARTIFACT_COMMAND_TIMEOUT_SECS",
+]);
 
 function isNixStorePath(value: string): boolean {
   return value === "/nix/store" || value.startsWith("/nix/store/");
@@ -112,6 +116,8 @@ export function buildRemoteVerifyTestEnvArgs(opts: RemoteVerifyTestEnvArgsOption
     `NIX_PNPM_FETCH_TIMEOUT=${opts.testNixTimeoutSecs}`,
     "--env",
     `NIX_PNPM_INSTALL_TIMEOUT=${opts.testNixTimeoutSecs}`,
+    "--env",
+    `VBR_ARTIFACT_COMMAND_TIMEOUT_SECS=${opts.testNixTimeoutSecs}`,
     ...gitAutoMaintenanceDisabledTestEnvArgs(),
     "--env",
     `BUCK_NESTED_ISO=${opts.nestedIso}`,

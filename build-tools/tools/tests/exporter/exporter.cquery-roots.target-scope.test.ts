@@ -142,7 +142,7 @@ test("exporter cquery reuse defaults to per-workspace isolation", async () => {
     },
     async () => {
       const result = computeIsolationFlags(process.cwd());
-      assert.match(result.iso, /^exporter-shared-[0-9a-f]{10}$/);
+      assert.match(result.iso, /^exporter-shared-[0-9a-f]{10}(?:\.noindex)?$/);
       assert.notEqual(result.iso, "zxtest-shared-fixture");
       assert.notEqual(result.iso, "verify-pass-fixture");
       assert.deepEqual(result.flags, ["--isolation-dir", result.iso]);

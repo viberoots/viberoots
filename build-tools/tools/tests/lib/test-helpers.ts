@@ -12,6 +12,7 @@ export { mktemp } from "./test-helpers/tmp";
 export { exists } from "./test-helpers/fs";
 export {
   reconcileTempDependencyInputs,
+  retargetTempCommandToolSource,
   runInScratchTemp,
   runInTemp,
   workspaceFlakeRef,
@@ -35,6 +36,7 @@ export const nestedBuckCommandEnv = Object.fromEntries(
 
 const ownedBuckIsolations = new Map<string, string>();
 let buckIsolationCleanupRegistered = false;
+let ownedBuckIsolationSequence = 0;
 
 function cleanupOwnedBuckIsolationsSync(): void {
   for (const [isolationDir, repoRoot] of ownedBuckIsolations) {
@@ -102,6 +104,20 @@ export function inheritedBuckIsolation(
     registerOwnedBuckIsolation(standalone, env);
   }
   return standalone;
+}
+
+export function testOwnedBuckIsolation(
+  defaultIsolation: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const prefix =
+    String(defaultIsolation || "test-owned")
+      .trim()
+      .replace(/[^A-Za-z0-9._-]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "test-owned";
+  const isolation = `${prefix}-${process.pid}-${++ownedBuckIsolationSequence}`;
+  registerOwnedBuckIsolation(isolation, env);
+  return isolation;
 }
 
 export function envWithStubbedNix(

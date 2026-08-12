@@ -1,14 +1,14 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
+import { macosNoindexPathSegment, mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { registerBuckIsolation } from "./owned-process-state";
 
 export async function initializeVerifyProcessState(root: string): Promise<{
   iso: string;
   stateFile: string;
 }> {
-  const iso = `v-${process.pid}-${Date.now()}`;
+  const iso = macosNoindexPathSegment(`v-${process.pid}-${Date.now()}`);
   const stateFile = path.join(
     root,
     ".viberoots",

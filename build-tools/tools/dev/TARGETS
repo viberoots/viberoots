@@ -65,6 +65,18 @@ export_file(
     visibility = ["PUBLIC"],
 )
 
+export_file(
+    name = "zx-process-kill.mjs",
+    src = "zx-process-kill.mjs",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "verify-owner-pid.mjs",
+    src = "verify/owner-pid.mjs",
+    visibility = ["PUBLIC"],
+)
+
 filegroup(
     name = "runtime_ts",
     srcs = glob([

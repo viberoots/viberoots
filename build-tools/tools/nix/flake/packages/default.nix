@@ -3,6 +3,8 @@
 , zx-wrapper
 , repoRoot
 , viberootsRoot
+, viberootsRuntimeRoot
+, viberootsSourceIdentity
 , nodeMods ? null
 , mkNodeMods ? null
 , viberootsNodeMods ? null
@@ -23,9 +25,7 @@ let
   filterRepo = import ./filter-repo.nix { inherit lib; };
   repoSnapshot = builtins.path { path = repoRoot; name = "repo"; filter = filterRepo repoRoot; };
   remoteTools = import ./remote-worker-tools.nix {
-    inherit pkgs zx-wrapper viberootsRoot;
-    viberootsNodeModules =
-      if viberootsNodeMods == null then null else viberootsNodeMods.node-modules;
+    inherit pkgs zx-wrapper viberootsRoot viberootsRuntimeRoot viberootsSourceIdentity;
   };
   importers = import ./importers.nix { inherit lib filterRepo repoSnapshot repoRoot; };
   graph = import ./graph.nix {
@@ -82,13 +82,14 @@ let
     nodeMods = if viberootsNodeMods != null then viberootsNodeMods else resolvedNodeMods;
   };
   remoteWorkerBootstrap = import ./remote-worker-bootstrap.nix {
-    inherit pkgs viberootsRoot;
+    inherit pkgs;
+    viberootsRoot = viberootsRuntimeRoot;
     inherit (remoteTools) remote-worker-tools;
   };
   remoteBuilderProbes = import ./remote-builder-probes.nix { inherit pkgs; };
   viberootsCommand = import ../../packages/viberoots-command.nix {
     inherit pkgs zx-wrapper version releaseTag;
-    viberootsSrc = viberootsRoot;
+    viberootsSrc = viberootsRuntimeRoot;
     artifactToolsRoot = remoteTools.remote-worker-tools;
   };
 in

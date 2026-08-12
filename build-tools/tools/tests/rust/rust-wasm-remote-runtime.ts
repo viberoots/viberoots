@@ -19,6 +19,7 @@ const remoteNames = [
   "remote_component",
   "remote_wasi_component",
 ] as const;
+const nestedBuildConcurrency = ["--num-threads", "2"];
 
 export async function verifyRustWasmRemoteReadiness(
   tmp: string,
@@ -27,6 +28,7 @@ export async function verifyRustWasmRemoteReadiness(
   _tools: string,
 ): Promise<void> {
   const labels = remoteNames.map((name) => `//projects/apps/rust-wasm:${name}`);
+  const provenanceLabels = labels.map((label) => `${label}[provenance]`);
   const hostileBin = path.join(tmp, "rust-wasm-hostile-bin");
   await fs.mkdir(hostileBin, { recursive: true });
   for (const tool of ["cargo", "rustc", "nix", "wasm-tools", "wasmtime"]) {
@@ -81,10 +83,17 @@ export async function verifyRustWasmRemoteReadiness(
     cwd: tmp,
     env: hostileEnv,
     stdio: "pipe",
-  })`buck2 --isolation-dir ${remoteIsolation} build --target-platforms prelude//platforms:default --show-full-output ${labels}`;
+  })`buck2 --isolation-dir ${remoteIsolation} build ${nestedBuildConcurrency} --target-platforms prelude//platforms:default --show-full-output ${labels}`;
   const buckOutputs = parseBuckOutputs(String(built.stdout), tmp, labels);
   assert.equal(buckOutputs.size, labels.length, String(built.stdout));
-  await verifyRemoteOutputs(command, buckOutputs);
+  const provenanceBuilt = await command({
+    cwd: tmp,
+    env: hostileEnv,
+    stdio: "pipe",
+  })`buck2 --isolation-dir ${remoteIsolation} build ${nestedBuildConcurrency} --target-platforms prelude//platforms:default --show-full-output ${provenanceLabels}`;
+  const provenanceOutputs = parseBuckOutputs(String(provenanceBuilt.stdout), tmp, provenanceLabels);
+  assert.equal(provenanceOutputs.size, provenanceLabels.length, String(provenanceBuilt.stdout));
+  await verifyRemoteOutputs(command, buckOutputs, provenanceOutputs);
   const declaredToolClosure = JSON.parse(
     await fs.readFile(
       path.join(tmp, "projects/apps/rust-wasm/remote-evidence/tool-closure.json"),
@@ -94,9 +103,10 @@ export async function verifyRustWasmRemoteReadiness(
   const buckSourceRevisions = new Map<string, string>();
   const buckStorePaths = new Map<string, string>();
   for (const [label, output] of buckOutputs) {
+    const provenanceOutput = provenanceOutputs.get(`${label}[provenance]`)!;
     const materialization = JSON.parse(
       await fs.readFile(
-        path.join(output, "share/viberoots-rust/materialization-manifest.json"),
+        path.join(provenanceOutput, "share/viberoots-rust/materialization-manifest.json"),
         "utf8",
       ),
     );
@@ -109,7 +119,7 @@ export async function verifyRustWasmRemoteReadiness(
     assert.match(materialization.tools?.nix, /^\/nix\/store\//);
     await fs.access(path.join(materialization.tools.nix, "bin/nix"));
     await assertMaterializedTreeMatchesStore(output, storePath.path);
-    await verifyDeclaredToolClosure(output, declaredToolClosure);
+    await verifyDeclaredToolClosure(provenanceOutput, declaredToolClosure);
     buckSourceRevisions.set(label, materialization.sourceRevision);
     buckStorePaths.set(label, storePath.path);
   }
@@ -145,13 +155,25 @@ export async function verifyRustWasmRemoteReadiness(
       cwd: executionSnapshot,
       env: hostileEnv,
       stdio: "pipe",
-    })`buck2 --isolation-dir ${inheritedBuckIsolation("rust_wasm_remote_snapshot_replay")} build --target-platforms prelude//platforms:default --show-full-output ${labels}`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("rust_wasm_remote_snapshot_replay")} build ${nestedBuildConcurrency} --target-platforms prelude//platforms:default --show-full-output ${labels}`;
     const replayOutputs = parseBuckOutputs(String(replayBuild.stdout), executionSnapshot, labels);
     assert.equal(replayOutputs.size, labels.length, String(replayBuild.stdout));
+    const replayProvenanceBuild = await command({
+      cwd: executionSnapshot,
+      env: hostileEnv,
+      stdio: "pipe",
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("rust_wasm_remote_snapshot_replay")} build ${nestedBuildConcurrency} --target-platforms prelude//platforms:default --show-full-output ${provenanceLabels}`;
+    const replayProvenanceOutputs = parseBuckOutputs(
+      String(replayProvenanceBuild.stdout),
+      executionSnapshot,
+      provenanceLabels,
+    );
+    assert.equal(replayProvenanceOutputs.size, provenanceLabels.length);
     for (const [label, replayOutput] of replayOutputs) {
+      const replayProvenance = replayProvenanceOutputs.get(`${label}[provenance]`)!;
       const replayMaterialization = JSON.parse(
         await fs.readFile(
-          path.join(replayOutput, "share/viberoots-rust/materialization-manifest.json"),
+          path.join(replayProvenance, "share/viberoots-rust/materialization-manifest.json"),
           "utf8",
         ),
       );
@@ -165,24 +187,35 @@ export async function verifyRustWasmRemoteReadiness(
         buckStorePaths.get(label),
         `${label} changed its declared store identity in the immutable snapshot`,
       );
-      await verifyDeclaredToolClosure(replayOutput, declaredToolClosure);
+      await verifyDeclaredToolClosure(replayProvenance, declaredToolClosure);
     }
-    await verifyRemoteOutputs(command, replayOutputs);
+    await verifyRemoteOutputs(command, replayOutputs, replayProvenanceOutputs);
     const repeatedBuild = await command({
       cwd: executionSnapshot,
       env: hostileEnv,
       stdio: "pipe",
-    })`buck2 --isolation-dir ${inheritedBuckIsolation("rust_wasm_remote_snapshot_replay")} build --target-platforms prelude//platforms:default --show-full-output ${labels}`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("rust_wasm_remote_snapshot_replay")} build ${nestedBuildConcurrency} --target-platforms prelude//platforms:default --show-full-output ${labels}`;
     const repeatedOutputs = parseBuckOutputs(
       String(repeatedBuild.stdout),
       executionSnapshot,
       labels,
     );
+    const repeatedProvenanceBuild = await command({
+      cwd: executionSnapshot,
+      env: hostileEnv,
+      stdio: "pipe",
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("rust_wasm_remote_snapshot_replay")} build ${nestedBuildConcurrency} --target-platforms prelude//platforms:default --show-full-output ${provenanceLabels}`;
+    const repeatedProvenanceOutputs = parseBuckOutputs(
+      String(repeatedProvenanceBuild.stdout),
+      executionSnapshot,
+      provenanceLabels,
+    );
     assert.equal(repeatedOutputs.size, labels.length, String(repeatedBuild.stdout));
     for (const [label, output] of repeatedOutputs) {
+      const provenanceOutput = repeatedProvenanceOutputs.get(`${label}[provenance]`)!;
       const repeatedMaterialization = JSON.parse(
         await fs.readFile(
-          path.join(output, "share/viberoots-rust/materialization-manifest.json"),
+          path.join(provenanceOutput, "share/viberoots-rust/materialization-manifest.json"),
           "utf8",
         ),
       );

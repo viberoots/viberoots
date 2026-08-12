@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { proofBoundCachePolicyOutcome } from "../../dev/verify/nix-cache-health-config";
+import { NESTED_CACHE_ROLE_CONFIG } from "../../dev/verify/nested-cache-role-transport";
 import { withoutArtifactEnvironmentInfluence } from "../../lib/artifact-environment";
 
 export async function exists(file: string): Promise<boolean> {
@@ -23,6 +25,7 @@ export async function walkFiles(root: string): Promise<string[]> {
 }
 
 export function commandEnv(consumer: string, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  const reviewedCache = proofBoundCachePolicyOutcome(process.env);
   const currentToolBin = path.join(
     consumer,
     ".viberoots",
@@ -34,6 +37,17 @@ export function commandEnv(consumer: string, extra: NodeJS.ProcessEnv = {}): Nod
   const env = {
     ...withoutArtifactEnvironmentInfluence(process.env),
     ...extra,
+    ...(reviewedCache
+      ? {
+          NIX_CONFIG: reviewedCache.config,
+          VBR_NIX_CACHE_ROLE_REQUIRED: reviewedCache.requiredSubstituters.join(" "),
+          VBR_NIX_CACHE_ROLE_OPTIONAL: reviewedCache.optionalSubstituters.join(" "),
+          VBR_NIX_CACHE_ROLE_POLICY: reviewedCache.policy,
+          VBR_NIX_CACHE_ROLE_BINDING: process.env.VBR_NIX_CACHE_ROLE_BINDING,
+          [NESTED_CACHE_ROLE_CONFIG]: Buffer.from(reviewedCache.config, "utf8").toString("base64"),
+          VBR_NIX_CACHE_ROLE_AUTHORITY: process.env.VBR_NIX_CACHE_ROLE_AUTHORITY,
+        }
+      : {}),
     VIBEROOTS_ROOT: "",
     VIBEROOTS_SOURCE_ROOT: "",
     NO_DEV_SHELL: "1",
@@ -41,6 +55,7 @@ export function commandEnv(consumer: string, extra: NodeJS.ProcessEnv = {}): Nod
     VERIFY_ALLOW_CONCURRENT: "1",
     PATH: `${currentToolBin}:${process.env.PATH || ""}`,
   };
+  delete env.IN_NIX_SHELL;
   delete env.BUCK_ISOLATION_DIR;
   delete env.VBR_BUCK_REAPER_STATE_FILE;
   for (const key of Object.keys(env)) {
@@ -51,6 +66,15 @@ export function commandEnv(consumer: string, extra: NodeJS.ProcessEnv = {}): Nod
       delete env[key];
     }
   }
+  return env;
+}
+
+export function artifactCommandEnv(
+  consumer: string,
+  extra: NodeJS.ProcessEnv = {},
+): NodeJS.ProcessEnv {
+  const env = commandEnv(consumer, extra);
+  delete env.NIX_CONFIG;
   return env;
 }
 

@@ -34,6 +34,7 @@ export async function prepareStaleCodexShell(tmp: string, wrapper: string) {
   const wrapperCopy = path.join(wrapperDir, "codex");
   const sourceBin = path.join(sourceRoot, "node_modules", ".bin");
   const sourceDev = path.join(sourceRoot, "build-tools", "tools", "dev");
+  const sourceVerify = path.join(sourceDev, "verify");
   const sourceLib = path.join(sourceRoot, "build-tools", "tools", "lib");
   const staleNodeModules = path.join(tmp, "stale-node", "node_modules");
   const staleBin = path.join(staleNodeModules, ".bin");
@@ -43,6 +44,7 @@ export async function prepareStaleCodexShell(tmp: string, wrapper: string) {
     fsp.mkdir(wrapperDir, { recursive: true }),
     fsp.mkdir(sourceBin, { recursive: true }),
     fsp.mkdir(sourceDev, { recursive: true }),
+    fsp.mkdir(sourceVerify, { recursive: true }),
     fsp.mkdir(sourceLib, { recursive: true }),
     fsp.mkdir(staleBin, { recursive: true }),
   ]);
@@ -56,9 +58,15 @@ export async function prepareStaleCodexShell(tmp: string, wrapper: string) {
       path.join(viberootsRoot, "build-tools", "tools", "dev", "codex-accounts.ts"),
       path.join(sourceDev, "codex-accounts.ts"),
     ),
+    ...["zx-init.mjs", "zx-process-kill.mjs"].map((file) =>
+      fsp.copyFile(
+        path.join(viberootsRoot, "build-tools", "tools", "dev", file),
+        path.join(sourceDev, file),
+      ),
+    ),
     fsp.copyFile(
-      path.join(viberootsRoot, "build-tools", "tools", "dev", "zx-init.mjs"),
-      path.join(sourceDev, "zx-init.mjs"),
+      path.join(viberootsRoot, "build-tools", "tools", "dev", "verify", "owner-pid.mjs"),
+      path.join(sourceVerify, "owner-pid.mjs"),
     ),
     ...["argv.ts", "cli.ts", "cli-wrap.ts", "errors.ts", "terminal-select.ts"].map((file) =>
       fsp.copyFile(

@@ -8,6 +8,7 @@ import {
   defaultFilteredFlakeSnapshotRelPaths,
   defaultFilteredFlakeSnapshotRsyncSources,
   filteredFlakeRsyncExcludeArgs,
+  relPathsWithoutNestedViberoots,
 } from "../../../../dev/nix-build-filtered-flake-lib";
 import {
   materializeFilteredViberootsSource,
@@ -116,7 +117,7 @@ export async function prepareFilteredViberootsInput(
   const inputRoot = path.join(workDir, "source");
   try {
     const relPaths: string[] = [];
-    for (const rel of defaultFilteredFlakeSnapshotRelPaths()) {
+    for (const rel of relPathsWithoutNestedViberoots(defaultFilteredFlakeSnapshotRelPaths())) {
       if (rel === ".viberoots" || rel.startsWith(".viberoots/")) continue;
       if (await pathExists(path.join(sourceRoot, rel))) relPaths.push(rel);
     }
@@ -156,7 +157,7 @@ export async function prepareFilteredConsumerSnapshot(
   const snapshotRoot = path.join(workDir, "source");
   try {
     const relPaths: string[] = [];
-    for (const rel of defaultFilteredFlakeSnapshotRelPaths()) {
+    for (const rel of relPathsWithoutNestedViberoots(defaultFilteredFlakeSnapshotRelPaths())) {
       if (await pathExists(path.join(consumerRoot, rel))) relPaths.push(rel);
     }
     const sources = defaultFilteredFlakeSnapshotRsyncSources(relPaths);
@@ -170,6 +171,7 @@ export async function prepareFilteredConsumerSnapshot(
     for (const excluded of [
       ".viberoots/current",
       ".viberoots/workspace/prelude",
+      "viberoots",
       "viberoots/prelude",
     ]) {
       if (await pathExists(path.join(snapshotRoot, excluded))) {

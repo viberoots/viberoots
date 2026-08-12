@@ -2,5 +2,10 @@
   "language": "rust",
   "template": "proc-macro",
   "description": "Experimental Rust procedural macro",
-  "resolverDestination": "projects/libs/{name}"
+  "resolverDestination": "projects/libs/{name}",
+  "help": {
+    "usage": "scaf new rust proc-macro <name> [--path=DEST]",
+    "notes": ["Creates a locked Rust procedural-macro crate with Buck targets."],
+    "examples": ["scaf new rust proc-macro demo --yes"]
+  }
 }

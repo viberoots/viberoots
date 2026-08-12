@@ -3,6 +3,7 @@ import path from "node:path";
 import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../../../lib/macos-metadata";
 import { GENERATED_REPO_STATE_PATHS } from "../../../lib/generated-repo-state";
 import { ensureNixStoreToolPathSync } from "../../../lib/tool-paths";
+import { PREPARED_SEED_MARKER } from "./seed-store-config";
 
 const requiredFiles = [".buckconfig"];
 const requiredFlakeFiles = ["flake.nix", path.join(".viberoots", "workspace", "flake.nix")];
@@ -27,71 +28,6 @@ rc = clonefile(src.encode(), dst.encode(), 0)
 if rc != 0:
     err = ctypes.get_errno()
     raise OSError(err, os.strerror(err), src)
-`;
-const darwinCloneTreeScript = String.raw`
-import ctypes
-import os
-import stat
-import sys
-
-src_root = sys.argv[1]
-dst_root = sys.argv[2]
-repair_permissions = sys.argv[3] == "1"
-libc = ctypes.CDLL(None, use_errno=True)
-clonefile = libc.clonefile
-clonefile.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int]
-clonefile.restype = ctypes.c_int
-
-os.makedirs(dst_root, exist_ok=True)
-
-def clone_regular_file(src, dst):
-    rc = clonefile(src.encode(), dst.encode(), 0)
-    if rc != 0:
-        err = ctypes.get_errno()
-        raise OSError(err, os.strerror(err), src)
-
-for cur, dirs, files in os.walk(src_root, topdown=True, followlinks=False):
-    rel = os.path.relpath(cur, src_root)
-    dst_cur = dst_root if rel == "." else os.path.join(dst_root, rel)
-    os.makedirs(dst_cur, exist_ok=True)
-    try:
-        st = os.lstat(cur)
-        if repair_permissions:
-            os.chmod(dst_cur, stat.S_IMODE(st.st_mode) | 0o700)
-    except OSError:
-        pass
-
-    kept_dirs = []
-    for name in dirs:
-        src = os.path.join(cur, name)
-        dst = os.path.join(dst_cur, name)
-        st = os.lstat(src)
-        if stat.S_ISLNK(st.st_mode):
-            os.symlink(os.readlink(src), dst)
-        elif stat.S_ISDIR(st.st_mode):
-            kept_dirs.append(name)
-        else:
-            raise RuntimeError(f"unsupported directory entry type: {src}")
-    dirs[:] = kept_dirs
-
-    for name in files:
-        src = os.path.join(cur, name)
-        dst = os.path.join(dst_cur, name)
-        st = os.lstat(src)
-        if stat.S_ISLNK(st.st_mode):
-            os.symlink(os.readlink(src), dst)
-            continue
-        if not stat.S_ISREG(st.st_mode):
-            raise RuntimeError(f"unsupported file type: {src}")
-        if os.path.lexists(dst):
-            if rel == "." and name == ".metadata_never_index":
-                if repair_permissions:
-                    os.chmod(dst, stat.S_IMODE(st.st_mode) | 0o600)
-                continue
-            raise FileExistsError(f"destination already exists: {dst}")
-        clone_regular_file(src, dst)
-        if repair_permissions:
-            os.chmod(dst, stat.S_IMODE(st.st_mode) | 0o600)
 `;
 
 async function makeDirectoryPublishable(dir: string): Promise<void> {
@@ -224,14 +160,12 @@ async function copyTreeCow(srcRoot: string, dstRoot: string): Promise<void> {
   const repairPermissions =
     process.platform !== "darwin" ||
     !(await fsp
-      .access(path.join(srcRoot, ".seed-store-prepared-v8"))
+      .access(path.join(srcRoot, PREPARED_SEED_MARKER))
       .then(() => true)
       .catch(() => false));
   const result =
     process.platform === "darwin"
-      ? await $(
-          fastCopyOpts,
-        )`${ensureNixStoreToolPathSync("python3")} -c ${darwinCloneTreeScript} ${srcRoot} ${dstRoot} ${repairPermissions ? "1" : "0"}`
+      ? await $(fastCopyOpts)`/bin/cp -cRp ${`${srcRoot}/.`} ${dstRoot}`
       : await $(fastCopyOpts)`cp -a --reflink=always ${`${srcRoot}/.`} ${dstRoot}`;
   if (result.exitCode !== 0) {
     throw new Error(
@@ -243,6 +177,7 @@ async function copyTreeCow(srcRoot: string, dstRoot: string): Promise<void> {
       ].join("\n"),
     );
   }
+  if (repairPermissions) await makeTreeWritable(dstRoot);
 }
 
 async function removeGeneratedRepoState(root: string): Promise<void> {

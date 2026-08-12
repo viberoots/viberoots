@@ -11,6 +11,22 @@ function parseGitConfigCount(value: string | undefined): number {
   return Number.isInteger(count) && count >= 0 ? count : 0;
 }
 
+export function withGitConfigEnvEntries<T extends EnvLike>(
+  env: T,
+  entries: readonly (readonly [string, string])[],
+): T {
+  const start = parseGitConfigCount(env.GIT_CONFIG_COUNT);
+  const appended: Record<string, string> = {
+    GIT_CONFIG_COUNT: String(start + entries.length),
+  };
+  entries.forEach(([key, value], index) => {
+    const slot = start + index;
+    appended[`GIT_CONFIG_KEY_${slot}`] = key;
+    appended[`GIT_CONFIG_VALUE_${slot}`] = value;
+  });
+  return { ...env, ...appended };
+}
+
 export function gitAutoMaintenanceDisabledEnvEntries(
   env: EnvLike = process.env,
 ): Record<string, string> {
@@ -27,10 +43,7 @@ export function gitAutoMaintenanceDisabledEnvEntries(
 }
 
 export function withGitAutoMaintenanceDisabledEnv<T extends EnvLike>(env: T): T {
-  return {
-    ...env,
-    ...gitAutoMaintenanceDisabledEnvEntries(env),
-  };
+  return withGitConfigEnvEntries(env, DISABLED_GIT_AUTO_MAINTENANCE_CONFIG);
 }
 
 export function gitAutoMaintenanceDisabledTestEnvArgs(env: EnvLike = process.env): string[] {

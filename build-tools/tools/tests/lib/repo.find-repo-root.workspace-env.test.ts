@@ -7,11 +7,11 @@ import path from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
 import { findRepoRoot, resolveWorkspaceRootsSync } from "../../lib/repo";
+import { viberootsSourcePath } from "./test-helpers/source-paths";
 import { runInTemp } from "./test-helpers";
 
 const execFileAsync = promisify(execFile);
-const REPO_ROOT = process.cwd();
-const VIBEROOTS_ROOT = path.join(REPO_ROOT, "viberoots");
+const VIBEROOTS_ROOT = viberootsSourcePath(".");
 const ZX_INIT = path.join(VIBEROOTS_ROOT, "build-tools", "tools", "dev", "zx-init.mjs");
 const VERSION_SCRIPT = path.join(VIBEROOTS_ROOT, "build-tools", "tools", "dev", "viberoots.ts");
 const VIBEROOTS_BIN = path.join(VIBEROOTS_ROOT, "build-tools", "tools", "bin", "viberoots");

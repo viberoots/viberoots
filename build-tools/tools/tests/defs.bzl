@@ -1,6 +1,11 @@
 load("@viberoots//build-tools/lang:defs_common.bzl", "dedupe_preserve")
 load("@viberoots//build-tools/tools/buck:zx_test.bzl", "zx_test")
 load(
+    "@viberoots//build-tools/tools/tests:heavy_fanout_conventions.bzl",
+    "heavy_fanout_convention_for_script",
+    "validate_heavy_fanout_convention",
+)
+load(
     "@viberoots//build-tools/tools/tests:deployment_conventions.bzl",
     "deployment_convention_for_script",
     "validate_deployment_convention",
@@ -75,16 +80,23 @@ def auto_zx_tests(root = "build-tools/tools/tests", patterns = ["**/*.test.ts"])
         resource_limited_convention = resource_limited_convention_for_script(f)
         if resource_limited_convention != None:
             labels = dedupe_preserve(labels + resource_limited_convention.get("labels", []))
+        heavy_fanout_convention = heavy_fanout_convention_for_script(f)
+        heavy_fanout_pool = None
+        if heavy_fanout_convention != None:
+            labels = dedupe_preserve(labels + heavy_fanout_convention.get("labels", []))
+            heavy_fanout_pool = heavy_fanout_convention.get("pool")
         validate_template_convention(f, labels, template_inputs)
         validate_deployment_convention(f, labels)
         validate_enforcement_convention(f, labels)
         validate_project_enforcement_convention(f, labels)
         validate_resource_limited_convention(f, labels)
+        validate_heavy_fanout_convention(f, labels, heavy_fanout_pool)
         zx_test(
             name = name,
             script = f,
             out = name + ".stamp",
             test_rule_timeout_ms = 20 * 60 * 1000,
             labels = labels,
+            heavy_fanout_pool = heavy_fanout_pool,
             template_inputs = sorted(template_inputs),
         )

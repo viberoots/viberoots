@@ -19,7 +19,7 @@ test("shell cache health publishes exact full config on success and nothing on f
     await fsp.mkdir(bin);
     await fsp.writeFile(
       path.join(bin, "nix"),
-      '#!/usr/bin/env bash\n[[ "${TEST_NIX_CONFIG_STATUS:-0}" == 0 ]] || exit "$TEST_NIX_CONFIG_STATUS"\nif [[ "${3:-}" == "--json" ]]; then if [[ -n "${TEST_EFFECTIVE_NIX_CONFIG_JSON:-}" ]]; then printf "%s\\n" "$TEST_EFFECTIVE_NIX_CONFIG_JSON"; else printf "{}\\n"; fi; else printf "%s\\n" "${TEST_EFFECTIVE_NIX_CONFIG:-}"; fi\n',
+      '#!/usr/bin/env bash\n[[ "${TEST_NIX_CONFIG_STATUS:-0}" == 0 ]] || exit "$TEST_NIX_CONFIG_STATUS"\nif [[ " $* " == *" --json "* ]]; then if [[ -n "${TEST_EFFECTIVE_NIX_CONFIG_JSON:-}" ]]; then printf "%s\\n" "$TEST_EFFECTIVE_NIX_CONFIG_JSON"; else printf "{}\\n"; fi; else printf "%s\\n" "${TEST_EFFECTIVE_NIX_CONFIG:-}"; fi\n',
       { mode: 0o755 },
     );
     await fsp.writeFile(
@@ -91,13 +91,20 @@ test("shell cache health publishes exact full config on success and nothing on f
 
     const requiredTransport = await execFileAsync("/bin/bash", [
       "-c",
-      `. "$1"; export PATH="$2:/usr/bin:/bin" NIX_CONFIG="$3" TEST_EFFECTIVE_NIX_CONFIG='substituters = https://required.example/cache' TEST_CURL_EXIT=6 VBR_NIX_CACHE_POLICY=auto; unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG; set +e; env_apply_nix_cache_health >/dev/null 2>&1; status=$?; set -e; printf '%s:%s' "$status" "\${VBR_NIX_CACHE_HEALTH_APPLIED+x}"`,
+      `. "$1"; export PATH="$2:$3:/usr/bin:/bin" NIX_CONFIG="$4" TEST_EFFECTIVE_NIX_CONFIG='substituters = https://required.example/cache' TEST_EFFECTIVE_NIX_CONFIG_JSON="$5" TEST_CURL_EXIT=6 VBR_NIX_CACHE_POLICY=auto; unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG; set +e; env_apply_nix_cache_health >/dev/null 2>&1; status=$?; set -e; printf '%s:%s:%s' "$status" "$VBR_NIX_CACHE_HEALTH_APPLIED" "$VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS"`,
       "cache-health-required-transport",
       devshell,
       bin,
+      path.dirname(process.execPath),
       full,
+      JSON.stringify({
+        substituters: {
+          defaultValue: ["https://required.example/cache"],
+          value: ["https://required.example/cache"],
+        },
+      }),
     ]);
-    assert.equal(requiredTransport.stdout, "1:");
+    assert.equal(requiredTransport.stdout, "0:1:");
 
     const configRoot = path.join(root, "nix-conf");
     await fsp.mkdir(configRoot);

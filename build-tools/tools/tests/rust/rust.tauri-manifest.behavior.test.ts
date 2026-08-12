@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { $ } from "zx";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 
 const sourceRoot = path.resolve(process.env.VIBEROOTS_ROOT || process.cwd());
 
@@ -44,7 +45,7 @@ test("manifest evaluation emits Tauri desktop metadata only for Rust Tauri outpu
         },
       })}\n`,
     );
-    const jqPath = String((await $({ stdio: "pipe" })`which jq`).stdout).trim();
+    const jqPath = resolveToolPathSync("jq");
     const manifestPath = path.join(sourceRoot, "build-tools/tools/nix/planner/manifest.nix");
     const expression = `
       let

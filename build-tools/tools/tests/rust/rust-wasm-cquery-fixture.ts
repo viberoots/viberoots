@@ -3,9 +3,9 @@ import fs from "fs-extra";
 import path from "node:path";
 
 export const wasmDeclarations = [
-  'rust_wasm_static_library(name = "wasm_static", crate = "rustapp", wasm_header = "rustapp.h", srcs = ["src/lib.rs"])',
-  'rust_wasm_browser_package(name = "browser", crate = "rustapp", exported_functions = ["add"], wasm_optimize = "size", wasm_debug = True, wasm_source_map = True, srcs = ["src/lib.rs"])',
-  'rust_wasm_component(name = "component", crate = "rustapp", wit = "wit/math.wit", wit_world = "calculator", exported_functions = ["add"], srcs = ["src/lib.rs"])',
+  'rust_wasm_static_library(name = "wasm_static", crate = "rustapp", behavior_probe = True, wasm_header = "rustapp.h", srcs = ["src/lib.rs"])',
+  'rust_wasm_browser_package(name = "browser", crate = "rustapp", behavior_probe = True, exported_functions = ["add"], wasm_optimize = "size", wasm_debug = True, wasm_source_map = True, srcs = ["src/lib.rs"])',
+  'rust_wasm_component(name = "component", crate = "rustapp", behavior_probe = True, wit = "wit/math.wit", wit_world = "calculator", exported_functions = ["add"], srcs = ["src/lib.rs"])',
 ];
 
 export async function writeWasmContractFiles(appDir: string): Promise<void> {

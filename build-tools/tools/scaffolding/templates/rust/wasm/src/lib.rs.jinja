@@ -1,4 +1,14 @@
+#[cfg(feature = "browser")]
+use wasm_bindgen::prelude::*;
+
+#[cfg(not(feature = "browser"))]
 #[no_mangle]
 pub extern "C" fn answer() -> i32 {
+    42
+}
+
+#[cfg(feature = "browser")]
+#[wasm_bindgen]
+pub fn answer() -> i32 {
     42
 }

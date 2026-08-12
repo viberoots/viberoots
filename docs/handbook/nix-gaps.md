@@ -162,6 +162,9 @@ The same checker mechanically inventories production Nix, Buck, and process/acti
 these roles; it is separate from the exception ledger because every production command site must be
 classified:
 
+This policy inventories Viberoots toolchain command sites only; ordinary consumer project code must
+not require updates to this file.
+
 - `canonical-artifact`: consumes immutable source and the canonical artifact environment/tool policy.
 - `live-d`: explicit local development behavior; it cannot publish or cache production artifacts.
 - `update-install`: explicit mutation, reconciliation, bootstrap, repair, or maintenance ownership.

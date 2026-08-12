@@ -5,13 +5,17 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 import {
   buildCanonicalArtifactEnvironment,
   canonicalArtifactToolsRoot,
   withoutArtifactEnvironmentInfluence,
 } from "../../lib/artifact-environment";
 import { installCanonicalArtifactToolsAuthority } from "../../lib/artifact-tool-authority";
+import { missingConsumerGitignoreEntries } from "../../lib/consumer-tracked-inputs";
 import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
+import { withGitConfigEnvEntries } from "../../lib/git-auto-maintenance-env";
+import { ensureBuckConfigForTempRepo } from "../lib/test-helpers/buck-config";
 import { runInTemp } from "../lib/test-helpers/run-in-temp";
 import { createFreshCloneFixture } from "../viberoots/fresh-clone-post-clone.fixture";
 import {
@@ -25,7 +29,7 @@ import {
 const execFileAsync = promisify(execFile);
 
 test("real i, devshell entry, and b reject stale Cargo metadata without changing bytes", async () => {
-  await runInTemp("rust-stale-entrypoints", async (root) => {
+  await runInTemp("rust-stale-entrypoints", async (root, $) => {
     await fsp.appendFile(
       path.join(root, ".git/info/exclude"),
       "\n.viberoots/\nviberoots/.viberoots/\n",
@@ -54,16 +58,25 @@ test("real i, devshell entry, and b reject stale Cargo metadata without changing
       });
     }
     const artifactToolsRoot = canonicalArtifactToolsRoot(root);
-    const env: NodeJS.ProcessEnv = {
-      ...process.env,
-      PATH: `${fakeBin}${path.delimiter}${process.env.PATH || ""}`,
-      NO_DEV_SHELL: "1",
-      VBR_RUN_INSTALL: "0",
-      VBR_DIRENV_ALLOW: "0",
-      VBR_ARTIFACT_TOOLS_ROOT: artifactToolsRoot,
-      VBR_GC_MODE: "off",
-      WORKSPACE_ROOT: root,
-    };
+    const env: NodeJS.ProcessEnv = withGitConfigEnvEntries(
+      {
+        ...process.env,
+        PATH: `${fakeBin}${path.delimiter}${process.env.PATH || ""}`,
+        NO_DEV_SHELL: "1",
+        VBR_RUN_INSTALL: "0",
+        VBR_DIRENV_ALLOW: "0",
+        VBR_ARTIFACT_TOOLS_ROOT: artifactToolsRoot,
+        VBR_GC_MODE: "off",
+        WORKSPACE_ROOT: root,
+      },
+      [
+        ["protocol.file.allow", "always"],
+        [
+          `url.${pathToFileURL(path.join(root, "viberoots")).href}.insteadOf`,
+          "https://github.com/viberoots/viberoots.git",
+        ],
+      ],
+    );
     delete env.VBR_BOOTSTRAP_PNPM_GENERATE;
     delete env.VBR_DEVSHELL_RECONCILE;
     delete env.VBR_INSTALL_REFRESH_PNPM_HASHES;
@@ -75,6 +88,14 @@ test("real i, devshell entry, and b reject stale Cargo metadata without changing
       trackedLocks.map(async (lockfile) => await fsp.rm(path.join(root, lockfile))),
     );
     await execFileAsync(bootstrap, [], { cwd: root, env: { ...env, VBR_WORKSPACE_ROOT: root } });
+    await ensureBuckConfigForTempRepo(root, $);
+    const gitignorePath = path.join(root, ".gitignore");
+    const missingGitignores = missingConsumerGitignoreEntries(
+      await fsp.readFile(gitignorePath, "utf8"),
+    );
+    if (missingGitignores.length > 0) {
+      await fsp.appendFile(gitignorePath, `${missingGitignores.join("\n")}\n`);
+    }
     await commitAll(root, "test: initialized consumer baseline");
     const lock = await addStaleRustRoot(root, env, undefined, async () => {
       await execFileAsync(path.join(root, "viberoots/build-tools/tools/bin/u"), [], {
@@ -143,7 +164,11 @@ test("real i, devshell entry, and b reject stale Cargo metadata without changing
     for (const [label, run] of entrypoints) {
       await expectStale(label, run);
       assert.deepEqual(await fsp.readFile(lock), beforeLock);
-      assert.equal(await trackedState(root), beforeStatus);
+      assert.equal(
+        await trackedState(root),
+        beforeStatus,
+        `${label} changed tracked files:\n${await git(root, ["diff", "--", ".buckconfig"])}`,
+      );
     }
   });
 });

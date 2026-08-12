@@ -35,15 +35,14 @@ test(
         for (let attempt = 0; attempt < 2; attempt++) {
           await $({
             cwd: consumer,
-            env: { ...process.env, WORKSPACE_ROOT: consumer, VBR_NIX_CACHE_POLICY: "off" },
+            env: { ...process.env, WORKSPACE_ROOT: consumer },
             stdio: "pipe",
-          })`nix run --accept-flake-config path:${workspaceFlake}#viberoots -- init-workspace`;
+          })`nix run --option eval-cache false --accept-flake-config path:${workspaceFlake}#viberoots -- init-workspace`;
         }
         const sourcePath = await fs.realpath(path.join(consumer, ".viberoots", "current"));
         const lifecycleEnv = (extra: NodeJS.ProcessEnv = {}) => {
           const env = commandEnv(consumer, extra);
           delete env.VERIFY_SKIP_LINT;
-          env.VBR_NIX_CACHE_POLICY = "auto";
           return env;
         };
         await $({ cwd: consumer, env: lifecycleEnv() })`scaf new rust cli rust_demo --yes`;
@@ -71,7 +70,7 @@ test(
         await $({
           cwd: consumer,
           env: lifecycleEnv(),
-        })`v //projects/apps/rust_demo:rust_demo-test`;
+        })`v --seed-mode=never //projects/apps/rust_demo:rust_demo-test`;
         const run = await $({
           cwd: consumer,
           env: lifecycleEnv(),

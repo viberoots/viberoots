@@ -23,6 +23,12 @@ import {
 export type ActiveReviewedRemoteNix = {
   builderAuthority: ArtifactReproducibilityEvidence["builderAuthority"];
   runNix(args: string[]): Promise<{ stdout: string; stderr: string }>;
+  runWithRemoteStore(opts: {
+    command: string;
+    args: string[];
+    cwd: string;
+    timeoutMs: number;
+  }): Promise<{ stdout: string; stderr: string }>;
   copyToEvidenceStore(opts: {
     storeUri: string;
     storePaths: string[];
@@ -141,9 +147,29 @@ export async function withActiveReviewedRemoteNix<T>(
         args: remoteNixCommandArgs(args),
         cwd: process.cwd(),
         env: childEnv,
+        timeoutMs: 2_700_000,
       });
       if (result.exitCode !== 0 || result.timedOut || result.interrupted) {
         throw new Error("active reviewed remote Nix command failed");
+      }
+      return { stdout: result.stdout, stderr: result.stderr };
+    },
+    runWithRemoteStore: async ({ command, args, cwd, timeoutMs }) => {
+      if (
+        !path.isAbsolute(command) ||
+        !path.resolve(command).startsWith(`${opts.remoteCiTools}/`)
+      ) {
+        throw new Error("reviewed remote-store command must use the immutable remote tool closure");
+      }
+      const result = await runBoundedArtifactCommand({
+        command,
+        args,
+        cwd,
+        env: childEnv,
+        timeoutMs,
+      });
+      if (result.exitCode !== 0 || result.timedOut || result.interrupted) {
+        throw new Error("reviewed remote-store proof command failed");
       }
       return { stdout: result.stdout, stderr: result.stderr };
     },

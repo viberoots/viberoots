@@ -101,6 +101,9 @@
         "viberoots/build-tools/tools/nix/templates/rust-quality.nix",
         "viberoots/build-tools/tools/nix/templates/rust-dependency-inventory.nix",
         "viberoots/build-tools/tools/nix/templates/rust-evidence-install.nix",
+        "viberoots/build-tools/tools/ci/admit-tauri-release.ts",
+        "viberoots/build-tools/tools/ci/tauri-release-admission.ts",
+        "viberoots/build-tools/tools/ci/tauri-release-evidence-reader.ts",
         "viberoots/build-tools/tools/nix/flake/packages/toolchains.nix",
         "viberoots/build-tools/tools/dev/rust-dev-watch.ts",
         "viberoots/build-tools/tools/dev/tauri-dev.ts",
@@ -114,6 +117,7 @@
         "viberoots/build-tools/tools/scaffolding/templates/rust/python-extension/TARGETS.jinja",
         "viberoots/build-tools/tools/scaffolding/templates/rust/node-addon/TARGETS.jinja",
         "viberoots/build-tools/tools/scaffolding/templates/rust/cxx-bridge/TARGETS.jinja",
+        "viberoots/build-tools/tools/scaffolding/templates/rust/cross-root/libs/{{ name }}-app/TARGETS.jinja",
         "viberoots/build-tools/tools/scaffolding/templates/rust/wasm/TARGETS.jinja",
         "viberoots/build-tools/tools/scaffolding/templates/rust/tauri-app/TARGETS.jinja"
       ],
@@ -127,10 +131,29 @@
         "immutableBundleInputs": true,
         "storeQualifiedToolchain": true,
         "selectorTransport": true,
-        "sandboxNetwork": false,
-        "remoteExecution": true,
+        "sandboxNetwork": true,
+        "remoteExecution": false,
         "publicationAdmission": false,
-        "reproducibilityMatrixIds": ["rust-pr5"]
+        "reproducibilityMatrixIds": [
+          "rust-pr5",
+          "rust-test-pr12",
+          "rust-lib-pr12",
+          "rust-static-library-pr12",
+          "rust-cdylib-pr12",
+          "rust-proc-macro-pr12",
+          "rust-python-extension-pr12",
+          "rust-node-addon-pr12",
+          "rust-c-ffi-pr12",
+          "rust-cxx-bridge-pr12",
+          "rust-wasm-pr12",
+          "rust-wasm-static-pr12",
+          "rust-wasi-static-pr12",
+          "rust-wasm-browser-pr12",
+          "rust-wasm-component-pr12",
+          "rust-wasi-pr12",
+          "rust-cross-root-pr12",
+          "rust-tauri-darwin-pr12"
+        ]
       }
     }
   ]

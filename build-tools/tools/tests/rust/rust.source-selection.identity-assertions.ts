@@ -9,6 +9,14 @@ export const expectedPlan = (planTarget: string) => ({
   nixpkg_pins: { "pkgs.zlib": { nixpkgs_profile: "default" } },
 });
 
+export function graphNodes(graph: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(graph)) return graph as Array<Record<string, unknown>>;
+  if (graph && typeof graph === "object" && Array.isArray((graph as { nodes?: unknown }).nodes)) {
+    return (graph as { nodes: Array<Record<string, unknown>> }).nodes;
+  }
+  throw new Error("exported graph must be an array or a versioned object with nodes");
+}
+
 export function rustIdentity(node: Record<string, unknown>) {
   return {
     cargo_manifest: node.cargo_manifest,

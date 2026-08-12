@@ -93,7 +93,7 @@ export async function startVerifyPass(opts: {
       try {
         status = await spawned.wait();
       } finally {
-        rails.stop();
+        await rails.stop();
         opts.onPgidDone?.(spawned.pgid);
         await killBuckIsolation(opts.root, spawned.nestedIso).catch(() => {});
         opts.onNestedIsoDone?.(spawned.nestedIso);
@@ -110,7 +110,7 @@ export async function startVerifyPass(opts: {
             value == null ? "?" : Number.isInteger(value) ? String(value) : value.toFixed(2);
           await appendVerifyPassLog(
             opts.logFile,
-            `[verify] resource summary pass=${opts.pass.name} samples=${summary.samples} max_load1=${fmt(summary.maxLoad1)} max_load5=${fmt(summary.maxLoad5)} max_processes=${fmt(summary.maxProcessCount)} max_node=${fmt(summary.maxNodeCount)} max_buck=${fmt(summary.maxBuckCount)} max_nix=${fmt(summary.maxNixCount)} max_verify_env=${fmt(summary.maxVerifyEnvCount)} high_load_top_process_samples=${summary.highLoadTopProcessSamples}`,
+            `[verify] resource summary pass=${opts.pass.name} samples=${summary.samples} max_load1=${fmt(summary.maxLoad1)} max_load5=${fmt(summary.maxLoad5)} max_processes=${fmt(summary.maxProcessCount)} max_node=${fmt(summary.maxNodeCount)} max_buck=${fmt(summary.maxBuckCount)} max_nix=${fmt(summary.maxNixCount)} max_verify_env=${fmt(summary.maxVerifyEnvCount)} high_load_top_process_attempts=${summary.highLoadTopProcessAttempts} high_load_top_process_successes=${summary.highLoadTopProcessSuccesses} high_load_top_process_unavailable=${summary.highLoadTopProcessUnavailable} high_load_top_process_timeouts=${summary.highLoadTopProcessTimeouts} high_load_top_process_errors=${summary.highLoadTopProcessErrors} high_load_top_process_samples=${summary.highLoadTopProcessSamples} disk_io_successes=${summary.diskIoSuccesses} disk_io_unavailable=${summary.diskIoUnavailable} disk_io_parse_errors=${summary.diskIoParseErrors} disk_io_exits=${summary.diskIoExits} disk_io_timeouts=${summary.diskIoTimeouts} max_disk_mbps=${fmt(summary.maxDiskMbps)} max_disk_tps=${fmt(summary.maxDiskTps)}`,
           );
           for (const line of summary.highLoadTopProcessLines) {
             await appendVerifyPassLog(

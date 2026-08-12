@@ -316,6 +316,29 @@ prepare_codex_account_invocation() {
   esac
 }
 
+ensure_repo_skills_for_account() {
+  local codex_home="${1:-}"
+  local marketplace_manifest="${VIBEROOTS_SOURCE_ROOT}/.agents/plugins/marketplace.json"
+  local config
+  [[ -n "$codex_home" && -f "$marketplace_manifest" ]] || return 0
+  config="${codex_home}/config.toml"
+  mkdir -p -- "$codex_home"
+
+  if ! grep -Fq '[marketplaces.repo-plugins]' "$config" 2>/dev/null; then
+    if ! CODEX_HOME="$codex_home" "$real_codex" plugin marketplace add "$VIBEROOTS_SOURCE_ROOT" --json >/dev/null; then
+      echo "error: failed to register the repo-plugins marketplace for account home ${codex_home}" >&2
+      return 1
+    fi
+  fi
+  if ! grep -Fq '[plugins."repo-skills@repo-plugins"]' "$config" 2>/dev/null || \
+    [[ ! -d "${codex_home}/plugins/cache/repo-plugins/repo-skills" ]]; then
+    if ! CODEX_HOME="$codex_home" "$real_codex" plugin add repo-skills@repo-plugins --json >/dev/null; then
+      echo "error: failed to install repo-skills for account home ${codex_home}" >&2
+      return 1
+    fi
+  fi
+}
+
 codex_args_request_sandbox() {
   local token
   while [[ "$#" -gt 0 ]]; do
@@ -836,6 +859,7 @@ run_codex_in_safehouse() {
 
 root="$(git_root || pwd -P)"
 prepare_codex_account_invocation "$@"
+ensure_repo_skills_for_account "$RESOLVED_CODEX_HOME"
 parse_codex_worktree_args "${ACCOUNT_ARGS[@]+"${ACCOUNT_ARGS[@]}"}"
 
 operation_count=0

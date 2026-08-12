@@ -4,7 +4,7 @@ load("@viberoots//build-tools/rust:defs.bzl", "tauri_app")
 
 node_webapp(
     name = "frontend_raw",
-    labels = ["lang:node", "kind:app", "framework:vite"],
+    labels = ["lang:node", "kind:app", "framework:vite", "patch_scope:importer-local"],
     lockfile_label = "lockfile:projects/apps/tauri-composition-app/pnpm-lock.yaml#projects/apps/tauri-composition-app",
     ts_module_roots = ["."],
 )
@@ -13,6 +13,7 @@ node_asset_stage(
     name = "frontend",
     app = ":frontend_raw",
     assets = [
+        {"src": "//projects/libs/tauri-composition-providers/rust-wasm:rust_module", "dest": "frontend.wasm"},
         {"src": "//projects/libs/tauri-composition-providers/rust-wasm:rust_module", "dest": "wasm/rust.wasm"},
         {"src": "//projects/libs/tauri-composition-providers/cpp-wasm:module", "dest": "wasm/cpp.wasm", "artifact_glob": "*.wasm"},
         {"src": "//projects/libs/tauri-composition-providers/go-wasm:go_module", "dest": "wasm/go.wasm"},

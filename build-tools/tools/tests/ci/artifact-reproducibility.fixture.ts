@@ -16,10 +16,12 @@ const hash = (character: string) => `sha256:${character.repeat(64)}`;
 export function artifactReproducibilityEvidenceFixture(
   overrides: Partial<ArtifactReproducibilityEvidence> = {},
 ): ArtifactReproducibilityEvidence {
+  const outputPath = overrides.outputPath || `/nix/store/${"b".repeat(32)}-artifact`;
   return {
-    schema: "viberoots.artifact-reproducibility-evidence.v4",
+    schema: "viberoots.artifact-reproducibility-evidence.v6",
     classification: "hermetic",
     sourceRevision: "a".repeat(40),
+    toolSourceRevision: "e".repeat(40),
     immutableSourceDigest: hash("1"),
     evaluationBundleAuthority: {
       sourceRoot: `/nix/store/${"e".repeat(32)}-evaluation-bundle/source`,
@@ -33,9 +35,13 @@ export function artifactReproducibilityEvidenceFixture(
     toolClosureRoot: `/nix/store/${"f".repeat(32)}-remote-ci-tools`,
     system: "x86_64-linux",
     derivationPath: `/nix/store/${"a".repeat(32)}-artifact.drv`,
-    outputPath: `/nix/store/${"b".repeat(32)}-artifact`,
+    outputPath,
+    provenanceOutputPath: overrides.provenanceOutputPath || outputPath,
     narHash: hash("6"),
+    provenanceNarHash: hash("6"),
     closureIdentityDigest: hash("a"),
+    provenanceClosureIdentityDigest: hash("a"),
+    semanticManifest: { kind: "not-applicable" },
     subjectAuthority: {
       kind: "matrix",
       matrixDigest: ARTIFACT_REPRODUCIBILITY_MATRIX_DIGEST,
@@ -152,7 +158,11 @@ export const graduatedLanguageManifestFixture = {
 };
 
 function language(id: string, kinds: string[], reproducibilityMatrixIds: string[]) {
-  return { id, kinds, hermetic: { status: "graduated", reproducibilityMatrixIds } };
+  return {
+    id,
+    kinds,
+    hermetic: { status: "graduated", publicationAdmission: true, reproducibilityMatrixIds },
+  };
 }
 
 function observationStorePathForObservation(

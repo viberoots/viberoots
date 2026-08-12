@@ -4,13 +4,13 @@ load("@viberoots//build-tools/rust:defs.bzl", "tauri_app")
 filegroup(
     name = "frontend",
     srcs = ["index.html"],
-    labels = ["lang:node", "kind:app", "webapp:static"],
+    labels = ["lang:node", "kind:app", "patch_scope:importer-local", "webapp:static"],
 )
 
 filegroup(
     name = "sidecar",
     srcs = ["help.txt"],
-    labels = ["kind:bin", "sidecar:reviewed"],
+    labels = ["sidecar:reviewed"],
 )
 
 tauri_app(

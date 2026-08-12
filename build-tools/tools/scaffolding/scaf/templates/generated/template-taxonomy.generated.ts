@@ -23,6 +23,7 @@ export const TEMPLATE_TAXONOMY = {
   python: ["app", "lib", "wasm-app", "wasm-lib"],
   rust: [
     "cli",
+    "cross-root",
     "cxx-bridge",
     "lib",
     "node-addon",

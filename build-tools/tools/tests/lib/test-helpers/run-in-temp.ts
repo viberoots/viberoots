@@ -10,7 +10,10 @@ import { resolveTestHome } from "./run-in-temp/test-roots";
 import "./worker-init";
 
 export { workspaceFlakeRef } from "./run-in-temp/filtered-inputs";
-export { reconcileTempDependencyInputs } from "./run-in-temp/dependency-reconcile";
+export {
+  reconcileTempDependencyInputs,
+  retargetTempCommandToolSource,
+} from "./run-in-temp/dependency-reconcile";
 
 async function allocateTemp(name: string): Promise<TempAllocation> {
   const realHome = String(process.env.HOME || os.homedir() || "").trim();

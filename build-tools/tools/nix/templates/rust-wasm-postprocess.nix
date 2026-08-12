@@ -6,7 +6,9 @@
   lib,
   kind,
   crate,
+  publicCrate,
   wasm,
+  behaviorProbe ? false,
 }:
 let
   Tools = import ./rust-wasm-tools.nix {
@@ -14,7 +16,9 @@ let
   };
   wasmTools = "${Tools.wasmTools}/bin/wasm-tools";
   wasmBindgen = "${Tools.wasmBindgen}/bin/wasm-bindgen";
-  Controls = import ./rust-wasm-controls.nix { inherit pkgs lib Tools kind wasm; };
+  Controls = import ./rust-wasm-controls.nix {
+    inherit pkgs lib Tools kind wasm behaviorProbe;
+  };
   wasmOpt = "${Tools.wasmOpt}/bin/wasm-opt";
   wasmtime = "${Tools.wasmtime}/bin/wasmtime";
   adapter = wasm.adapter or "none";
@@ -89,8 +93,8 @@ let
     ${Controls.enforceWitExports "$out/lib/${crate}.component.wit" true}
   '';
   metadata = ''
-    mkdir -p "$out/share/viberoots-rust"
-    cat > "$out/share/viberoots-rust/wasm-manifest.json" <<'JSON'
+    mkdir -p "$provenance/share/viberoots-rust"
+    cat > "$provenance/share/viberoots-rust/wasm-manifest.json" <<'JSON'
     ${builtins.toJSON {
       schemaVersion = "viberoots.rust-wasm.v1";
       inherit (wasm) abi target linkKind allocator exceptionPolicy runtime
@@ -131,6 +135,23 @@ let
   ) ''
     ${Controls.processCore core}
   '';
+  staticRuntimeReferenceScrub = lib.optionalString (
+    builtins.elem kind [ "wasm_static" "wasi_static" ]
+  ) ''
+    ${pkgs.python3}/bin/python - "$out/lib/lib${publicCrate}.a" ${rustToolchain} <<'PY'
+    import pathlib
+    import sys
+
+    archive = pathlib.Path(sys.argv[1])
+    store_hash = pathlib.Path(sys.argv[2]).name.split("-", 1)[0].encode()
+    if len(store_hash) != 32:
+        raise SystemExit("Rust toolchain path lacks an exact Nix store hash")
+    data = archive.read_bytes()
+    archive.write_bytes(data.replace(store_hash, b"e" * len(store_hash)))
+    if store_hash in archive.read_bytes():
+        raise SystemExit("Rust WASM static archive retained its toolchain store reference")
+    PY
+  '';
 in {
   buildInputs = lib.optionals (wasm != {}) [
     Tools.wasmBindgen
@@ -140,10 +161,10 @@ in {
   ] ++ lib.optionals (adapter == "wasi-preview1-reactor") [ Tools.adapters.reactor ]
     ++ lib.optionals (adapter == "wasi-preview1-command") [ Tools.adapters.command ]
     ++ lib.optionals (kind == "wasm_browser") [ Tools.browserEngine ];
-  install = corePostprocess
+  runtimeInstall = corePostprocess + staticRuntimeReferenceScrub
     + lib.optionalString (kind == "wasm_browser") browser
-    + lib.optionalString (kind == "wasm_component") component
-    + lib.optionalString (wasm != {}) metadata;
+    + lib.optionalString (kind == "wasm_component") component;
+  evidenceInstall = lib.optionalString (wasm != {}) metadata;
   passthru = {
     inherit adapterPath;
     toolIdentities = if wasm == {} then {} else {

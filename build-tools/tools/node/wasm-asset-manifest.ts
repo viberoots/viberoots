@@ -22,15 +22,15 @@ export function appendWasmAssetManifestEntry(
   destination: string,
   blob: string,
   manifest: string,
+  provenance?: string,
 ): void {
   const bytes = fs.readFileSync(blob);
   const sha256 = `sha256-${crypto.createHash("sha256").update(bytes).digest("hex")}`;
-  const resolvedReal = fs.realpathSync(resolved);
-  const producer = producerLineage(resolvedReal) || embeddedProducerLineage(blob);
+  const producer = producerLineage(resolved, provenance) || embeddedProducerLineage(blob);
   const value = JSON.parse(fs.readFileSync(manifest, "utf8"));
   value.assets.push({
     declaredSource: declared,
-    resolvedSource: portableWasmAssetSourceIdentity(declared, resolvedReal, sha256),
+    resolvedSource: portableWasmAssetSourceIdentity(declared, resolved, sha256),
     destination,
     sha256,
     ...(producer ? { producer } : {}),
@@ -38,13 +38,17 @@ export function appendWasmAssetManifestEntry(
   fs.writeFileSync(manifest, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-export function producerLineage(resolved: string): {
+export function producerLineage(
+  resolved: string,
+  provenance?: string,
+): {
   storePath: string;
   outputIdentity: string;
   sourceRevision: string;
   compositionDigest?: string;
 } | null {
-  let cursor = fs.statSync(resolved).isDirectory() ? resolved : path.dirname(resolved);
+  let cursor =
+    provenance || (fs.statSync(resolved).isDirectory() ? resolved : path.dirname(resolved));
   for (let depth = 0; depth < 6; depth += 1) {
     const candidate = path.join(cursor, "share/viberoots-rust/materialization-manifest.json");
     if (fs.existsSync(candidate)) {
@@ -95,12 +99,12 @@ if (
   const args = process.argv.slice(2);
   if (args[0] === "--lineage") {
     if (!args[1]) throw new Error("--lineage requires a resolved producer path");
-    process.stdout.write(`${JSON.stringify(producerLineage(fs.realpathSync(args[1])))}\n`);
+    process.stdout.write(`${JSON.stringify(producerLineage(args[1], args[2]))}\n`);
     process.exit(0);
   }
-  const [declared, resolved, destination, blob, manifest] = args;
+  const [declared, resolved, destination, blob, manifest, provenance] = args;
   if (!declared || !resolved || !destination || !blob || !manifest) {
     throw new Error("wasm asset manifest requires declared, resolved, destination, blob, manifest");
   }
-  appendWasmAssetManifestEntry(declared, resolved, destination, blob, manifest);
+  appendWasmAssetManifestEntry(declared, resolved, destination, blob, manifest, provenance);
 }

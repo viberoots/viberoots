@@ -40,7 +40,7 @@ static mut MODULE: PyModuleDef = PyModuleDef {
         m_index: 0,
         m_copy: core::ptr::null_mut(),
     },
-    m_name: c"{{ name }}".as_ptr(),
+    m_name: c"{{ name | replace("-", "_") }}".as_ptr(),
     m_doc: c"viberoots Rust extension".as_ptr(),
     m_size: -1,
     m_methods: core::ptr::null_mut(),
@@ -52,6 +52,6 @@ static mut MODULE: PyModuleDef = PyModuleDef {
 
 #[allow(non_snake_case)]
 #[no_mangle]
-pub unsafe extern "C" fn PyInit_{{ name }}() -> *mut PyObject {
+pub unsafe extern "C" fn PyInit_{{ name | replace("-", "_") }}() -> *mut PyObject {
     PyModule_Create2(&raw mut MODULE, 1013)
 }

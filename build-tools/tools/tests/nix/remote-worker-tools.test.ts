@@ -1,55 +1,39 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
+import { runInTemp } from "../lib/test-helpers";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
+import {
+  buildNixAttr,
+  execFileResult,
+  expectBin,
+  REMOTE_WORKER_TEST_RSYNC_ROOTS,
+} from "./remote-worker-tools.fixture";
 
-process.env.TEST_RSYNC_ROOTS =
-  process.env.TEST_RSYNC_ROOTS ||
-  "viberoots/build-tools/tools/nix viberoots/build-tools/tools/lib viberoots/build-tools/tools/remote-exec";
+process.env.TEST_RSYNC_ROOTS = process.env.TEST_RSYNC_ROOTS || REMOTE_WORKER_TEST_RSYNC_ROOTS;
 
-async function build(root: string, $: any, attr: string): Promise<string> {
-  const flakeRoot = await workspaceFlakeRef(root);
-  const res = await $({
-    cwd: root,
-    stdio: "pipe",
-  })`nix build ${`path:${flakeRoot}#${attr}`} --impure --no-link --print-out-paths --accept-flake-config`;
-  const out = String(res.stdout || "")
-    .trim()
-    .split("\n")
-    .filter(Boolean)
-    .pop();
-  if (!out) throw new Error(`missing output path for ${attr}`);
-  return out;
-}
-
-async function expectBin(root: string, bin: string): Promise<void> {
-  await fs.access(path.join(root, "bin", bin));
-}
-
-async function execFileResult(
-  file: string,
-  args: string[],
-  opts: { cwd: string; env: NodeJS.ProcessEnv },
-): Promise<{ code: number; stdout: string; stderr: string }> {
-  return await new Promise((resolve) => {
-    execFile(file, args, opts, (error, stdout, stderr) => {
-      const code =
-        error && typeof (error as NodeJS.ErrnoException & { code?: unknown }).code === "number"
-          ? ((error as NodeJS.ErrnoException & { code: number }).code as number)
-          : 0;
-      resolve({ code, stdout: String(stdout || ""), stderr: String(stderr || "") });
-    });
-  });
-}
+test("runtime source invalidation retains only runtime-owned support from the test tree", async () => {
+  const filter = await fs.readFile(
+    viberootsSourcePath(
+      "viberoots/build-tools/tools/nix/flake/packages/filter-viberoots-runtime.nix",
+    ),
+    "utf8",
+  );
+  assert.match(filter, /runtimeTestSupport/);
+  assert.match(filter, /runtimeTestSupportDirs/);
+  assert.match(filter, /canonical-artifact-reviewed-config-handoff\.fixture\.ts/);
+  assert.match(filter, /template_taxonomy_adapter\.bzl/);
+  assert.match(filter, /builtins\.elem relative runtimeTestSupportDirs/);
+  assert.match(filter, /builtins\.elem relative runtimeTestSupport/);
+  assert.doesNotMatch(filter, /docs|projects|templates/);
+});
 
 test("remote worker and CI tool closures expose declared tools only from Nix store", async () => {
   await runInTemp("remote-worker-tools", async (tmp, $) => {
-    const worker = await build(tmp, $, "remote-worker-tools");
-    const ci = await build(tmp, $, "remote-ci-tools");
+    const worker = await buildNixAttr(tmp, $, "remote-worker-tools");
+    const ci = await buildNixAttr(tmp, $, "remote-ci-tools");
 
     for (const bin of [
       "bash",
@@ -70,6 +54,31 @@ test("remote worker and CI tool closures expose declared tools only from Nix sto
 
     assert.ok(worker.startsWith("/nix/store/"));
     assert.ok(ci.startsWith("/nix/store/"));
+    const workerSource = await fs.realpath(path.join(worker, "share/viberoots-source"));
+    const ciSource = await fs.realpath(path.join(ci, "share/viberoots-source"));
+    assert.match(workerSource, /-source$/);
+    assert.match(ciSource, /-source$/);
+    // The temp repo can already be scoped to the runtime source shape, so the
+    // worker and CI source roots may realize to the same store path. The
+    // behavioral contract is the exposed source content and CI-only identity.
+    await fs.access(path.join(workerSource, "build-tools/tools/remote-exec"));
+    const workerTests = path.join(workerSource, "build-tools/tools/tests");
+    assert.deepEqual(await fs.readdir(workerTests), [
+      "defs.bzl",
+      "dev",
+      "template_taxonomy_adapter.bzl",
+    ]);
+    await fs.access(
+      path.join(workerTests, "dev", "canonical-artifact-reviewed-config-handoff.fixture.ts"),
+    );
+    await assert.rejects(
+      fs.access(path.join(worker, "share/viberoots/source-identity.json")),
+      /ENOENT/,
+    );
+    assert.match(
+      await fs.readFile(path.join(ci, "share/viberoots/source-identity.json"), "utf8"),
+      /viberoots\.remote-ci-tools-source-identity\.v2/,
+    );
     const restrictedEnv = {
       HOME: tmp,
       PATH: path.join(worker, "bin"),
@@ -98,7 +107,7 @@ test("remote worker and CI tool closures expose declared tools only from Nix sto
 
 test("remote worker bootstrap uses closure PATH and avoids scheduler registration", async () => {
   await runInTemp("remote-worker-bootstrap", async (tmp, $) => {
-    const bootstrap = await build(tmp, $, "remote-worker-bootstrap");
+    const bootstrap = await buildNixAttr(tmp, $, "remote-worker-bootstrap");
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
@@ -166,7 +175,7 @@ test("remote worker bootstrap rejects non-store tools before PATH construction",
 
 test("remote CI helper smoke flow runs with PATH restricted to remote-ci-tools", async () => {
   await runInTemp("remote-ci-tools-path", async (tmp, $) => {
-    const ci = await build(tmp, $, "remote-ci-tools");
+    const ci = await buildNixAttr(tmp, $, "remote-ci-tools");
     const bash = path.join(ci, "bin", "bash");
     const res = await execFileResult(
       bash,

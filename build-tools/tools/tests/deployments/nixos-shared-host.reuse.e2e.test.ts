@@ -112,10 +112,14 @@ test("nixos-shared-host publish-only reuse flows", async (t) => {
             rejectUnauthorized: false,
           },
         });
-        const finished = await waitFor(async () => {
-          const current = await readStatus(harness.controlPlane.url, submitted.submissionId);
-          return current.lifecycleState === "finished" ? current : null;
-        }, "timed out waiting for failed reuse seed run");
+        const finished = await waitFor(
+          async () => {
+            const current = await readStatus(harness.controlPlane.url, submitted.submissionId);
+            return current.lifecycleState === "finished" ? current : null;
+          },
+          "timed out waiting for failed reuse seed run",
+          60_000,
+        );
         assert.equal(finished.finalOutcome, "smoke_failed_after_publish");
         const failedRecord = await readRecord(harness.controlPlane.url, finished.deployRunId);
         assert.equal(failedRecord.finalOutcome, "smoke_failed_after_publish");

@@ -5,7 +5,7 @@ load("@viberoots//build-tools/node:defs_vercel.bzl", _node_vercel_next_artifact 
 load("@viberoots//build-tools/lang:collections.bzl", "dedupe_preserve")
 load("@viberoots//build-tools/lang:label_stamping.bzl", "normalize_labels")
 load("@viberoots//build-tools/lang:module_surface.bzl", "module_surface")
-load("@viberoots//build-tools/node/private:asset_contract.bzl", "asset_metadata", "module_surface_labels")
+load("@viberoots//build-tools/node/private:asset_contract.bzl", "app_metadata", "asset_metadata", "module_surface_labels")
 load(
     "@viberoots//build-tools/node:defs_stage.bzl",
     _node_asset_stage = "node_asset_stage",
@@ -155,12 +155,12 @@ def node_asset_stage(
     kw = dict(kwargs)
     labels = kw.get("labels", []) or []
     kw["labels"] = dedupe_preserve(
-        labels + asset_metadata(native.package_name(), assets),
+        labels + [app_metadata(native.package_name(), app)] + asset_metadata(native.package_name(), assets),
     )
     inferred_surface_deps = module_surface_labels(native.package_name(), module_deps)
     explicit_surface_deps = normalize_labels(native.package_name(), module_surface_deps)
     merged_surface_deps = dedupe_preserve(inferred_surface_deps + explicit_surface_deps)
-    merged_deps = dedupe_preserve((deps or []) + merged_surface_deps)
+    merged_deps = dedupe_preserve((deps or []) + [app] + merged_surface_deps)
     _node_asset_stage(
         name = name,
         app = app,

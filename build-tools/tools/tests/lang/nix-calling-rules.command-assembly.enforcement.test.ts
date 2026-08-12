@@ -171,6 +171,21 @@ test("workspace setup establishes canonical tools before direct action path disc
     setup.indexOf("nix_artifact_tool_authority_shell()") < setup.indexOf('git -C \\"$FLK_DIR\\"'),
     "workspace setup must establish canonical PATH before git",
   );
+  assert.match(setup, /VBR_ACTION_TOOL_SOURCE_ROOT/);
+  assert.ok(
+    setup.indexOf('export VIBEROOTS_ROOT=\\"$VBR_ACTION_TOOL_SOURCE_ROOT\\"') >
+      setup.indexOf('. \\"$WORKSPACE_ENV\\"'),
+    "workspace metadata must not replace canonical action tool-source authority",
+  );
+  const selectedBuild =
+    runner.match(/def nix_action_build_selected_out_path_cmd\([\s\S]*?(?=\n\ndef )/)?.[0] || "";
+  assert.ok(
+    selectedBuild.indexOf('export VIBEROOTS_ROOT=\\"$VBR_ACTION_TOOL_SOURCE_ROOT\\"') <
+      selectedBuild.indexOf(
+        'VBR_NODE_ZX_INIT=\\"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\\"',
+      ),
+    "selected builds must reassert canonical action tool-source authority at execution",
+  );
   for (const file of [
     "viberoots/build-tools/cpp/private/nix_build.bzl",
     "viberoots/build-tools/go/private/nix_build_carchive.bzl",

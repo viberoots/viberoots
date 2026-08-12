@@ -75,6 +75,7 @@ in
   isRootDir "result" ||
   isRootDir ".direnv" ||
   isRootDir ".git" ||
+  isRootDir ".viberoots" ||
   isRootFile ".envrc" ||
   isRootFile ".full-test-output.log" ||
   isRootFile ".patch-sessions.json" ||

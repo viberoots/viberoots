@@ -119,7 +119,7 @@ test("shared language discovery admits enablement-ready experimental contracts",
         {
           id: "rust",
           requiredPaths: [requiredPath],
-          hermetic: { ...contract, remoteExecution: false },
+          hermetic: { ...contract, selectorTransport: false },
         },
       ],
     });

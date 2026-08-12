@@ -11,6 +11,7 @@ import {
 import {
   defaultFilteredFlakeSnapshotRsyncSources,
   filteredFlakeRsyncExcludeArgs,
+  relPathsForImmutableViberootsInput,
 } from "./nix-build-filtered-flake-lib";
 import { emitTimingDetail } from "../lib/timing-detail";
 import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../lib/macos-metadata";
@@ -40,6 +41,7 @@ export async function makeFilteredFlakeRef(opts: {
   logPrefix: string;
   graphPath?: string;
   target?: string;
+  packageScope?: string;
   classification?: ArtifactBuildClassification;
   platform?: string;
   env: NodeJS.ProcessEnv;
@@ -87,9 +89,16 @@ export async function makeFilteredFlakeRef(opts: {
       src,
       opts.target || "",
       opts.graphPath,
+      opts.packageScope,
     );
     const snapshotSources = defaultFilteredFlakeSnapshotRsyncSources(
-      await existingRelPaths(src, snapshotSelection.relPaths),
+      await existingRelPaths(
+        src,
+        relPathsForImmutableViberootsInput(
+          snapshotSelection.relPaths,
+          String(opts.immutableViberootsInputRoot || ""),
+        ),
+      ),
     );
     await runCommand({
       command: ensureNixStoreToolPathSync("rsync", artifactEnv),
@@ -112,12 +121,15 @@ export async function makeFilteredFlakeRef(opts: {
       }
     }
     await copyWorkspaceGraphIntoSnapshot(src, snapDirReal, opts.graphPath);
+    const elapsedMs = Date.now() - snapshotStart;
+    console.warn(
+      `${opts.logPrefix} filtered source snapshot ready in ${formatTimingDuration(elapsedMs)}`,
+    );
     if (filteredFlakeDiagnosticsEnabled()) {
       const stats = await readSnapshotStats(snapDirReal, artifactEnv);
-      const elapsedMs = Date.now() - snapshotStart;
       emitTimingDetail("filteredFlake snapshotRsync", elapsedMs);
       console.warn(
-        `${opts.logPrefix} snapshot ready in ${formatTimingDuration(elapsedMs)} files=${stats.fileCount} dirs=${stats.dirCount} kb=${stats.kb}`,
+        `${opts.logPrefix} filtered source snapshot stats files=${stats.fileCount} dirs=${stats.dirCount} kb=${stats.kb}`,
       );
     }
     const hiddenFlake = path.join(snapDirReal, ".viberoots", "workspace", "flake.nix");

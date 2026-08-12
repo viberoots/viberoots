@@ -1,6 +1,11 @@
 {
   "language": "rust",
   "template": "cxx-bridge",
-  "description": "Experimental Rust C++ bridge",
-  "resolverDestination": "projects/libs/{name}"
+  "description": "Experimental Rust C FFI and C++ bridge",
+  "resolverDestination": "projects/libs/{name}",
+  "help": {
+    "usage": "scaf new rust cxx-bridge <name> [--path=DEST]",
+    "notes": ["Creates Rust libraries with explicit public C FFI and C++ bridge contracts."],
+    "examples": ["scaf new rust cxx-bridge demo --yes"]
+  }
 }

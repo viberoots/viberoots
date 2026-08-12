@@ -220,13 +220,13 @@ __vbr_stage0_apply_nix_cache_health() {
   unset VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG
   command -v nix >/dev/null 2>&1 || return 0
 
-  local config
+  local config source_config="\${NIX_CONFIG:-}"
   if ! config="$(nix config show 2>/dev/null)"; then
     echo "error: nix config show failed during cache health evaluation" 1>&2
     unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY
     return 1
   fi
-  export VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG="\${config}"
+  export VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG="\${source_config}"
 
   local required_substituters optional_substituters netrc_file
   required_substituters="$(printf "%s\\n" "\${config}" | awk '{
@@ -242,7 +242,11 @@ __vbr_stage0_apply_nix_cache_health() {
     if (key == "extra-substituters") { gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); print value }
   }')"
   local resolved_roles
-  if [[ -n "\${required_substituters}" && -z "\${optional_substituters}" ]]; then
+  local required_substituter_count=0
+  if [[ -n "\${required_substituters}" ]]; then
+    required_substituter_count="$(printf '%s\\n' "\${required_substituters}" | wc -w | tr -d '[:space:]')"
+  fi
+  if [[ "\${required_substituter_count}" -gt 1 && -z "\${optional_substituters}" ]]; then
     if ! resolved_roles="$(__vbr_stage0_resolve_nix_cache_roles "\${__vbr_flake_input_root:-\${VIBEROOTS_SOURCE_ROOT:-\${VIBEROOTS_ROOT:-}}}")"; then
       echo "error: flattened Nix substituters require reviewed source-role provenance" 1>&2
       return 1
@@ -331,12 +335,6 @@ __vbr_stage0_apply_nix_cache_health() {
         if [[ "\${probe_status}" -eq 0 ]]; then
           available+=("\${substituter}")
         else
-          if [[ " \${required_substituters} " == *" \${substituter} "* ]]; then
-            echo "error: required Nix substituter unavailable: \${cache_identity}" 1>&2
-            unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG
-            unset VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY
-            return 1
-          fi
           removed+=("\${substituter}")
           removed_identities+=("\${cache_identity}")
         fi

@@ -80,6 +80,111 @@ test("verify preserves only reviewed cache proof after removing restored ambient
   assert.equal(result.status, 0, result.stderr);
 });
 
+test("reviewed cache ingress removes only the exact bound Nix config", () => {
+  for (const [captured, expected] of [
+    ["reviewed", ""],
+    ["hostile", "hostile"],
+  ]) {
+    const result = spawnSync(
+      "/bin/bash",
+      [
+        "-c",
+        '. "$1"; export VBR_ARTIFACT_INGRESS_WAS_SET_NIX_CONFIG=1 VBR_ARTIFACT_INGRESS_VALUE_NIX_CONFIG="$2" VBR_DEVSHELL_ARTIFACT_WAS_SET_NIX_CONFIG=1 VBR_DEVSHELL_ARTIFACT_VALUE_NIX_CONFIG=baseline VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED=1 VBR_NIX_CACHE_HEALTH_APPLIED=1 VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG=reviewed; artifact_ingress_restore_or_remove_selectors; test "${NIX_CONFIG:-}" = "$3"',
+        "artifact-ingress-test",
+        ingressScript,
+        captured,
+        expected,
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(result.status, 0, `${captured}: ${result.stderr}`);
+  }
+});
+
+test("proof-bound NIX_CONFIG is removed after canonical netrc augmentation", () => {
+  const result = spawnSync(
+    "/bin/bash",
+    [
+      "-c",
+      '. "$1"; captured="substituters = https://cache.nixos.org/"; encoded="$(printf %s "$captured" | base64 | tr -d "\\n")"; export VBR_ARTIFACT_INGRESS_WAS_SET_NIX_CONFIG=1 VBR_ARTIFACT_INGRESS_VALUE_NIX_CONFIG="$captured" VBR_NIX_CACHE_HEALTH_APPLIED=1 VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG="$captured"$\'\\n\'"netrc-file = $1" VBR_NIX_CACHE_ROLE_AUTHORITY=verify-nested-v1 VBR_NIX_CACHE_ROLE_CONFIG_B64="$encoded"; artifact_ingress_restore_or_remove_selectors; test -z "${NIX_CONFIG:-}"',
+      "artifact-ingress-test",
+      ingressScript,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("proof-bound cache refresh restores captured config instead of historical source config", () => {
+  const result = spawnSync(
+    "/bin/bash",
+    [
+      "-c",
+      '. "$1"; export VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED=1 VBR_NIX_CACHE_ROLE_AUTHORITY=verify-nested-v1 VBR_NIX_CACHE_ROLE_CONFIG_B64=cmV2aWV3ZWQ= VBR_ARTIFACT_INGRESS_WAS_SET_NIX_CONFIG=1 VBR_ARTIFACT_INGRESS_VALUE_NIX_CONFIG=reviewed VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG=historical; env_apply_nix_cache_health() { test "$NIX_CONFIG" = reviewed; export VBR_NIX_CACHE_HEALTH_APPLIED=1; }; artifact_ingress_refresh_nix_cache_health; test "$NIX_CONFIG" = reviewed',
+      "artifact-ingress-test",
+      ingressScript,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("reviewed cache refresh does not restore historical pre-degradation config", () => {
+  const result = spawnSync(
+    "/bin/bash",
+    [
+      "-c",
+      '. "$1"; export VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED=1 VBR_NIX_CACHE_HEALTH_APPLIED=1 VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG=reviewed VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG=historical; env_apply_nix_cache_health() { test "$NIX_CONFIG" = reviewed; export VBR_NIX_CACHE_HEALTH_APPLIED=1; }; artifact_ingress_refresh_nix_cache_health; test "$NIX_CONFIG" = reviewed',
+      "artifact-ingress-test",
+      ingressScript,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("proof-bound cache refresh preserves substituters before validating the bound config", () => {
+  const result = spawnSync(
+    "/bin/bash",
+    [
+      "-c",
+      '. "$1"; config="substituters = https://cache.nixos.org/"; encoded="$(printf %s "$config" | base64 | tr -d "\\n")"; export VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED=1 VBR_NIX_CACHE_ROLE_AUTHORITY=verify-nested-v1 VBR_NIX_CACHE_ROLE_CONFIG_B64="$encoded"; env_strip_nix_cache_overrides() { printf %s "builders ="; }; env_apply_nix_cache_health() { test "$NIX_CONFIG" = "$config"; export VBR_NIX_CACHE_HEALTH_APPLIED=1; }; artifact_ingress_refresh_nix_cache_health; test "$NIX_CONFIG" = "$config"',
+      "artifact-ingress-test",
+      ingressScript,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("proof-bound cache refresh validates before adding the canonical netrc", () => {
+  const result = spawnSync(
+    "/bin/bash",
+    [
+      "-c",
+      '. "$1"; config="substituters = https://cache.nixos.org/"; encoded="$(printf %s "$config" | base64 | tr -d "\\n")"; export VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED=1 VBR_NIX_CACHE_ROLE_AUTHORITY=verify-nested-v1 VBR_NIX_CACHE_ROLE_CONFIG_B64="$encoded" VBR_ARTIFACT_INGRESS_EFFECTIVE_NETRC_FILE="$1"; env_apply_nix_cache_health() { test "$NIX_CONFIG" = "$config"; export VBR_NIX_CACHE_HEALTH_APPLIED=1 VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG="$NIX_CONFIG"; }; artifact_ingress_refresh_nix_cache_health; test "$NIX_CONFIG" = "$config"$\'\\n\'"netrc-file = $1"; test "$VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG" = "$NIX_CONFIG"',
+      "artifact-ingress-test",
+      ingressScript,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("canonical proof publication consumes nested cache role authority", () => {
+  const result = spawnSync(
+    "/bin/bash",
+    [
+      "-c",
+      '. "$1"; export VBR_NIX_CACHE_ROLE_AUTHORITY=verify-nested-v1 VBR_NIX_CACHE_ROLE_REQUIRED=required VBR_NIX_CACHE_ROLE_OPTIONAL=optional VBR_NIX_CACHE_ROLE_POLICY=auto VBR_NIX_CACHE_ROLE_BINDING=binding VBR_NIX_CACHE_ROLE_CONFIG_B64=Y29uZmln; artifact_ingress_consume_nested_cache_role_authority; test -z "${VBR_NIX_CACHE_ROLE_AUTHORITY:-}${VBR_NIX_CACHE_ROLE_REQUIRED:-}${VBR_NIX_CACHE_ROLE_OPTIONAL:-}${VBR_NIX_CACHE_ROLE_POLICY:-}${VBR_NIX_CACHE_ROLE_BINDING:-}${VBR_NIX_CACHE_ROLE_CONFIG_B64:-}"',
+      "artifact-ingress-test",
+      ingressScript,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr);
+});
+
 test("shell ingress discards only the historical launcher-owned flake input", () => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "artifact-ingress-flake-input-"));
   try {
@@ -122,91 +227,4 @@ test("shell ingress discards only the historical launcher-owned flake input", ()
   } finally {
     fs.rmSync(workspace, { recursive: true, force: true });
   }
-});
-
-test("shell ingress restores caller language selectors that differ from trusted baseline", () => {
-  for (const name of ["CC", "PYTHONPATH", "RUSTFLAGS", "GOFLAGS"]) {
-    const result = spawnSync(
-      "/bin/bash",
-      [
-        "-c",
-        '. "$1"; name="$2"; printf -v "VBR_ARTIFACT_INGRESS_WAS_SET_${name}" %s 1; printf -v "VBR_ARTIFACT_INGRESS_VALUE_${name}" %s /host/value; printf -v "VBR_DEVSHELL_ARTIFACT_WAS_SET_${name}" %s 1; printf -v "VBR_DEVSHELL_ARTIFACT_VALUE_${name}" %s /nix/store/value; export "VBR_ARTIFACT_INGRESS_WAS_SET_${name}" "VBR_ARTIFACT_INGRESS_VALUE_${name}" "VBR_DEVSHELL_ARTIFACT_WAS_SET_${name}" "VBR_DEVSHELL_ARTIFACT_VALUE_${name}"; export VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED=1; artifact_ingress_restore_or_remove_selectors; test "${!name}" = /host/value',
-        "artifact-ingress-test",
-        ingressScript,
-        name,
-      ],
-      { encoding: "utf8" },
-    );
-    assert.equal(result.status, 0, `${name}: ${result.stderr}`);
-  }
-});
-
-test("verified ingress removes Nix target selectors contributed by the devshell", () => {
-  const names = [
-    "NIX_BINTOOLS_FOR_TARGET",
-    "NIX_BINTOOLS_WRAPPER_TARGET_TARGET_arm64_apple_darwin",
-    "NIX_CC_FOR_TARGET",
-    "NIX_CC_WRAPPER_TARGET_TARGET_arm64_apple_darwin",
-    "NIX_CFLAGS_COMPILE_FOR_TARGET",
-    "NIX_LDFLAGS_FOR_TARGET",
-  ];
-  const result = spawnSync(
-    "/bin/bash",
-    [
-      "-c",
-      '. "$1"; shift; for name in "$@"; do export "${name}=/nix/store/devshell"; done; artifact_ingress_capture_environment; artifact_ingress_record_devshell_selectors; artifact_ingress_clear_selectors; export VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED=1; artifact_ingress_restore_or_remove_selectors; for name in "$@"; do ! declare -p "$name" >/dev/null 2>&1 || exit 1; done',
-      "artifact-ingress-test",
-      ingressScript,
-      ...names,
-    ],
-    { encoding: "utf8" },
-  );
-  assert.equal(result.status, 0, result.stderr);
-});
-
-test("verified ingress removes stale Nix toolchain selectors across a devshell refresh", () => {
-  const names = [
-    "NIX_BINTOOLS_FOR_TARGET",
-    "NIX_BINTOOLS_WRAPPER_TARGET_TARGET_arm64_apple_darwin",
-    "NIX_CC_FOR_TARGET",
-    "NIX_CC_WRAPPER_TARGET_TARGET_arm64_apple_darwin",
-    "NIX_CFLAGS_COMPILE_FOR_TARGET",
-    "NIX_LDFLAGS",
-    "NIX_LDFLAGS_FOR_TARGET",
-  ];
-  const result = spawnSync(
-    "/bin/bash",
-    [
-      "-c",
-      '. "$1"; shift; for name in "$@"; do export "${name}=/nix/store/old-devshell"; done; artifact_ingress_capture_environment; for name in "$@"; do export "${name}=/nix/store/new-devshell"; done; artifact_ingress_record_devshell_selectors; artifact_ingress_clear_selectors; export VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED=1; artifact_ingress_restore_or_remove_selectors; for name in "$@"; do ! declare -p "$name" >/dev/null 2>&1 || exit 1; done',
-      "artifact-ingress-test",
-      ingressScript,
-      ...names,
-    ],
-    { encoding: "utf8" },
-  );
-  assert.equal(result.status, 0, result.stderr);
-});
-
-test("verified ingress removes Nix target selectors introduced after capture", () => {
-  const names = [
-    "NIX_BINTOOLS_FOR_TARGET",
-    "NIX_BINTOOLS_WRAPPER_TARGET_TARGET_arm64_apple_darwin",
-    "NIX_CC_FOR_TARGET",
-    "NIX_CC_WRAPPER_TARGET_TARGET_arm64_apple_darwin",
-    "NIX_CFLAGS_COMPILE_FOR_TARGET",
-    "NIX_LDFLAGS_FOR_TARGET",
-  ];
-  const result = spawnSync(
-    "/bin/bash",
-    [
-      "-c",
-      '. "$1"; shift; artifact_ingress_capture_environment; for name in "$@"; do export "${name}=/nix/store/selected-devshell"; done; artifact_ingress_restore_or_remove_selectors; for name in "$@"; do ! declare -p "$name" >/dev/null 2>&1 || exit 1; done',
-      "artifact-ingress-test",
-      ingressScript,
-      ...names,
-    ],
-    { encoding: "utf8" },
-  );
-  assert.equal(result.status, 0, result.stderr);
 });

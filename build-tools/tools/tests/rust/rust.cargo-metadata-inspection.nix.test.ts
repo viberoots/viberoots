@@ -50,13 +50,27 @@ test("Rust derivation exports exact cargo_packages inspection metadata", async (
       nix eval --impure --json --expr ${expression}
     `;
     assert.deepEqual(JSON.parse(String(result.stdout || "[]")), [
-      { name: "fixture", version: "0.1.0", source: "" },
       {
+        checksum: "",
+        dependencies: [],
+        name: "fixture",
+        version: "0.1.0",
+        source: "workspace",
+      },
+      {
+        checksum: "",
+        dependencies: [],
+        name: "git_dep",
+        version: "2.3.4",
+        source: gitSource,
+      },
+      {
+        checksum: "fixture",
+        dependencies: [],
         name: "registry_dep",
         version: "1.2.3",
         source: "registry+https://registry.example/private-index",
       },
-      { name: "git_dep", version: "2.3.4", source: gitSource },
     ]);
   });
 });

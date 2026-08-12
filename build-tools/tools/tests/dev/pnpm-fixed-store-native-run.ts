@@ -11,16 +11,14 @@ export type CommandResult = {
   stderr: string;
   elapsedMs: number;
   peakFixtureKib: number;
-  peakDiskDeltaKib: number;
 };
 
 type RunOptions = {
   cwd: string;
   env?: NodeJS.ProcessEnv;
   fixtureRoot: string;
-  diskRoot?: string;
   maxKib?: number;
-  measureUsage?: () => Promise<{ diskDeltaKib: number; fixtureKib: number }>;
+  measureUsage?: () => Promise<{ fixtureKib: number }>;
   sampleIntervalMs?: number;
   timeoutMs?: number;
 };
@@ -31,11 +29,8 @@ export async function runGuardedCommand(
   opts: RunOptions,
 ): Promise<CommandResult> {
   const maxKib = opts.maxKib ?? DEFAULT_MAX_KIB;
-  const diskRoot = opts.diskRoot || opts.fixtureRoot;
-  const beforeDisk = opts.measureUsage ? 0 : await diskUsedKib(diskRoot);
   const startedAt = Date.now();
   let peakFixtureKib = 0;
-  let peakDiskDeltaKib = 0;
   return await new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: opts.cwd,
@@ -48,60 +43,63 @@ export async function runGuardedCommand(
     let stopReason: Error | null = null;
     let settled = false;
     let forceTimer: NodeJS.Timeout | undefined;
+    let timeout: NodeJS.Timeout | undefined;
+    let sampler: NodeJS.Timeout | undefined;
     let sampleInFlight: Promise<void> | null = null;
     child.stdout.on("data", (chunk) => (stdout += String(chunk)));
     child.stderr.on("data", (chunk) => (stderr += String(chunk)));
 
-    const signalChild = (signal: NodeJS.Signals) => {
-      if (!child.pid) return;
+    const signalChild = (signal: NodeJS.Signals): boolean => {
+      if (!child.pid) return false;
       try {
         process.kill(process.platform === "win32" ? child.pid : -child.pid, signal);
-      } catch {}
+        return true;
+      } catch {
+        return false;
+      }
     };
     const stop = (reason: Error) => {
       if (stopReason || settled) return;
       stopReason = reason;
-      signalChild("SIGTERM");
+      if (!signalChild("SIGTERM")) {
+        Object.assign(stopReason, {
+          terminationError: "failed to deliver SIGTERM to guarded command process group",
+        });
+        return;
+      }
       forceTimer = setTimeout(() => signalChild("SIGKILL"), TERMINATION_GRACE_MS);
     };
     const measure = async () => {
-      const { fixtureKib, diskDeltaKib } = opts.measureUsage
+      const { fixtureKib } = opts.measureUsage
         ? await opts.measureUsage()
-        : await (async () => {
-            const [measuredFixtureKib, diskKib] = await Promise.all([
-              directorySizeKib(opts.fixtureRoot),
-              diskUsedKib(diskRoot),
-            ]);
-            return { fixtureKib: measuredFixtureKib, diskDeltaKib: diskKib - beforeDisk };
-          })();
+        : { fixtureKib: await directorySizeKib(opts.fixtureRoot) };
       peakFixtureKib = Math.max(peakFixtureKib, fixtureKib);
-      peakDiskDeltaKib = Math.max(peakDiskDeltaKib, diskDeltaKib);
-      if (fixtureKib > maxKib || diskDeltaKib > maxKib) {
-        throw new Error(
-          `native reconcile exceeded ${maxKib}KiB guard: fixture=${fixtureKib}KiB diskDelta=${diskDeltaKib}KiB`,
-        );
+      if (fixtureKib > maxKib) {
+        throw new Error(`native reconcile exceeded ${maxKib}KiB guard: fixture=${fixtureKib}KiB`);
       }
     };
     const invocation = [command, ...args].map((value) => JSON.stringify(value)).join(" ");
     const timeoutMs = opts.timeoutMs ?? NATIVE_PNPM_COMMAND_TIMEOUT_MS;
-    const timeout = setTimeout(() => {
-      stop(new Error(`command exceeded ${timeoutMs}ms: ${invocation}`));
-    }, timeoutMs);
-    const sampler = setInterval(() => {
-      if (settled || stopReason || sampleInFlight) return;
-      sampleInFlight = measure()
-        .catch((error) => {
-          const reason = error instanceof Error ? error : new Error(String(error));
-          if (settled) {
-            stopReason ||= reason;
-          } else {
-            stop(reason);
-          }
-        })
-        .finally(() => {
-          sampleInFlight = null;
-        });
-    }, opts.sampleIntervalMs ?? DEFAULT_SAMPLE_INTERVAL_MS);
+    child.once("spawn", () => {
+      timeout = setTimeout(() => {
+        stop(new Error(`command exceeded ${timeoutMs}ms: ${invocation}`));
+      }, timeoutMs);
+      sampler = setInterval(() => {
+        if (settled || stopReason || sampleInFlight) return;
+        sampleInFlight = measure()
+          .catch((error) => {
+            const reason = error instanceof Error ? error : new Error(String(error));
+            if (settled) {
+              stopReason ||= reason;
+            } else {
+              stop(reason);
+            }
+          })
+          .finally(() => {
+            sampleInFlight = null;
+          });
+      }, opts.sampleIntervalMs ?? DEFAULT_SAMPLE_INTERVAL_MS);
+    });
     child.on("error", stop);
     child.on("close", async (status) => {
       settled = true;
@@ -122,7 +120,6 @@ export async function runGuardedCommand(
           stderr,
           elapsedMs: Date.now() - startedAt,
           peakFixtureKib,
-          peakDiskDeltaKib,
         });
         reject(stopReason);
       } else
@@ -132,7 +129,6 @@ export async function runGuardedCommand(
           stderr,
           elapsedMs: Date.now() - startedAt,
           peakFixtureKib,
-          peakDiskDeltaKib,
         });
     });
   });
@@ -143,40 +139,36 @@ export async function directorySizeKib(target: string): Promise<number> {
   return parseNonnegativeKib(output.split(/\s+/)[0], "du");
 }
 
-export function diskUsageCommand(
-  target: string,
-  platform: NodeJS.Platform = process.platform,
-): { command: string; args: string[] } {
-  return platform === "darwin"
-    ? { command: "/bin/df", args: ["-Pk", target] }
-    : { command: "df", args: ["-k", target] };
-}
+export type OwnedStorePathSize = { narKib: number; closureKib: number };
 
-export function parseDfUsedKib(output: string): number {
-  const fields = output.trim().split("\n").at(-1)?.trim().split(/\s+/) || [];
-  return parseNonnegativeKib(fields[2], "df");
-}
-
-export function parseDiskutilUsedKib(output: string): number {
-  const match = output.match(/<key>CapacityInUse<\/key>\s*<integer>(\d+)<\/integer>/);
-  const bytes = parseNonnegativeKib(match?.[1], "diskutil");
-  return Math.ceil(bytes / 1024);
-}
-
-export function parseDfDevice(output: string): string {
-  const device = output.trim().split("\n").at(-1)?.trim().split(/\s+/)[0];
-  if (!device?.startsWith("/dev/")) {
-    throw new Error("df did not emit a device path");
+export function parseOwnedStorePathSize(output: string, storePath: string): OwnedStorePathSize {
+  const parsed = JSON.parse(output) as unknown;
+  const record = Array.isArray(parsed)
+    ? parsed.find((entry) => String((entry as { path?: unknown }).path || "") === storePath)
+    : (parsed as Record<string, unknown>)[storePath];
+  const narSize = Number((record as { narSize?: unknown } | undefined)?.narSize);
+  const closureSize = Number((record as { closureSize?: unknown } | undefined)?.closureSize);
+  if (
+    !Number.isSafeInteger(narSize) ||
+    narSize < 0 ||
+    !Number.isSafeInteger(closureSize) ||
+    closureSize < 0
+  ) {
+    throw new Error(`Nix path-info omitted owned size evidence for ${storePath}`);
   }
-  return device;
+  return { narKib: Math.ceil(narSize / 1024), closureKib: Math.ceil(closureSize / 1024) };
 }
 
-async function diskUsedKib(target: string): Promise<number> {
-  const invocation = diskUsageCommand(target);
-  const output = await shellOutput(invocation.command, invocation.args);
-  if (process.platform !== "darwin") return parseDfUsedKib(output);
-  const device = parseDfDevice(output);
-  return parseDiskutilUsedKib(await shellOutput("/usr/sbin/diskutil", ["info", "-plist", device]));
+export function assertOwnedStorePathWithinKib(
+  storePath: string,
+  size: OwnedStorePathSize,
+  maxKib: number,
+): void {
+  if (size.narKib > maxKib || size.closureKib > maxKib) {
+    throw new Error(
+      `owned reconciled output exceeded ${maxKib}KiB guard: path=${storePath} nar=${size.narKib}KiB closure=${size.closureKib}KiB`,
+    );
+  }
 }
 
 export function parseNonnegativeKib(value: string | undefined, command: string): number {

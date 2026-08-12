@@ -33,7 +33,7 @@ async function writeProducerTarget(
 
 async function writeBrowserProducerTarget(pkgDir: string) {
   await fsp.mkdir(pkgDir, { recursive: true });
-  await fsp.writeFile(path.join(pkgDir, "rust_bg.wasm"), "rust-browser-wasm", "utf8");
+  await fsp.writeFile(path.join(pkgDir, "rust_bg.wasm"), "\0asm\x01\0\0\0", "binary");
   await fsp.writeFile(
     path.join(pkgDir, "TARGETS"),
     [
@@ -62,26 +62,29 @@ test("node wasm stage/inline works with mixed producer labels", async () => {
       path.join(tmp, "projects", "libs", "demo-go-wasm"),
       "wasm",
       "top.wasm",
-      "go-wasm",
+      "\0asm\x01\0\0\0",
     );
     await writeProducerTarget(
       path.join(tmp, "projects", "libs", "demo-cpp-wasm"),
       "cpp_wasm",
       "cpp_emscripten.wasm",
-      "cpp-wasm",
+      "\0asm\x01\0\0\0",
     );
     await writeProducerTarget(
       path.join(tmp, "projects", "libs", "demo-py-wasm"),
       "py_wasm",
       "pyext.wasm",
-      "py-wasm",
+      "\0asm\x01\0\0\0",
     );
     await writeBrowserProducerTarget(path.join(tmp, "projects", "libs", "demo-rust-wasm"));
 
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
+        'load("@prelude//:rules.bzl", "export_file")',
         'load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module")',
+        "",
+        'export_file(name = "index", src = "index.html")',
         "",
         "node_wasm_inline_module(",
         '  name = "go_inline",',
@@ -114,12 +117,12 @@ test("node wasm stage/inline works with mixed producer labels", async () => {
         "",
         "node_asset_stage(",
         '  name = "staged",',
-        '  app = "index.html",',
+        '  app = ":index",',
         "  assets = [",
-        '    {"src": ":go_inline", "dest": "wasm-inline/go.js"},',
-        '    {"src": ":cpp_inline", "dest": "wasm-inline/cpp.js"},',
-        '    {"src": ":py_inline", "dest": "wasm-inline/py.js"},',
-        '    {"src": ":rust_inline", "dest": "wasm-inline/rust.js"},',
+        '    {"src": ":go_inline", "output_path": "go-inline.js", "dest": "wasm-inline/go.js"},',
+        '    {"src": ":cpp_inline", "output_path": "cpp-inline.js", "dest": "wasm-inline/cpp.js"},',
+        '    {"src": ":py_inline", "output_path": "py-inline.js", "dest": "wasm-inline/py.js"},',
+        '    {"src": ":rust_inline", "output_path": "rust-inline.js", "dest": "wasm-inline/rust.js"},',
         '    {"src": "//projects/libs/demo-rust-wasm:browser", "dest": "wasm/rust.wasm", "artifact_name": "rust_bg.wasm"},',
         "  ],",
         '  labels = ["lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],',
@@ -148,14 +151,21 @@ test("node wasm stage/inline works with mixed producer labels", async () => {
     await fsp.access(path.join(absOut, "wasm-inline", "py.js"));
     await fsp.access(path.join(absOut, "wasm-inline", "rust.js"));
     assert.equal(
-      await fsp.readFile(path.join(absOut, "wasm", "rust.wasm"), "utf8"),
-      "rust-browser-wasm",
+      (await fsp.readFile(path.join(absOut, "wasm", "rust.wasm"))).subarray(0, 4).toString("hex"),
+      "0061736d",
     );
     const manifest = JSON.parse(
       await fsp.readFile(path.join(absOut, "asset-manifest.json"), "utf8"),
     );
     assert.equal(manifest.schemaVersion, "viberoots.node-wasm-assets.v1");
-    assert.equal(manifest.assets.length, 5);
+    assert.equal(manifest.assets.length, 1);
+    assert.equal(manifest.assets[0]?.destination, "wasm/rust.wasm");
+    assert.equal(manifest.assets[0]?.declaredSource, "//projects/libs/demo-rust-wasm:browser");
+    assert.deepEqual(
+      manifest.assets.map((asset: { destination: string }) => asset.destination),
+      ["wasm/rust.wasm"],
+      "raw inline JavaScript assets must not be recorded as WASM",
+    );
     for (const asset of manifest.assets) {
       assert.match(asset.resolvedSource, /^buck:.*#sha256-[a-f0-9]{64}$/);
       assert.doesNotMatch(asset.resolvedSource, /buck-out|viberoots-test-tmp|workspace-/);

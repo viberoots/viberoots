@@ -1,8 +1,14 @@
 import * as fsp from "node:fs/promises";
+import { performance } from "node:perf_hooks";
 import path from "node:path";
 import { cargoPackageKey, readCargoPackages } from "../../patch/rust-lock";
+import { emitTimingDetail } from "../../lib/timing-detail";
 import { verifiedGitSourceCopy } from "./cargo-git-integrity";
 import { verifiedRegistrySourceCopy } from "./cargo-registry-integrity";
+import {
+  forEachFixedSourceMaterialization,
+  type DeferredFixedSourceMaterialization,
+} from "./cargo-fixed-source-materialization";
 
 export type FixedSourceEntry = {
   originPath: string;
@@ -75,15 +81,50 @@ export async function materializeFixedSources(
   }>,
   runGit?: (command: string, args: string[], cwd: string) => Promise<string>,
   cargoHome?: string,
+  deferredMaterialization?: DeferredFixedSourceMaterialization,
 ): Promise<FixedSourceMap> {
   const result: FixedSourceMap = {};
-  for (const [key, entry] of Object.entries(sources)) {
+  const deferred: Array<{
+    index: number;
+    key: string;
+    entry: FixedSourceEntry;
+    storePath: string;
+  }> = [];
+  let verifiedCopyMs = 0;
+  let immutableMaterializationMs = 0;
+  let materializedCount = 0;
+  let reusedCount = 0;
+  const entries = Object.entries(sources).map(([key, entry], index) => ({ index, key, entry }));
+  for (const { key, entry } of entries) result[key] = entry;
+  const materializeEntry = async ({
+    index,
+    key,
+    entry,
+  }: {
+    index: number;
+    key: string;
+    entry: FixedSourceEntry;
+  }): Promise<void> => {
     if (!entry.source.startsWith("registry+") && !entry.source.startsWith("git+")) {
-      result[key] = entry;
-      continue;
+      return;
     }
-    const verified = entry.source.startsWith("registry+")
-      ? await verifiedRegistrySourceCopy(
+    const cached = await deferredMaterialization?.lookup?.(key, entry);
+    if (cached) {
+      result[key] = {
+        ...entry,
+        ...cached,
+        buildInput: {
+          source: entry.source,
+          checksum: entry.checksum,
+          ...cached,
+        },
+      };
+      reusedCount += 1;
+      return;
+    }
+    const verifiedStarted = performance.now();
+    const verified = await (entry.source.startsWith("registry+")
+      ? verifiedRegistrySourceCopy(
           entry.originPath,
           key,
           entry.source,
@@ -92,74 +133,81 @@ export async function materializeFixedSources(
           cargoHome,
         )
       : runGit
-        ? await verifiedGitSourceCopy(entry.originPath, key, entry.source, runGit)
+        ? verifiedGitSourceCopy(entry.originPath, key, entry.source, runGit)
         : (() => {
             throw new Error(`Cargo Git materialization command authority is unavailable: ${key}`);
-          })();
-    let immutable: { storePath: string; narHash: string };
+          })());
+    verifiedCopyMs += performance.now() - verifiedStarted;
     try {
-      immutable = await materialize(key, { ...entry, originPath: verified.root });
+      const materializationStarted = performance.now();
+      if (deferredMaterialization) {
+        const immutable = await deferredMaterialization.add(key, {
+          ...entry,
+          originPath: verified.root,
+        });
+        deferred.push({ index, key, entry, storePath: immutable.storePath });
+        // Establish the original source order before replacing this placeholder
+        // after the single batch hash operation.
+        result[key] = entry;
+      } else {
+        const immutable = await materialize(key, { ...entry, originPath: verified.root });
+        result[key] = {
+          ...entry,
+          ...immutable,
+          buildInput: {
+            source: entry.source,
+            checksum: entry.checksum,
+            ...immutable,
+          },
+        };
+      }
+      immutableMaterializationMs += performance.now() - materializationStarted;
+      materializedCount += 1;
     } finally {
       await verified.cleanup();
     }
-    result[key] = {
-      ...entry,
-      ...immutable,
-      buildInput: {
-        source: entry.source,
-        checksum: entry.checksum,
+  };
+  if (deferredMaterialization) {
+    await forEachFixedSourceMaterialization(entries, materializeEntry);
+  } else {
+    for (const entry of entries) await materializeEntry(entry);
+  }
+  if (deferred.length > 0) {
+    deferred.sort((left, right) => left.index - right.index);
+    const materializationStarted = performance.now();
+    const hashes = await deferredMaterialization!.hash(deferred.map((entry) => entry.storePath));
+    immutableMaterializationMs += performance.now() - materializationStarted;
+    if (hashes.length !== deferred.length) {
+      throw new Error(
+        `Cargo fixed-source batch hash returned ${hashes.length} hashes for ${deferred.length} paths`,
+      );
+    }
+    for (const [index, pending] of deferred.entries()) {
+      const narHash = hashes[index] || "";
+      if (!narHash.startsWith("sha256-")) {
+        throw new Error(`Cargo fixed-source batch hash is invalid: ${pending.key}`);
+      }
+      const immutable = { storePath: pending.storePath, narHash };
+      result[pending.key] = {
+        ...pending.entry,
         ...immutable,
-      },
-    };
+        buildInput: {
+          source: pending.entry.source,
+          checksum: pending.entry.checksum,
+          ...immutable,
+        },
+      };
+      await deferredMaterialization!.store?.(pending.key, pending.entry, immutable);
+    }
   }
+  emitTimingDetail(`Rust fixed sources cache reuse total (${reusedCount} sources)`, 0);
+  emitTimingDetail(
+    `Rust fixed sources verified copy total (${materializedCount} sources)`,
+    verifiedCopyMs,
+  );
+  emitTimingDetail(
+    `Rust fixed sources immutable materialization total (${materializedCount} sources)`,
+    immutableMaterializationMs,
+  );
   return result;
-}
-
-export function fixedSourceManifestPath(root: string): string {
-  return path.join(root, ".viberoots/workspace/cargo-home/viberoots-fixed-sources.json");
-}
-
-export async function fixedSourceManifestMatches(
-  root: string,
-  expected: FixedSourceMap,
-): Promise<boolean> {
-  const file = fixedSourceManifestPath(root);
-  const actual = await fsp
-    .readFile(file, "utf8")
-    .then((bytes) => JSON.parse(bytes) as FixedSourceMap)
-    .catch((error: NodeJS.ErrnoException) => {
-      if (error.code === "ENOENT") return {};
-      throw error;
-    });
-  if (JSON.stringify(Object.keys(actual).sort()) !== JSON.stringify(Object.keys(expected).sort())) {
-    return false;
-  }
-  for (const [key, entry] of Object.entries(expected)) {
-    const reviewed = actual[key];
-    if (
-      !reviewed ||
-      reviewed.originPath !== entry.originPath ||
-      reviewed.source !== entry.source ||
-      reviewed.checksum !== entry.checksum
-    ) {
-      return false;
-    }
-    if (
-      (entry.source.startsWith("registry+") || entry.source.startsWith("git+")) &&
-      (!reviewed.storePath?.startsWith("/nix/store/") || !reviewed.narHash?.startsWith("sha256-"))
-    ) {
-      return false;
-    }
-    if (
-      (entry.source.startsWith("registry+") || entry.source.startsWith("git+")) &&
-      (!reviewed.buildInput ||
-        reviewed.buildInput.source !== entry.source ||
-        reviewed.buildInput.checksum !== entry.checksum ||
-        reviewed.buildInput.storePath !== reviewed.storePath ||
-        reviewed.buildInput.narHash !== reviewed.narHash)
-    ) {
-      return false;
-    }
-  }
-  return true;
 }

@@ -1,0 +1,21 @@
+load("@viberoots//build-tools/tools/buck:zx_test.bzl", "zx_test")
+
+zx_test(
+    name = "heavy_one",
+    script = "heavy-one.fixture.ts",
+    heavy_fanout_pool = "@viberoots//:viberoots_heavy_fanout",
+    labels = ["verify:manual", "verify:resource-limited", "verify:heavy-fanout"],
+)
+
+zx_test(
+    name = "heavy_two",
+    script = "heavy-two.fixture.ts",
+    heavy_fanout_pool = "@viberoots//:viberoots_heavy_fanout",
+    labels = ["verify:manual", "verify:resource-limited", "verify:heavy-fanout"],
+)
+
+zx_test(
+    name = "ordinary",
+    script = "ordinary.fixture.ts",
+    labels = ["verify:manual", "verify:resource-limited"],
+)

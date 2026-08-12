@@ -51,6 +51,7 @@ export interface Node {
   target_triple?: string;
   features?: string[];
   default_features?: boolean;
+  behavior_probe?: boolean;
   profile?: string;
   target?: string;
   local_patch_dirs?: string[];

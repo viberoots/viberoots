@@ -16,6 +16,7 @@ import {
   buildArtifactEnvironment,
   withoutArtifactEnvironmentInfluence,
 } from "../lib/artifact-environment";
+import { maybeCurrentNixCachePolicyCapability } from "../lib/nix-cache-policy-capability";
 
 function isLikelyTempWorkspace(workspaceRoot: string): boolean {
   const workspaceAbs = path.resolve(workspaceRoot);
@@ -69,6 +70,7 @@ export async function chooseRunnableFlakeRef(opts: {
     });
   }
   const baseEnv = withoutArtifactEnvironmentInfluence(process.env);
+  const nixCachePolicyCapability = maybeCurrentNixCachePolicyCapability();
   const artifactEnv = buildArtifactEnvironment({
     baseEnv,
     mode: String(process.env.CI || "").trim() ? "ci" : "local",
@@ -76,6 +78,7 @@ export async function chooseRunnableFlakeRef(opts: {
     workspaceRoot: opts.workspaceRoot,
     artifactToolsRoot: opts.artifactToolsRoot,
     internal: opts.target ? { BUCK_TARGET: opts.target, WORKSPACE_ROOT: opts.workspaceRoot } : {},
+    ...(nixCachePolicyCapability ? { nixCachePolicyCapability } : {}),
   });
   const targetPackages = opts.target ? [targetPackageFromLabel(opts.target)].filter(Boolean) : [];
   let classification: ArtifactBuildClassification;

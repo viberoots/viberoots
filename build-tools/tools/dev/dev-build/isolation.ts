@@ -2,6 +2,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { nodeFlagsWithZx } from "../../lib/node-run";
 import { buckProcessTableLines } from "../../lib/process-inspection";
+import { macosNoindexPathSegment } from "../../lib/macos-metadata";
 import { artifactBuckIsolation } from "./cache-isolation";
 import { buildToolPath, zxInitPath } from "./paths";
 
@@ -24,22 +25,33 @@ export type CreateIsolationOptions = {
   reuseDaemon?: boolean;
 };
 
-export function sharedDevBuildIsolationName(workspaceRoot: string): string {
-  const repoHash = crypto
-    .createHash("sha256")
-    .update(path.resolve(workspaceRoot))
-    .digest("hex")
-    .slice(0, 10);
-  return `devbuild-shared-${repoHash}`;
+function sharedIsolationHash(workspaceRoot: string): string {
+  return crypto.createHash("sha256").update(path.resolve(workspaceRoot)).digest("hex").slice(0, 10);
 }
 
-export function sharedExporterIsolationName(workspaceRoot: string): string {
-  const repoHash = crypto
-    .createHash("sha256")
-    .update(path.resolve(workspaceRoot))
-    .digest("hex")
-    .slice(0, 10);
-  return `exporter-shared-${repoHash}`;
+export function legacyDarwinSharedIsolationNames(
+  workspaceRoot: string,
+  platform: NodeJS.Platform = process.platform,
+): string[] {
+  if (platform !== "darwin") return [];
+  const repoHash = sharedIsolationHash(workspaceRoot);
+  return [`devbuild-shared-${repoHash}`, `exporter-shared-${repoHash}`];
+}
+
+export function sharedDevBuildIsolationName(
+  workspaceRoot: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const repoHash = sharedIsolationHash(workspaceRoot);
+  return macosNoindexPathSegment(`devbuild-shared-${repoHash}`, platform);
+}
+
+export function sharedExporterIsolationName(
+  workspaceRoot: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const repoHash = sharedIsolationHash(workspaceRoot);
+  return macosNoindexPathSegment(`exporter-shared-${repoHash}`, platform);
 }
 
 export function changedGraphConsumerIsolationNames(
@@ -51,6 +63,7 @@ export function changedGraphConsumerIsolationNames(
       [
         sharedDevBuildIsolationName(workspaceRoot),
         sharedExporterIsolationName(workspaceRoot),
+        ...legacyDarwinSharedIsolationNames(workspaceRoot),
         String(env.BUCK_ISOLATION_DIR || "").trim(),
         String(env.BUCK_NESTED_ISO || "").trim(),
       ].filter(Boolean),
@@ -97,7 +110,7 @@ export function createIsolation(opts: CreateIsolationOptions = {}): Isolation {
   const inheritedIso = (process.env.BUCK_ISOLATION_DIR || "").trim();
   const defaultIso = reuseDaemon
     ? sharedDevBuildIsolationName(process.cwd())
-    : `devbuild-${process.pid}`;
+    : macosNoindexPathSegment(`devbuild-${process.pid}`);
   const baseBuckIsolation = inheritedIso ? inheritedIso : defaultIso;
   const cachePolicyBinding = String(opts.cachePolicyBinding || "").trim();
   const buckIsolation = cachePolicyBinding

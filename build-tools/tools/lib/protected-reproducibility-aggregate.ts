@@ -19,6 +19,14 @@ export type ProtectedReproducibilityAggregate = {
   evidenceStoreUri: string;
 };
 
+const verifiedAggregates = new WeakSet<object>();
+
+export function isProtectedReproducibilityAggregate(
+  value: ProtectedReproducibilityAggregate,
+): boolean {
+  return verifiedAggregates.has(value);
+}
+
 export function assertReviewedEvidenceStoreUri(uri: string): string {
   let parsed: URL;
   try {
@@ -79,12 +87,22 @@ export async function readProtectedReproducibilityAggregate(
     candidateStoreUri,
     registry.evidenceStore.storeUri,
   );
-  return {
+  const protectedAggregate = deepFreeze({
     storePath: file,
     aggregate: parseArtifactReproducibilityAggregate(text, {
       registry,
       registryStorePath,
     }),
     evidenceStoreUri,
-  };
+  });
+  verifiedAggregates.add(protectedAggregate);
+  return protectedAggregate;
+}
+
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === "object") {
+    for (const nested of Object.values(value)) deepFreeze(nested);
+    Object.freeze(value);
+  }
+  return value;
 }

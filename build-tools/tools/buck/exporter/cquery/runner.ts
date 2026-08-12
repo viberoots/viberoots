@@ -12,6 +12,7 @@ import {
   GLOBAL_NIX_INPUT_TARGET_LABELS,
 } from "../../../lib/global-nix-input-targets";
 import { packagePathFromLabel } from "../../../lib/labels";
+import { macosNoindexPathSegment } from "../../../lib/macos-metadata";
 import { isRetryableCqueryError, resetBuckDaemon } from "./retry";
 
 export type CqueryRunnerOptions = {
@@ -88,7 +89,7 @@ export function computeRootsExpr(cwd: string): string {
 function stableExporterIsolation(cwd: string): string {
   const key = path.resolve(cwd);
   const h = crypto.createHash("sha256").update(key).digest("hex").slice(0, 10);
-  return `exporter-shared-${h}`;
+  return macosNoindexPathSegment(`exporter-shared-${h}`);
 }
 
 export function computeIsolationFlags(cwd: string): {

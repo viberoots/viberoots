@@ -4,14 +4,19 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { $ } from "zx";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 const sourceRoot = path.resolve(process.env.VIBEROOTS_ROOT || process.cwd());
+const fixturesRoot = path.join(sourceRoot, "build-tools/tools/tests/fixtures");
 const read = (relative: string) => fsp.readFile(path.join(sourceRoot, relative), "utf8");
+const sourceRuleIsolation =
+  String(process.env.BUCK_NESTED_ISO || "").trim() ||
+  inheritedBuckIsolation("rust_tauri_app_contract");
 
 test("tauri_app exports app identity and declared desktop inputs", async () => {
   const target = "//build-tools/tools/tests/fixtures/rust-tauri-app:desktop";
   const result = await $({ cwd: sourceRoot, stdio: "pipe" })`
-    buck2 uquery --json \
+    buck2 --isolation-dir ${sourceRuleIsolation} uquery --json \
       --output-attribute labels --output-attribute frontend_dist \
       --output-attribute tauri_config --output-attribute tauri_platform \
       --output-attribute tauri_root --output-attribute cargo_root \
@@ -48,7 +53,7 @@ test("tauri_app exports app identity and declared desktop inputs", async () => {
 
 test("tauri_app admits only the bounded src-tauri ownership layout", async () => {
   const result = await $({ cwd: sourceRoot, stdio: "pipe" })`
-    buck2 uquery --json \
+    buck2 --isolation-dir ${sourceRuleIsolation} uquery --json \
       --output-attribute tauri_root --output-attribute cargo_root \
       --output-attribute cargo_manifest --output-attribute cargo_lock \
       --output-attribute tauri_config \
@@ -66,51 +71,84 @@ test("tauri_app admits only the bounded src-tauri ownership layout", async () =>
   }
 });
 
-test("tauri_app rejects unsupported platform and direct native links during analysis", async () => {
-  for (const [target, expected] of [
-    [
-      "//build-tools/tools/tests/fixtures/rust-tauri-invalid-platform:desktop",
-      "only aarch64-darwin",
-    ],
-    [
-      "//build-tools/tools/tests/fixtures/rust-tauri-invalid-link:desktop",
-      "native link_deps/header_deps are private bridge wiring",
-    ],
-    [
-      "//build-tools/tools/tests/fixtures/rust-tauri-invalid-mapping:desktop",
-      "resources dest must remain package-relative",
-    ],
-    [
-      "//build-tools/tools/tests/fixtures/rust-tauri-invalid-command:desktop",
-      "app_commands must use a conservative identifier grammar",
-    ],
+test("valid Tauri fixture remains queryable while invalid fixtures remain inert", async () => {
+  const result = await $({ cwd: sourceRoot, stdio: "pipe" })`
+    buck2 --isolation-dir ${sourceRuleIsolation} uquery \
+      '//build-tools/tools/tests/fixtures/rust-tauri-app:'
+  `;
+  const targets = String(result.stdout)
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  assert.ok(targets.length > 0, "expected the valid Tauri fixture to be queryable");
+  assert.ok(
+    targets.some((target) => target.includes("rust-tauri-app:desktop")),
+    "expected query to include the valid Tauri fixture",
+  );
+  for (const fixtureName of [
+    "rust-tauri-invalid-platform",
+    "rust-tauri-invalid-link",
+    "rust-tauri-invalid-mapping",
+    "rust-tauri-invalid-command",
   ]) {
-    const result = await $({
-      cwd: sourceRoot,
-      stdio: "pipe",
-      reject: false,
-      nothrow: true,
-    })`buck2 uquery ${target}`;
-    assert.notEqual(result.exitCode, 0);
-    assert.match(String(result.stderr || result.stdout), new RegExp(expected));
+    const fixtureDir = path.join(fixturesRoot, fixtureName);
+    await assert.rejects(fsp.access(path.join(fixtureDir, "TARGETS")));
+    await fsp.access(path.join(fixtureDir, "TARGETS.fixture"));
   }
 });
 
+test("tauri_app rejects unsupported platform and direct native links during analysis", async () => {
+  await runInTemp("rust-tauri-invalid-contracts", async (tmp, tempShell) => {
+    for (const [fixtureName, expected] of [
+      ["rust-tauri-invalid-platform", "only aarch64-darwin"],
+      ["rust-tauri-invalid-link", "native link_deps/header_deps are private bridge wiring"],
+      ["rust-tauri-invalid-mapping", "resources dest must remain package-relative"],
+      ["rust-tauri-invalid-command", "app_commands must use a conservative identifier grammar"],
+    ]) {
+      const sourceFixture = path.join(fixturesRoot, fixtureName);
+      const tempFixture = path.join(tmp, "projects", "fixtures", fixtureName);
+      await fsp.cp(sourceFixture, tempFixture, { recursive: true });
+      await fsp.rename(
+        path.join(tempFixture, "TARGETS.fixture"),
+        path.join(tempFixture, "TARGETS"),
+      );
+      const target = `//projects/fixtures/${fixtureName}:desktop`;
+      const result = await tempShell({
+        cwd: tmp,
+        stdio: "pipe",
+        reject: false,
+        nothrow: true,
+      })`buck2 uquery ${target}`;
+      assert.notEqual(result.exitCode, 0);
+      assert.match(String(result.stderr || result.stdout), new RegExp(expected));
+    }
+  });
+});
+
 test("Tauri planner owns frontend, policy, platform, and local signature contracts", async () => {
-  const [contract, planner, composition, template, nixBuild, graph, manifest] = await Promise.all([
-    read("build-tools/rust/private/tauri_contract.bzl"),
-    read("build-tools/tools/nix/planner/rust-tauri.nix"),
-    read("build-tools/tools/nix/planner/rust-composition.nix"),
-    read("build-tools/tools/nix/templates/rust-tauri.nix"),
-    read("build-tools/rust/private/nix_build.bzl"),
-    read("build-tools/tools/nix/graph-generator.nix"),
-    read("build-tools/tools/nix/planner/manifest.nix"),
-  ]);
+  const [contract, planner, composition, template, rustTemplate, nixBuild, graph, manifest] =
+    await Promise.all([
+      read("build-tools/rust/private/tauri_contract.bzl"),
+      read("build-tools/tools/nix/planner/rust-tauri.nix"),
+      read("build-tools/tools/nix/planner/rust-composition.nix"),
+      read("build-tools/tools/nix/templates/rust-tauri.nix"),
+      read("build-tools/tools/nix/templates/rust.nix"),
+      read("build-tools/rust/private/nix_build.bzl"),
+      read("build-tools/tools/nix/graph-generator.nix"),
+      read("build-tools/tools/nix/planner/manifest.nix"),
+    ]);
   assert.match(contract, /app:tauri/);
   assert.match(contract, /platform:aarch64-darwin/);
   assert.doesNotMatch(contract, /wasm_deps/);
   assert.match(planner, /webapp:static/);
   assert.match(planner, /selectedSystem != platform/);
+  assert.match(planner, /tauriSourceRoot = builtins\.path \{/);
+  assert.match(planner, /name = "viberoots-tauri-source"/);
+  assert.match(planner, /relative == "projects"/);
+  assert.match(planner, /lib\.hasPrefix "projects\/" relative/);
+  assert.match(planner, /sourceRoot = tauriSourceRoot/);
+  assert.match(rustTemplate, /VIBEROOTS_TAURI_SOURCE_ROOT =/);
+  assert.match(rustTemplate, /if kind == "tauri" then tauri\.sourceRoot else ""/);
   assert.match(composition, /\[ "runtime_deps" "sidecar_deps" \]/);
   assert.match(template, /beforeBuildCommand == null/);
   assert.match(template, /beforeDevCommand == null/);
@@ -134,7 +172,7 @@ test("Tauri planner owns frontend, policy, platform, and local signature contrac
   assert.match(manifest, /desktop-app/);
   assert.match(manifest, /viberoots-tauri-dev/);
 
-  const fixture = path.join(sourceRoot, "build-tools/tools/tests/fixtures/rust-tauri-app");
+  const fixture = path.join(fixturesRoot, "rust-tauri-app");
   const plannerPath = path.join(sourceRoot, "build-tools/tools/nix/planner/rust-tauri.nix");
   const expression = `
     let
@@ -159,12 +197,17 @@ test("Tauri planner owns frontend, policy, platform, and local signature contrac
       nodeFor = name: if name == "owner" then owner else if name == "frontend" then frontend else sidecar;
       ctx = {
         get = node: field: if builtins.hasAttr field node then node.\${field} else null;
+        repoRoot = builtins.toPath ${JSON.stringify(sourceRoot)};
         repoRootStr = ${JSON.stringify(sourceRoot)};
         dependencyArtifactOf = _: builtins.toPath ${JSON.stringify(fixture)};
       };
       P = { cleanLabel = value: value; labelsOf = node: node.labels; };
       tauri = import (builtins.toPath ${JSON.stringify(plannerPath)}) {
-        lib = { imap0 = f: values: builtins.genList (index: f index (builtins.elemAt values index)) (builtins.length values); };
+        lib = {
+          imap0 = f: values: builtins.genList (index: f index (builtins.elemAt values index)) (builtins.length values);
+          hasPrefix = prefix: value: builtins.substring 0 (builtins.stringLength prefix) value == prefix;
+          removePrefix = prefix: value: builtins.substring (builtins.stringLength prefix) (builtins.stringLength value) value;
+        };
         inherit P ctx nodeFor;
         normalizeList = _: value: value;
         sourcePath = _: relative: ${JSON.stringify("build-tools/tools/tests/fixtures/rust-tauri-app")} + "/" + relative;
@@ -183,11 +226,12 @@ test("Tauri planner owns frontend, policy, platform, and local signature contrac
   };
   assert.equal(result.platform, "aarch64-darwin");
   assert.equal(result.resources.length, 1);
-  assert.deepEqual(result.resources[0], {
-    path: path.join(fixture, "help.txt"),
-    source: "help.txt",
-    destination: "help/help.txt",
-  });
+  assert.match(
+    result.resources[0]?.path || "",
+    /\/nix\/store\/[^/]+-viberoots-tauri-source\/build-tools\/tools\/tests\/fixtures\/rust-tauri-app\/help\.txt$/,
+  );
+  assert.equal(result.resources[0]?.source, "help.txt");
+  assert.equal(result.resources[0]?.destination, "help/help.txt");
   assert.equal(result.capabilities.length, 1);
   assert.equal(result.icons.length, 1);
   assert.deepEqual(

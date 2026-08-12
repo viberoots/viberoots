@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { inventoryMismatchDetails } from "./nix-gaps-command-site-inventory-details";
 import {
   activeSourceContains,
   patternsForCommandSite,
@@ -173,9 +174,10 @@ export async function enforceProductionCommandSiteInventory(
 ): Promise<Record<CommandSiteRole, number>> {
   const actual = await inspectProductionCommandSites(root, policy);
   if (actual.count !== policy.expectedCount || actual.digest !== policy.expectedDigest) {
+    const details = await inventoryMismatchDetails(root, policy, actual);
     throw new Error(
       `production command-site inventory changed: expected count=${policy.expectedCount} digest=${policy.expectedDigest}; ` +
-        `actual count=${actual.count} digest=${actual.digest}. Classify and review the changed executor sites before updating policy.`,
+        `actual count=${actual.count} digest=${actual.digest}. Classify and review the changed executor sites before updating policy.${details}`,
     );
   }
   return actual.roleCounts;

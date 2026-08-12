@@ -15,6 +15,12 @@ export const REVIEWED_EVIDENCE_PUBLIC_KEY =
 export const REVIEWED_EVIDENCE_SIGNER_IDENTITY = "nix:main" as const;
 export const REVIEWED_NIX_EXPERIMENTAL_FEATURES = "nix-command flakes" as const;
 
+export function reviewedArtifactSandboxPaths(
+  platform: NodeJS.Platform = process.platform,
+): readonly string[] {
+  return platform === "darwin" ? ["/bin/bash"] : [];
+}
+
 export const REVIEWED_PUBLIC_KEYS = [
   "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=",
   REVIEWED_EVIDENCE_PUBLIC_KEY,
@@ -45,7 +51,7 @@ export function artifactNixScopedPolicyArgs(opts?: {
     "false",
     "--option",
     "sandbox-paths",
-    "",
+    reviewedArtifactSandboxPaths().join(" "),
     "--option",
     "extra-sandbox-paths",
     "",

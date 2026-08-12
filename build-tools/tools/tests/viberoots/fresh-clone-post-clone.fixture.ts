@@ -2,6 +2,7 @@ import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { TestContext } from "node:test";
+import { pathToFileURL } from "node:url";
 import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-viberoots-input";
 import {
   buildCanonicalArtifactEnvironment,
@@ -9,12 +10,14 @@ import {
 } from "../../lib/artifact-environment";
 import { VIBEROOTS_SOURCE_ROOT } from "../lib/test-helpers/source-paths";
 import { execManaged } from "../lib/test-helpers/managed-exec";
-import { withGitAutoMaintenanceDisabledEnv } from "../../lib/git-auto-maintenance-env";
+import {
+  withGitAutoMaintenanceDisabledEnv,
+  withGitConfigEnvEntries,
+} from "../../lib/git-auto-maintenance-env";
 import { stageFreshCloneConsistencyEntrypoint } from "./fresh-clone-post-clone-consistency-source";
 import { writeFreshCloneShims } from "./fresh-clone-post-clone-shims";
 
 export const requiredTrackedInputs = [".buckroot", ".buckconfig", ".envrc", ".gitignore"] as const;
-
 export async function git(
   root: string,
   args: string[],
@@ -67,13 +70,15 @@ export async function createFreshCloneFixture(
   const nixLog = path.join(tmp, "nix.log");
   const realGitPath = await underlyingGitPath();
   t.after(async () => await fsp.rm(tmp, { recursive: true, force: true }));
-  const localGitEnv = withGitAutoMaintenanceDisabledEnv({
-    ...process.env,
-    VBR_REAL_GIT: realGitPath,
-    GIT_CONFIG_COUNT: "1",
-    GIT_CONFIG_KEY_0: "protocol.file.allow",
-    GIT_CONFIG_VALUE_0: "always",
-  });
+  const localGitEnv = withGitAutoMaintenanceDisabledEnv(
+    withGitConfigEnvEntries({ ...process.env, VBR_REAL_GIT: realGitPath }, [
+      ["protocol.file.allow", "always"],
+      [
+        `url.${pathToFileURL(submoduleSource).href}.insteadOf`,
+        "https://github.com/viberoots/viberoots.git",
+      ],
+    ]),
+  );
   await Promise.all(
     [submoduleSource, consumerSource, fakeBin].map((dir) => fsp.mkdir(dir, { recursive: true })),
   );

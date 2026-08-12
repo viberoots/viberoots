@@ -5,6 +5,8 @@ import {
   type PublicationSubject,
 } from "../../ci/artifact-reproducibility-aggregate";
 import type { SignedArtifactReproducibilityAggregate } from "../../ci/cache-publication-evidence";
+import { createProtectedRustPatchEvidence } from "../../ci/protected-rust-patch-evidence";
+import { protectedRustPatchCaseDefinitions } from "../../ci/protected-rust-patch-case-driver";
 import {
   artifactToolClosureDigest,
   type ArtifactReproducibilityEvidence,
@@ -13,6 +15,7 @@ import {
   ARTIFACT_REPRODUCIBILITY_MATRIX,
   ARTIFACT_REPRODUCIBILITY_MATRIX_DIGEST,
   RELEASE_BUILDER_SYSTEMS,
+  reproducibilityMatrixCase,
   reproducibilityRecipeDigest,
 } from "../../lib/artifact-reproducibility-matrix";
 import { deterministicRemoteBuilderHostKey } from "../remote-exec/remote-builder-host-key.fixture";
@@ -21,13 +24,14 @@ import {
   graduatedLanguageManifestFixture,
   observationStorePath,
 } from "./artifact-reproducibility.fixture";
+import { remoteCiToolsSourceIdentity } from "./remote-ci-tools-source-identity.fixture";
 
 const registryStorePath = `/nix/store/${"9".repeat(32)}-registry/registry.json`;
-const evidenceStoreUri = "s3://reviewed-evidence/reproducibility";
 const digest = (value: string) =>
   `sha256:${crypto.createHash("sha256").update(value).digest("hex")}`;
 const store = (value: string, name: string) =>
   `/nix/store/${crypto.createHash("sha256").update(value).digest("hex").slice(0, 32)}-${name}`;
+const toolClosureSourceIdentity = remoteCiToolsSourceIdentity("b".repeat(40));
 
 export const productionPublicationSubject: PublicationSubject = {
   kind: "publication",
@@ -54,7 +58,7 @@ function registry() {
     schema: "viberoots.reviewed-remote-builders.v3" as const,
     evidenceStore: {
       schema: "viberoots.reproducibility-evidence-store.v1" as const,
-      storeUri: evidenceStoreUri,
+      storeUri: "s3://reviewed-evidence/reproducibility",
       signatures: "required" as const,
     },
     builders: RELEASE_BUILDER_SYSTEMS.flatMap((system) =>
@@ -86,10 +90,26 @@ function evidence(
   index: number,
 ): ArtifactReproducibilityEvidence {
   const key = `${subject.kind}-${subject.kind === "matrix" ? subject.matrixId : subject.subjectId}-${system}`;
+  const outputPath = store(key, key);
+  const semanticManifest =
+    subject.kind !== "matrix" || subject.artifactFamily !== "rust"
+      ? ({ kind: "not-applicable" } as const)
+      : subject.matrixId === "rust-tauri-darwin-pr12"
+        ? ({
+            kind: "tauri-artifact-manifest",
+            storePath: `${outputPath}/share/viberoots-tauri/artifact-manifest.json`,
+            digest: digest(`semantic-${key}`),
+          } as const)
+        : ({
+            kind: "rust-materialization-manifest",
+            storePath: `${outputPath}/share/viberoots-rust/materialization-manifest.json`,
+            digest: digest(`semantic-${key}`),
+          } as const);
   return {
-    schema: "viberoots.artifact-reproducibility-evidence.v4",
+    schema: "viberoots.artifact-reproducibility-evidence.v6",
     classification: "hermetic",
     sourceRevision: "a".repeat(40),
+    toolSourceRevision: "b".repeat(40),
     immutableSourceDigest: digest("source"),
     evaluationBundleAuthority: {
       sourceRoot: `${store(`bundle-${index}`, "evaluation-bundle")}/source`,
@@ -103,9 +123,13 @@ function evidence(
     toolClosureRoot: store("tools", "remote-ci-tools"),
     system,
     derivationPath: store(key, `${key}.drv`),
-    outputPath: store(key, key),
+    outputPath,
+    provenanceOutputPath: outputPath,
     narHash: digest(`nar-${key}`),
+    provenanceNarHash: digest(`nar-${key}`),
     closureIdentityDigest: digest(`closure-${key}`),
+    provenanceClosureIdentityDigest: digest(`closure-${key}`),
+    semanticManifest,
     subjectAuthority: subject,
     checkoutIdentity: digest(`checkout-${system}-${slot}`),
     builderAuthority: authority(system, slot),
@@ -128,9 +152,17 @@ export function signedCacheAggregateFixture(): SignedArtifactReproducibilityAggr
     productionPublicationSubject,
   ];
   const records = subjects.flatMap((subject, index) =>
-    RELEASE_BUILDER_SYSTEMS.flatMap((system) =>
+    (subject.kind === "matrix"
+      ? reproducibilityMatrixCase(subject.matrixId).systems
+      : RELEASE_BUILDER_SYSTEMS
+    ).flatMap((system) =>
       (["a", "b"] as const).map((slot) => {
-        const artifactEvidence = evidence(subject, system, slot, index);
+        const artifactEvidence = evidence(
+          subject,
+          system as (typeof RELEASE_BUILDER_SYSTEMS)[number],
+          slot,
+          index,
+        );
         return createArtifactReproducibilityRunRecord({
           registryStorePath,
           observationStorePath: observationStorePath(artifactEvidence),
@@ -150,7 +182,69 @@ export function signedCacheAggregateFixture(): SignedArtifactReproducibilityAggr
       languageManifest: graduatedLanguageManifestFixture,
       expectedSourceRevision: "a".repeat(40),
       expectedToolClosureRoot: store("tools", "remote-ci-tools"),
+      expectedToolClosureSourceIdentity: toolClosureSourceIdentity,
+      protectedRustPatchEvidence: RELEASE_BUILDER_SYSTEMS.flatMap((system) =>
+        (["a", "b"] as const).map((slot, index) =>
+          createProtectedRustPatchEvidence({
+            sourceRevision: "a".repeat(40),
+            toolSourceRevision: "b".repeat(40),
+            system,
+            builderSlot: index === 0 ? "one" : "two",
+            builderAuthority: authority(system, slot),
+            remoteStoreRequired: true,
+            toolClosureSourceIdentity,
+            cases: protectedRustPatchCaseDefinitions(system).map((testCase, caseIndex) => {
+              const baseline = protectedPatchPhase(testCase, system, caseIndex, "baseline");
+              return {
+                caseId: testCase.id,
+                driverSource: `${store("tools", "remote-ci-tools")}/share/viberoots-source/build-tools/tools/ci/protected-rust-patch-case-driver.ts`,
+                workflowSource: `${store("tools", "remote-ci-tools")}/share/viberoots-source/build-tools/tools/patch/patch-rust.ts`,
+                workflowActions: ["start", "apply", "remove"] as ["start", "apply", "remove"],
+                patchPath: `${testCase.cargoRoot}/patches/rust/dependency.patch`,
+                baseline,
+                patched: protectedPatchPhase(testCase, system, caseIndex, "patched"),
+                restored: protectedPatchPhase(testCase, system, caseIndex, "restored"),
+              };
+            }),
+          }),
+        ),
+      ),
     }),
-    evidenceStoreUri,
+    evidenceStoreUri: "s3://reviewed-evidence/reproducibility",
+  };
+}
+
+function protectedPatchPhase(
+  testCase: ReturnType<typeof protectedRustPatchCaseDefinitions>[number],
+  system: string,
+  caseIndex: number,
+  phase: string,
+) {
+  const state = phase === "patched" ? "patched" : "baseline";
+  const outputPath = store(`${system}-${caseIndex}-${state}`, state);
+  const reachableNodes = testCase.matrixCase.languageProofs.map((proof) => ({
+    name: proof.target,
+    ruleType: proof.ruleTypes[0]!,
+    kinds: proof.requiredLabels.filter((label) => label.startsWith("kind:")),
+  }));
+  return {
+    derivationPaths: [`${outputPath}.drv`],
+    outputPaths: [outputPath],
+    semanticDigest: digest(`${outputPath}:semantic`),
+    behaviorDigest: digest(`${outputPath}:behavior`),
+    behavior: state === "patched" ? "43" : "42",
+    graphDigest: digest(`${system}:${caseIndex}:${state}:graph`),
+    graphBindingDigest: digest(`${system}:${caseIndex}:binding`),
+    matrixDigest: ARTIFACT_REPRODUCIBILITY_MATRIX_DIGEST,
+    evaluationBundleDigest: digest(`${system}:${caseIndex}:${state}:bundle`),
+    sourceTreeDigest: `sha256-${Buffer.from(`${system}:${caseIndex}:${state}`).toString("base64")}`,
+    consumerCommit: digest(`${system}:${caseIndex}:${phase}:commit`).slice(7, 47),
+    consumerTree: digest(`${system}:${caseIndex}:${state}:tree`).slice(7, 47),
+    patchDigest: state === "patched" ? digest(`${system}:${caseIndex}:patch`) : null,
+    reachableNodes,
+    reachableNodesDigest: `sha256:${crypto
+      .createHash("sha256")
+      .update(JSON.stringify(reachableNodes))
+      .digest("hex")}`,
   };
 }

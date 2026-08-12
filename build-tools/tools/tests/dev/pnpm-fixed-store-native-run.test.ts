@@ -3,12 +3,11 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { nixEnv } from "./pnpm-fixed-store-native-fixture";
 import {
-  diskUsageCommand,
+  assertOwnedStorePathWithinKib,
   NATIVE_PNPM_COMMAND_TIMEOUT_MS,
-  parseDfDevice,
-  parseDfUsedKib,
-  parseDiskutilUsedKib,
+  parseOwnedStorePathSize,
   parseNonnegativeKib,
   runGuardedCommand,
 } from "./pnpm-fixed-store-native-run";
@@ -17,42 +16,63 @@ test("native reconciliation uses the production cold command budget", () => {
   assert.equal(NATIVE_PNPM_COMMAND_TIMEOUT_MS, 600_000);
 });
 
-test("disk guard measurements fail closed on malformed size output", () => {
-  assert.equal(parseNonnegativeKib("2048", "du"), 2048);
-  assert.equal(
-    parseDfUsedKib(
-      "Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/disk 9 7 2 78% /nix",
-    ),
-    7,
-  );
-  assert.throws(() => parseNonnegativeKib("not-a-size", "du"), /nonnegative KiB value/);
-  assert.throws(() => parseNonnegativeKib(undefined, "df"), /nonnegative KiB value/);
-  assert.throws(() => parseDfUsedKib("not df output"), /nonnegative KiB value/);
-  assert.equal(
-    parseDiskutilUsedKib(
-      "<plist><dict><key>CapacityInUse</key><integer>2097153</integer></dict></plist>",
-    ),
-    2049,
-  );
-  assert.throws(() => parseDiskutilUsedKib("not plist output"), /nonnegative KiB value/);
-  assert.equal(
-    parseDfDevice(
-      "Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/disk3s7 9 7 2 78% /nix",
-    ),
-    "/dev/disk3s7",
-  );
-  assert.throws(() => parseDfDevice("not df output"), /device path/);
+test("native reconciliation fixture preserves degraded reviewed Nix cache config", () => {
+  const previousConfig = process.env.NIX_CONFIG;
+  const previousReviewed = process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG;
+  try {
+    process.env.NIX_CONFIG = [
+      "substituters = https://cache.nixos.org/",
+      "extra-substituters = https://cache.home.kilty.io/main",
+    ].join("\n");
+    process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG = [
+      "substituters = https://cache.nixos.org/",
+      "extra-substituters =",
+      "connect-timeout = 3",
+      "stalled-download-timeout = 10",
+      "fallback = true",
+    ].join("\n");
+
+    const env = nixEnv("/tmp/vbr-native-reconcile-home");
+    assert.match(String(env.NIX_CONFIG), /experimental-features = nix-command flakes/);
+    assert.match(String(env.NIX_CONFIG), /substituters = https:\/\/cache\.nixos\.org\//);
+    assert.match(String(env.NIX_CONFIG), /extra-substituters =(?:\n|$)/);
+    assert.doesNotMatch(String(env.NIX_CONFIG), /cache\.home\.kilty\.io/);
+    assert.equal(env.NIX_CONF_DIR?.includes("viberoots-empty-nix-conf"), true);
+  } finally {
+    if (previousConfig === undefined) delete process.env.NIX_CONFIG;
+    else process.env.NIX_CONFIG = previousConfig;
+    if (previousReviewed === undefined) delete process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG;
+    else process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG = previousReviewed;
+  }
 });
 
-test("disk guard samples the requested APFS volume with structured diskutil output", () => {
-  assert.deepEqual(diskUsageCommand("/nix", "darwin"), {
-    command: "/bin/df",
-    args: ["-Pk", "/nix"],
-  });
-  assert.deepEqual(diskUsageCommand("/nix", "linux"), {
-    command: "df",
-    args: ["-k", "/nix"],
-  });
+test("owned size measurements fail closed on malformed output", () => {
+  assert.equal(parseNonnegativeKib("2048", "du"), 2048);
+  assert.throws(() => parseNonnegativeKib("not-a-size", "du"), /nonnegative KiB value/);
+  const storePath = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-owned";
+  assert.deepEqual(
+    parseOwnedStorePathSize(
+      JSON.stringify({ [storePath]: { narSize: 2049, closureSize: 4097 } }),
+      storePath,
+    ),
+    { narKib: 3, closureKib: 5 },
+  );
+  assert.throws(
+    () => parseOwnedStorePathSize(JSON.stringify({ [storePath]: {} }), storePath),
+    /omitted owned size evidence/,
+  );
+});
+
+test("owned output guard rejects an oversized reconciled path", () => {
+  assert.throws(
+    () =>
+      assertOwnedStorePathWithinKib(
+        "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-owned",
+        { narKib: 512, closureKib: 2048 },
+        1024,
+      ),
+    /owned reconciled output exceeded 1024KiB guard/,
+  );
 });
 
 test("guarded command preserves the guard error after child shutdown", async () => {
@@ -83,6 +103,27 @@ test("guarded command preserves the guard error after child shutdown", async () 
   }
 });
 
+test("unrelated container growth cannot fail an owned fixture guard", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-owned-usage-"));
+  let externalContainerKib = 0;
+  try {
+    const result = await runGuardedCommand("bash", ["--noprofile", "--norc", "-c", "sleep 0.03"], {
+      cwd: root,
+      fixtureRoot: root,
+      maxKib: 1024,
+      measureUsage: async () => {
+        externalContainerKib += 1024 * 1024;
+        return { fixtureKib: 1 };
+      },
+      sampleIntervalMs: 1,
+    });
+    assert.equal(result.status, 0);
+    assert.ok(externalContainerKib > 1024);
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
 test("guarded command preserves an in-flight sample failure observed during child close", async () => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-guarded-close-race-"));
   let samples = 0;
@@ -95,7 +136,7 @@ test("guarded command preserves an in-flight sample failure observed during chil
         measureUsage: async () => {
           samples++;
           await new Promise((resolve) => setTimeout(resolve, 50));
-          return { diskDeltaKib: 0, fixtureKib: 2048 };
+          return { fixtureKib: 2048 };
         },
         sampleIntervalMs: 1,
       }),

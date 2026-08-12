@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "expectedCount": 540,
-  "expectedDigest": "d703303ea89786b58d4d5c5981c0df36e4e7fcd6498670bf6f288c92e1b1df65",
+  "expectedCount": 569,
+  "expectedDigest": "a592d1b9b86fd3e9ab5eb1b60c3d83aa29f8ae84ccc233669f0077cfa1e6bcad",
   "classificationRules": [
     {
       "pathPattern": "^Jenkinsfile$",
@@ -91,6 +91,11 @@
       "allowedEscapes": ["diagnostic-impure"]
     },
     {
+      "pathPattern": "^build-tools/tools/dev/dev-build/debug\\.ts$",
+      "role": "non-artifact-orchestration",
+      "justification": "The development-build debug helper only inspects TARGETS files and Buck target expansion under an explicit debug flag; it does not construct or publish artifacts."
+    },
+    {
       "pathPattern": "^build-tools/tools/dev/dev-build(?:\\.ts|/)",
       "role": "canonical-artifact",
       "justification": "The public build command and its private orchestration implement canonical artifact admission and construction, including explicitly classified non-release development bundles."
@@ -157,7 +162,12 @@
       "justification": "Verification, status, cleanup, inventory, and developer control commands inspect or coordinate state without publishing artifacts."
     },
     {
-      "pathPattern": "^build-tools/tools/lib/(?:changed-paths|consumer-bootstrap|deployment-test-targets|fs-helpers|live-bootstrap|lockfiles|managed-command|node-run|open-file-inspection|pnpm-importer-lockfile|process-inspection|template-test-selector-query|tool-paths|workspace-remote-source)\\.ts$",
+      "pathPattern": "^build-tools/tools/dev/zx-(?:init|process-kill)\\.mjs$",
+      "role": "non-artifact-orchestration",
+      "justification": "The ZX bootstrap and process-tree terminator inspect numeric process relationships solely to shut down owned orchestration commands without constructing artifacts."
+    },
+    {
+      "pathPattern": "^build-tools/tools/lib/(?:changed-paths|consumer-bootstrap|deployment-test-targets|fs-helpers|live-bootstrap|lockfiles|managed-command|node-run|open-file-inspection|pnpm-importer-lockfile|process-inspection(?:-runner)?|template-test-selector-query|tool-paths|workspace-remote-source)\\.ts$",
       "role": "non-artifact-orchestration",
       "justification": "These shared utilities support bootstrap, inspection, querying, deployment tests, and process control without constructing artifacts."
     }

@@ -6,6 +6,12 @@ import {
   artifactToolClosureDigest,
   type ArtifactReproducibilityEvidence,
 } from "../lib/artifact-reproducibility-evidence";
+import {
+  readArtifactSemanticManifest,
+  readRemoteNixStoreFile,
+} from "./artifact-reproducibility-semantic-manifest";
+import { verifyArtifactOutputPair } from "./artifact-reproducibility-output-identity";
+export { readArtifactPathIdentity } from "./artifact-reproducibility-output-identity";
 
 type RunNix = (args: string[]) => Promise<{ stdout: string; stderr?: string }>;
 
@@ -17,8 +23,10 @@ export type ReproducibilityProductionInput = {
   system: string;
   flakeRef: string;
   outputPath: string;
+  provenanceOutputPath: string;
   subjectAuthority: ArtifactReproducibilityEvidence["subjectAuthority"];
   checkoutIdentity: string;
+  toolSourceRevision: string;
   builderAuthority: ArtifactReproducibilityEvidence["builderAuthority"];
 };
 
@@ -46,24 +54,21 @@ export async function produceArtifactReproducibilityEvidence(
     bindingDigest: input.expectedBindingDigest,
     replayMaterializations: 2,
   };
-  const initial = await readArtifactPathIdentity(input.outputPath, runNix);
-  await runNix(["store", "verify", "--no-trust", input.outputPath]);
-  const rebuilt = onlyPath(
-    (await runNix(["build", "--rebuild", "--no-link", "--print-out-paths", input.flakeRef])).stdout,
+  const { runtime: initial, provenance: initialProvenance } = await verifyArtifactOutputPair(
+    input,
+    runNix,
   );
-  if (rebuilt !== input.outputPath) throw new Error("forced rebuild changed the output store path");
-  const rebuiltIdentity = await readArtifactPathIdentity(rebuilt, runNix);
-  assertSamePathIdentity(initial, rebuiltIdentity, "forced rebuild");
-  const warm = onlyPath(
-    (await runNix(["build", "--no-link", "--print-out-paths", input.flakeRef])).stdout,
+  const semanticManifest = await readArtifactSemanticManifest(
+    input.outputPath,
+    input.subjectAuthority,
+    async (storePath) => await readRemoteNixStoreFile(runNix, storePath),
+    input.provenanceOutputPath,
   );
-  if (warm !== input.outputPath) throw new Error("warm build changed the output store path");
-  const warmIdentity = await readArtifactPathIdentity(warm, runNix);
-  assertSamePathIdentity(initial, warmIdentity, "warm build");
   const evidence: ArtifactReproducibilityEvidence = {
-    schema: "viberoots.artifact-reproducibility-evidence.v4",
+    schema: "viberoots.artifact-reproducibility-evidence.v6",
     classification: "hermetic",
     sourceRevision: identity.sourceRevision,
+    toolSourceRevision: input.toolSourceRevision,
     immutableSourceDigest: identity.immutableSourceDigest,
     evaluationBundleAuthority,
     declaredGraphDigest: identity.declaredGraphDigest,
@@ -73,8 +78,12 @@ export async function produceArtifactReproducibilityEvidence(
     system: input.system,
     derivationPath: initial.derivationPath,
     outputPath: input.outputPath,
+    provenanceOutputPath: input.provenanceOutputPath,
     narHash: initial.narHash,
+    provenanceNarHash: initialProvenance.narHash,
     closureIdentityDigest: initial.closureIdentityDigest,
+    provenanceClosureIdentityDigest: initialProvenance.closureIdentityDigest,
+    semanticManifest,
     subjectAuthority: input.subjectAuthority,
     checkoutIdentity: input.checkoutIdentity,
     builderAuthority: input.builderAuthority,
@@ -133,74 +142,6 @@ export async function readBundleIdentity(sourceRoot: string) {
 export function opaqueIdentity(value: string): string {
   if (!value.trim()) throw new Error("identity input is required");
   return digest(path.resolve(value));
-}
-
-export async function readArtifactPathIdentity(outputPath: string, runNix: RunNix) {
-  const derivationPath = onlyPath((await runNix(["path-info", "--derivation", outputPath])).stdout);
-  const raw = JSON.parse((await runNix(["path-info", "--json", outputPath])).stdout) as unknown;
-  const record = pathInfoRecord(raw, outputPath);
-  const narHash = String(record.narHash || "");
-  if (!narHash) throw new Error(`Nix path-info omitted the NAR hash for ${outputPath}`);
-  const closure = JSON.parse(
-    (await runNix(["path-info", "--recursive", "--json", outputPath])).stdout,
-  ) as unknown;
-  return { derivationPath, narHash, closureIdentityDigest: closureDigest(closure) };
-}
-
-function closureDigest(value: unknown): string {
-  const records = Array.isArray(value)
-    ? value
-    : Object.entries((value || {}) as Record<string, unknown>).map(([storePath, entry]) => ({
-        ...((entry || {}) as Record<string, unknown>),
-        path: storePath,
-      }));
-  const identity = records
-    .map((entry) => {
-      const record = entry as Record<string, unknown>;
-      const storePath = String(record.path || "");
-      const narHash = String(record.narHash || "");
-      if (!storePath.startsWith("/nix/store/") || !narHash) {
-        throw new Error("recursive Nix path-info omitted closure path or NAR identity");
-      }
-      return { narHash, path: storePath };
-    })
-    .sort((left, right) => left.path.localeCompare(right.path));
-  if (!identity.length) throw new Error("recursive Nix closure identity is empty");
-  return digest(canonicalJson(identity));
-}
-
-function pathInfoRecord(value: unknown, outputPath: string): Record<string, unknown> {
-  if (Array.isArray(value)) {
-    const hit = value.find((entry) => (entry as { path?: unknown })?.path === outputPath);
-    if (hit && typeof hit === "object") return hit as Record<string, unknown>;
-  }
-  if (value && typeof value === "object") {
-    const hit = (value as Record<string, unknown>)[outputPath];
-    if (hit && typeof hit === "object") return hit as Record<string, unknown>;
-  }
-  throw new Error(`Nix path-info omitted ${outputPath}`);
-}
-
-function assertSamePathIdentity(
-  left: { derivationPath: string; narHash: string; closureIdentityDigest: string },
-  right: { derivationPath: string; narHash: string; closureIdentityDigest: string },
-  phase: string,
-): void {
-  if (
-    left.derivationPath !== right.derivationPath ||
-    left.narHash !== right.narHash ||
-    left.closureIdentityDigest !== right.closureIdentityDigest
-  ) {
-    throw new Error(`${phase} changed derivation, output NAR, or recursive closure identity`);
-  }
-}
-
-function onlyPath(stdout: string): string {
-  const paths = stdout.trim().split(/\s+/u).filter(Boolean);
-  if (paths.length !== 1 || !paths[0]!.startsWith("/nix/store/")) {
-    throw new Error("Nix command must return exactly one store path");
-  }
-  return paths[0]!;
 }
 
 async function readRequired(file: string): Promise<string> {

@@ -59,7 +59,11 @@ export async function run() {
   // Fast path if no known-language nodes
   if (active.length === 0) {
     const normalized = nodes.map((n) => ({ ...n, labels: Array.from(new Set(n.labels || [])) }));
-    await writeIfChangedJSON(out, normalized);
+    await writeIfChangedJSON(out, {
+      $schema: "https://example.com/schemas/buck-graph.schema.json",
+      version: 1,
+      nodes: normalized,
+    });
     if (metricsOut)
       await emitMetrics(metricsOut, {
         totalBatches: 0,

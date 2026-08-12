@@ -7,7 +7,10 @@ import { ensureNixStoreToolPathSync, envWithResolvedNixBin } from "../lib/tool-p
 import { buildArtifactEnvironment } from "../lib/artifact-environment";
 import { artifactNixPolicyArgs } from "../lib/artifact-nix-policy";
 import { runBoundedArtifactCommand } from "../lib/artifact-command-runner";
-import type { NixCachePolicyCapability } from "../lib/nix-cache-policy-capability";
+import {
+  outcomeFromNixCachePolicyCapability,
+  type NixCachePolicyCapability,
+} from "../lib/nix-cache-policy-capability";
 
 function runnableBuildTimeoutSec(): number {
   const raw = String(process.env.VBR_RUNNABLE_BUILD_TIMEOUT_SEC || "").trim();
@@ -103,6 +106,22 @@ export function runnableNixArtifactEnvironment(
   });
 }
 
+function runnableNixCachePolicyArgs(capability: NixCachePolicyCapability | undefined): string[] {
+  if (!capability) return [];
+  const outcome = outcomeFromNixCachePolicyCapability(capability);
+  if (outcome.kind === "off") {
+    return ["--option", "substituters", "", "--option", "extra-substituters", ""];
+  }
+  return [
+    "--option",
+    "substituters",
+    outcome.requiredSubstituters.join(" "),
+    "--option",
+    "extra-substituters",
+    outcome.optionalSubstituters.join(" "),
+  ];
+}
+
 export async function runNixBuildWithProgress(
   opts: RunnableNixEnvironmentOptions & {
     args: string[];
@@ -114,7 +133,12 @@ export async function runNixBuildWithProgress(
   const nixBin = ensureNixStoreToolPathSync("nix", env);
   const result = await runBoundedArtifactCommand({
     command: nixBin,
-    args: ["build", ...artifactNixPolicyArgs(), ...opts.args],
+    args: [
+      "build",
+      ...artifactNixPolicyArgs(),
+      ...runnableNixCachePolicyArgs(opts.nixCachePolicyCapability),
+      ...opts.args,
+    ],
     cwd: opts.workspaceRoot,
     env,
     timeoutMs: timeoutSec * 1000,

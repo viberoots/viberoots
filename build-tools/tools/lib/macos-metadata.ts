@@ -5,6 +5,23 @@ import process from "node:process";
 
 export const MACOS_METADATA_NEVER_INDEX_FILE = ".metadata_never_index";
 
+export function macosNoindexPathSegment(
+  name: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  if (platform !== "darwin" || name.endsWith(".noindex")) return name;
+  return `${name}.noindex`;
+}
+
+export function extendMacosNoindexPathSegment(
+  base: string,
+  suffix: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const stem = platform === "darwin" && base.endsWith(".noindex") ? base.slice(0, -8) : base;
+  return macosNoindexPathSegment(`${stem}${suffix}`, platform);
+}
+
 export async function markMacosMetadataNeverIndex(
   dir: string,
   platform: NodeJS.Platform = process.platform,

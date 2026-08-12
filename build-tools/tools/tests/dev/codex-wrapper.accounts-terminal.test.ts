@@ -205,7 +205,10 @@ fi
     );
     await assert.rejects(
       runInControllingTerminal(fixture, "timeout", "", {
-        innerTimeoutSeconds: 30,
+        // The harness timeout is only a final deadlock guard. Keep it well beyond
+        // the outer timer so CPU starvation cannot make the harness win the race
+        // and turn the expected timeout rejection into a successful exit.
+        innerTimeoutSeconds: 120,
         outerTimeoutMs: 300,
         timeoutStartPath: pidFile,
       }),

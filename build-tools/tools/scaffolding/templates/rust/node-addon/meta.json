@@ -2,5 +2,10 @@
   "language": "rust",
   "template": "node-addon",
   "description": "Experimental Rust Node-API addon",
-  "resolverDestination": "projects/libs/{name}"
+  "resolverDestination": "projects/libs/{name}",
+  "help": {
+    "usage": "scaf new rust node-addon <name> [--path=DEST]",
+    "notes": ["Creates a Rust Node-API addon with locked Cargo metadata."],
+    "examples": ["scaf new rust node-addon demo --yes"]
+  }
 }

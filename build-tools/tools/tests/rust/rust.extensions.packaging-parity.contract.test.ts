@@ -11,16 +11,18 @@ async function source(relative: string): Promise<string> {
 }
 
 test("Rust and C++ extensions share language-neutral staging and evidence contracts", async () => {
-  const [python, node, service, macros, action, rust, nodeApi, pythonDeps] = await Promise.all([
-    source("build-tools/tools/nix/planner/python-pyext.nix"),
-    source("build-tools/tools/nix/planner/node-native-addons.nix"),
-    source("build-tools/tools/nix/planner/node-service.nix"),
-    source("build-tools/rust/private/macro_contract.bzl"),
-    source("build-tools/rust/private/nix_build.bzl"),
-    source("build-tools/tools/nix/templates/rust.nix"),
-    source("build-tools/tools/nix/templates/rust-node-api.nix"),
-    source("build-tools/tools/nix/planner/rust-python-deps.nix"),
-  ]);
+  const [python, node, service, macros, action, rust, rustEvidence, nodeApi, pythonDeps] =
+    await Promise.all([
+      source("build-tools/tools/nix/planner/python-pyext.nix"),
+      source("build-tools/tools/nix/planner/node-native-addons.nix"),
+      source("build-tools/tools/nix/planner/node-service.nix"),
+      source("build-tools/rust/private/macro_contract.bzl"),
+      source("build-tools/rust/private/nix_build.bzl"),
+      source("build-tools/tools/nix/templates/rust.nix"),
+      source("build-tools/tools/nix/templates/rust-evidence-install.nix"),
+      source("build-tools/tools/nix/templates/rust-node-api.nix"),
+      source("build-tools/tools/nix/planner/rust-python-deps.nix"),
+    ]);
   assert.match(python, /map ctx\.dependencyArtifactOf/);
   assert.doesNotMatch(python, /lang:rust/);
   assert.match(node, /builtins\.elem "lang:rust"/);
@@ -46,7 +48,8 @@ test("Rust and C++ extensions share language-neutral staging and evidence contra
   assert.match(rust, /import \.\/rust-node-api\.nix/);
   assert.match(nodeApi, /process\.versions\.napi/);
   assert.match(nodeApi, /node_api_module_get_api_version_v1/);
-  assert.match(rust, /materialization-manifest\.json/);
+  assert.match(rust, /import \.\/rust-evidence-install\.nix/);
+  assert.match(rustEvidence, /materialization-manifest\.json/);
   assert.match(rust, /pythonWheelhouse/);
   assert.doesNotMatch(rust, /pkgs\.python3\.pkgs/);
   assert.match(pythonDeps, /pythonTemplate\.pyWheelhouse/);

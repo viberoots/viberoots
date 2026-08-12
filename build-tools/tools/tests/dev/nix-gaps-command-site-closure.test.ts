@@ -94,6 +94,37 @@ test("root flake bytes are an explicit inventory fingerprint authority", async (
   });
 });
 
+test("command-site inventory mismatch reports changed inventory files", async () => {
+  await runInTemp("nix-gaps-command-site-explain", async (tmp, $) => {
+    const root = path.join(tmp, "inventory-root");
+    await fs.outputFile(
+      path.join(root, "build-tools/tools/ci/artifact.ts"),
+      "await $`nix build --no-link`;\n",
+    );
+    await $({ cwd: root })`git init --quiet`;
+    const policy: CommandSiteInventoryPolicy = {
+      ...emptyPolicy,
+      classificationRules: [
+        {
+          pathPattern: "^build-tools/tools/ci/",
+          role: "canonical-artifact",
+          justification: "Fixture canonical CI command route.",
+        },
+      ],
+    };
+    const baseline = await inspectProductionCommandSites(root, policy);
+    await fs.appendFile(path.join(root, "build-tools/tools/ci/artifact.ts"), "// reviewed drift\n");
+    await assert.rejects(
+      enforceProductionCommandSiteInventory(root, {
+        ...policy,
+        expectedCount: baseline.count,
+        expectedDigest: baseline.digest,
+      }),
+      /Changed command-site inventory files to review:[\s\S]*build-tools\/tools\/ci\/artifact\.ts role=canonical-artifact command_sites=1/,
+    );
+  });
+});
+
 test("new executable root, hook, and shim surfaces fail closed and stay fingerprinted", async () => {
   await runInTemp("nix-gaps-executable-surfaces", async (tmp, $) => {
     const root = path.join(tmp, "inventory-root");

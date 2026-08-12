@@ -146,21 +146,7 @@ function printFailedChildOutput(label: string, result: unknown): void {
 
 // Resolve absolute workspace root path without requiring callers to run from repo root.
 async function resolveWorkspaceRoot(): Promise<string> {
-  const cwd = process.cwd();
-  let gitRoot = "";
-  try {
-    const { stdout } = await $({ stdio: "pipe" })`git -C ${cwd} rev-parse --show-toplevel`.quiet();
-    gitRoot = String(stdout || "").trim();
-  } catch {}
-  if (!gitRoot) gitRoot = await findRepoRoot(cwd);
-  const wr = String(process.env.WORKSPACE_ROOT || "").trim();
-  if (wr) {
-    try {
-      const abs = path.resolve(wr);
-      if (abs === gitRoot) return abs;
-    } catch {}
-  }
-  return gitRoot;
+  return await findRepoRoot(process.cwd());
 }
 const envDryRun = process.env.INSTALL_DEPS_DRY_RUN === "1";
 const envSkipGoTidy = process.env.INSTALL_DEPS_SKIP_GO_TIDY === "1";

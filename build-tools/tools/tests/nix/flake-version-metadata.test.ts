@@ -68,10 +68,13 @@ test("flake app wrappers use the viberoots source root for helper scripts", asyn
   assert.match(context, /viberootsRoot = viberootsRootPath/);
   assert.match(context, /builtins\.getEnv "WORKSPACE_ROOT"/);
   assert.match(context, /builtins\.getEnv "BUCK_TEST_SRC"/);
-  assert.match(apps, /\{ pkgs, zx-wrapper, viberootsRoot, version, releaseTag, \.\.\. \}:/);
   assert.match(
     apps,
-    /import \.\/packages\/remote-worker-bootstrap\.nix \{\s*inherit pkgs viberootsRoot;/,
+    /\{ pkgs, zx-wrapper, viberootsRoot, viberootsRuntimeRoot, viberootsSourceIdentity, version, releaseTag, \.\.\. \}:/,
+  );
+  assert.match(
+    apps,
+    /import \.\/packages\/remote-worker-bootstrap\.nix \{\s*inherit pkgs;\s*viberootsRoot = viberootsRuntimeRoot;/,
   );
   assert.match(
     bootstrapPackage,

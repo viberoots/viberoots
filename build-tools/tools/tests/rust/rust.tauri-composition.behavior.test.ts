@@ -1,17 +1,20 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import { execFile, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
 import { test } from "node:test";
 import { runInScratchTemp } from "../lib/test-helpers";
 import { killBuckDaemonsForRepo } from "../lib/test-helpers/buck-kill";
-import { exactDescendantCommandPids } from "../lib/process-tree";
-import { buildTauriOutPath, makeTauriCompositionConsumer } from "./rust.tauri-consumer-fixture";
+import { timeDiagnosticAsync } from "../lib/test-helpers/timing";
+import { exactDescendantCommandPids, processTreeRows } from "../lib/process-tree";
+import {
+  buildTauriOutPath,
+  inspectTauriDerivationIdentity,
+  makeTauriCompositionConsumer,
+} from "./rust.tauri-consumer-fixture";
 
 process.env.TEST_NEED_DEV_ENV = "1";
-const execFileAsync = promisify(execFile);
 const sourceRoot = path.resolve(process.env.VIBEROOTS_ROOT || process.cwd());
 const target = "//projects/apps/tauri-composition-app:desktop";
 const evidencePrefix = "VIBEROOTS_TAURI_COMPOSITION_EVIDENCE ";
@@ -43,20 +46,6 @@ async function findFileWithSuffix(root: string, suffix: string): Promise<string>
   throw new Error(`missing *${suffix} under ${root}`);
 }
 
-async function processRows() {
-  const result = await execFileAsync("/bin/ps", ["-axo", "pid=,ppid=,pgid=,command="]);
-  return result.stdout
-    .split("\n")
-    .map((line) => line.trim().match(/^(\d+)\s+(\d+)\s+(\d+)\s+(.*)$/))
-    .filter((match): match is RegExpMatchArray => match !== null)
-    .map((match) => ({
-      pid: Number(match[1]),
-      ppid: Number(match[2]),
-      pgid: Number(match[3]),
-      command: match[4],
-    }));
-}
-
 test(
   "isolated Tauri composition builds, packages, and executes every typed provider",
   { timeout: 2_700_000 },
@@ -65,8 +54,19 @@ test(
       const fixture = await makeTauriCompositionConsumer(tmp, sourceRoot, $);
       const { consumer, artifactEnv } = fixture;
       try {
-        const outPath = await buildTauriOutPath(consumer, artifactEnv(), target, $);
-        await $({ cwd: consumer, env: artifactEnv(), stdio: "inherit" })`v ${target}`;
+        await timeDiagnosticAsync("tauri composition derivation identity", async () =>
+          inspectTauriDerivationIdentity(consumer, artifactEnv(), target, $),
+        );
+        const outPath = await timeDiagnosticAsync("tauri composition artifact build", async () =>
+          buildTauriOutPath(consumer, artifactEnv(), target, $),
+        );
+        await timeDiagnosticAsync("tauri composition nested verify", async () => {
+          await $({
+            cwd: consumer,
+            env: artifactEnv(),
+            stdio: "inherit",
+          })`v --seed-mode=never ${target}`;
+        });
         const manifestPath = path.join(outPath, "share/viberoots-tauri/artifact-manifest.json");
         const manifest = JSON.parse(await fsp.readFile(manifestPath, "utf8"));
         assert.equal(manifest.schema, "viberoots.tauri-artifact.v1");
@@ -142,7 +142,11 @@ test(
         let runtimeFailure: string | undefined;
         const deadline = Date.now() + 180_000;
         while (!exited && Date.now() < deadline) {
-          exactPids = exactDescendantCommandPids(await processRows(), child.pid!, appExecutable);
+          exactPids = exactDescendantCommandPids(
+            await processTreeRows(),
+            child.pid!,
+            appExecutable,
+          );
           const runtimeLines = runtimeOutput.split(/\r?\n/);
           const evidenceLine = runtimeLines.find((line) => line.startsWith(evidencePrefix));
           runtimeFailure = runtimeLines.find((line) => line.startsWith(failurePrefix));
@@ -167,7 +171,7 @@ test(
         const cleanupDeadline = Date.now() + 10_000;
         let groupAlive = true;
         while (groupAlive && Date.now() < cleanupDeadline) {
-          groupAlive = (await processRows()).some((row) => row.pgid === child.pid);
+          groupAlive = (await processTreeRows()).some((row) => row.pgid === child.pid);
           if (groupAlive) await new Promise((resolve) => setTimeout(resolve, 250));
         }
         assert.equal(

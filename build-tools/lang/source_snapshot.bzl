@@ -79,6 +79,9 @@ def _source_snapshot_runner_impl(ctx):
     module_tree = ctx.actions.symlinked_dir(
         ctx.attrs.name + ".modules",
         {
+            "build-tools/tools/dev/zx-init.mjs": ctx.attrs.zx_init,
+            "build-tools/tools/dev/zx-process-kill.mjs": ctx.attrs.zx_process_kill,
+            "build-tools/tools/dev/verify/owner-pid.mjs": ctx.attrs.verify_owner_pid,
             "dev/source-snapshot-graph.ts": ctx.attrs.graph_module,
             "dev/source-snapshot-policy.ts": ctx.attrs.policy_module,
             "dev/source-snapshot.ts": ctx.attrs.generator,
@@ -94,18 +97,17 @@ def _source_snapshot_runner_impl(ctx):
     return [
         DefaultInfo(
             default_output = module_tree,
-            other_outputs = [ctx.attrs.zx_init] + zx_wrapper_tool,
+            other_outputs = zx_wrapper_tool,
         ),
         RunInfo(args = cmd_args(
             ctx.attrs.zx_wrapper_tool[RunInfo],
             "--preserve-symlinks",
             "--preserve-symlinks-main",
             "--import",
-            cmd_args(ctx.attrs.zx_init, format = "./{}"),
+            cmd_args(module_tree, format = "./{}/build-tools/tools/dev/zx-init.mjs"),
             cmd_args(module_tree, format = "./{}/dev/source-snapshot.ts"),
             hidden = [
                 module_tree,
-                ctx.attrs.zx_init,
                 zx_wrapper_tool,
             ],
         )),
@@ -125,6 +127,8 @@ source_snapshot_runner = rule(
         "source_plan_core_module": attrs.source(default = "@viberoots//build-tools/tools/lib:source-plan-evidence-core.ts"),
         "target_label_module": attrs.source(default = "@viberoots//build-tools/tools/lib:target-label-normalization.ts"),
         "zx_init": attrs.source(default = "@viberoots//build-tools/tools/dev:zx-init.mjs"),
+        "zx_process_kill": attrs.source(default = "@viberoots//build-tools/tools/dev:zx-process-kill.mjs"),
+        "verify_owner_pid": attrs.source(default = "@viberoots//build-tools/tools/dev:verify-owner-pid.mjs"),
         "zx_wrapper_tool": attrs.dep(
             default = "@viberoots//build-tools/tools/dev:source-snapshot-zx-wrapper",
             providers = [RunInfo],

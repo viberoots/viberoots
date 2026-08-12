@@ -200,6 +200,17 @@ test("rust macros reject noncanonical Cargo inputs, patch traversal, and unknown
 
     await fsp.writeFile(
       targets,
+      `${load}\nrust_binary(name = "app", srcs = ["src/main.rs"], behavior_probe = "custom")\n`,
+    );
+    const invalidBehaviorProbe = await query();
+    assert.notEqual(invalidBehaviorProbe.exitCode, 0);
+    assert.match(
+      String(invalidBehaviorProbe.stderr || invalidBehaviorProbe.stdout),
+      /behavior_probe must be a bool/,
+    );
+
+    await fsp.writeFile(
+      targets,
       `${load}\nrust_binary(name = "app", srcs = ["src/main.rs"], nixpkg_deps = ["zlib"])\n`,
     );
     const nativeNixpkg = await query();

@@ -10,12 +10,24 @@ export type ReproducibilityMatrixCase = {
   };
   scaffoldRecipe: {
     language: "go" | "ts" | "python" | "cpp" | "rust";
-    template: "lib" | "app" | "cli" | "wasm-lib" | "go-cpp-lib";
+    template:
+      | "lib"
+      | "app"
+      | "cli"
+      | "wasm-lib"
+      | "go-cpp-lib"
+      | "proc-macro"
+      | "python-extension"
+      | "node-addon"
+      | "cxx-bridge"
+      | "cross-root"
+      | "wasm"
+      | "tauri-app";
     name: string;
     destination: string;
   };
   coverage: {
-    routeCapabilities: readonly ("base" | "wasm" | "wasi" | "mixed" | "addon")[];
+    routeCapabilities: readonly ("base" | "wasm" | "wasi" | "mixed" | "addon" | "desktop")[];
   };
   graphSelection: {
     attr: "graph-generator-selected";

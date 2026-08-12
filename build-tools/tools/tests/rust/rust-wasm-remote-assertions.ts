@@ -77,6 +77,7 @@ export async function assertMaterializedTreeMatchesStore(
 export async function verifyRemoteOutputs(
   command: any,
   outputs: Map<string, string>,
+  provenanceOutputs: Map<string, string>,
 ): Promise<void> {
   for (const name of ["remote_static", "remote_wasi_static"]) {
     const root = outputs.get(`//projects/apps/rust-wasm:${name}`)!;
@@ -94,8 +95,9 @@ export async function verifyRemoteOutputs(
 
   for (const name of ["remote_component", "remote_wasi_component"]) {
     const root = outputs.get(`//projects/apps/rust-wasm:${name}`)!;
+    const provenance = provenanceOutputs.get(`//projects/apps/rust-wasm:${name}[provenance]`)!;
     const manifest = JSON.parse(
-      await fs.readFile(path.join(root, "share/viberoots-rust/wasm-manifest.json"), "utf8"),
+      await fs.readFile(path.join(provenance, "share/viberoots-rust/wasm-manifest.json"), "utf8"),
     );
     const result =
       await command`${path.join(manifest.tools.wasmtime, "bin/wasmtime")} run --invoke ${"add(19, 23)"} ${path.join(root, "lib/rust_wasm_fixture.component.wasm")}`;

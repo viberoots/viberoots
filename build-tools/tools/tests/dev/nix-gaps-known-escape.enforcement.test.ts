@@ -7,7 +7,7 @@ import {
   enforceProductionCommandSiteInventory,
   inspectProductionCommandSites,
 } from "../../dev/nix-gaps-command-sites";
-import { runInTemp } from "../lib/test-helpers";
+import { runInScratchTemp } from "../lib/test-helpers";
 
 const policy = {
   schemaVersion: 1 as const,
@@ -55,7 +55,7 @@ const policy = {
 };
 
 test("canonical artifact inventory rejects automatic pnpm lock generation", async () => {
-  await runInTemp("nix-gaps-auto-lock-escape", async (tmp) => {
+  await runInScratchTemp("nix-gaps-auto-lock-escape", async (tmp) => {
     const root = path.join(tmp, "inventory-root");
     await fs.outputFile(
       path.join(root, "build-tools/node/defs.bzl"),
@@ -69,7 +69,7 @@ test("canonical artifact inventory rejects automatic pnpm lock generation", asyn
 });
 
 test("canonical artifact inventory rejects unapproved impure evaluation", async () => {
-  await runInTemp("nix-gaps-impure-escape", async (tmp) => {
+  await runInScratchTemp("nix-gaps-impure-escape", async (tmp) => {
     const root = path.join(tmp, "inventory-root");
     await fs.outputFile(
       path.join(root, "build-tools/node/defs.bzl"),
@@ -83,7 +83,7 @@ test("canonical artifact inventory rejects unapproved impure evaluation", async 
 });
 
 test("reviewed diagnostic helper may retain its explicit impure switch", async () => {
-  await runInTemp("nix-gaps-diagnostic-impure", async (tmp) => {
+  await runInScratchTemp("nix-gaps-diagnostic-impure", async (tmp) => {
     const root = path.join(tmp, "inventory-root");
     await fs.outputFile(
       path.join(root, "build-tools/lang/nix_shell.bzl"),
@@ -95,7 +95,7 @@ test("reviewed diagnostic helper may retain its explicit impure switch", async (
 });
 
 test("explicit update inventory may own pnpm lock generation", async () => {
-  await runInTemp("nix-gaps-update-lock-generation", async (tmp) => {
+  await runInScratchTemp("nix-gaps-update-lock-generation", async (tmp) => {
     const root = path.join(tmp, "inventory-root");
     await fs.outputFile(
       path.join(root, "build-tools/tools/dev/update/pnpm.ts"),
@@ -107,7 +107,7 @@ test("explicit update inventory may own pnpm lock generation", async () => {
 });
 
 test("diagnostic impure permission does not extend to neighboring dev-build files", async () => {
-  await runInTemp("nix-gaps-exact-impure", async (tmp) => {
+  await runInScratchTemp("nix-gaps-exact-impure", async (tmp) => {
     const root = path.join(tmp, "inventory-root");
     await fs.outputFile(
       path.join(root, "build-tools/tools/dev/dev-build/runner.ts"),
@@ -121,7 +121,7 @@ test("diagnostic impure permission does not extend to neighboring dev-build file
 });
 
 test("inventory discovers multiline zx commands", async () => {
-  await runInTemp("nix-gaps-multiline-zx", async (tmp) => {
+  await runInScratchTemp("nix-gaps-multiline-zx", async (tmp) => {
     const root = path.join(tmp, "inventory-root");
     await fs.outputFile(
       path.join(root, "build-tools/tools/dev/update/runner.ts"),
@@ -133,7 +133,7 @@ test("inventory discovers multiline zx commands", async () => {
 });
 
 test("scaffolding templates reject impure build instructions", async () => {
-  await runInTemp("nix-gaps-template-impure", async (tmp) => {
+  await runInScratchTemp("nix-gaps-template-impure", async (tmp) => {
     const root = path.join(tmp, "inventory-root");
     await fs.outputFile(
       path.join(root, "build-tools/tools/scaffolding/templates/toy/README.md.jinja"),
@@ -147,7 +147,7 @@ test("scaffolding templates reject impure build instructions", async () => {
 });
 
 test("inventory discovers reviewed root CI shell entrypoints", async () => {
-  await runInTemp("nix-gaps-root-ci", async (tmp) => {
+  await runInScratchTemp("nix-gaps-root-ci", async (tmp) => {
     const root = path.join(tmp, "inventory-root");
     await fs.outputFile(
       path.join(root, "Jenkinsfile"),
@@ -161,7 +161,7 @@ test("inventory discovers reviewed root CI shell entrypoints", async () => {
 });
 
 test("inventory rejects an unclassified root CI command", async () => {
-  await runInTemp("nix-gaps-root-ci-unclassified", async (tmp) => {
+  await runInScratchTemp("nix-gaps-root-ci-unclassified", async (tmp) => {
     const root = path.join(tmp, "inventory-root");
     await fs.outputFile(
       path.join(root, "Jenkinsfile"),
@@ -182,7 +182,7 @@ test("inventory rejects an unclassified root CI command", async () => {
 });
 
 test("reviewed root CI command drift invalidates the inventory digest", async () => {
-  await runInTemp("nix-gaps-root-ci-drift", async (tmp) => {
+  await runInScratchTemp("nix-gaps-root-ci-drift", async (tmp) => {
     const root = path.join(tmp, "inventory-root");
     const jenkinsfile = path.join(root, "Jenkinsfile");
     await fs.outputFile(
@@ -208,7 +208,7 @@ test("reviewed root CI command drift invalidates the inventory digest", async ()
 });
 
 test("inventory discovers the reviewed uv2nix artifact constructor", async () => {
-  await runInTemp("nix-gaps-uv2nix", async (tmp) => {
+  await runInScratchTemp("nix-gaps-uv2nix", async (tmp) => {
     const root = path.join(tmp, "inventory-root");
     await fs.outputFile(path.join(root, "build-tools/placeholder.ts"), "export {};\n");
     await fs.outputFile(
@@ -222,7 +222,7 @@ test("inventory discovers the reviewed uv2nix artifact constructor", async () =>
 });
 
 test("reviewed uv2nix constructor drift invalidates the inventory digest", async () => {
-  await runInTemp("nix-gaps-uv2nix-drift", async (tmp) => {
+  await runInScratchTemp("nix-gaps-uv2nix-drift", async (tmp) => {
     const root = path.join(tmp, "inventory-root");
     const flake = path.join(root, "third_party/uv2nix/flake.nix");
     await fs.outputFile(path.join(root, "build-tools/placeholder.ts"), "export {};\n");
@@ -241,7 +241,7 @@ test("reviewed uv2nix constructor drift invalidates the inventory digest", async
 });
 
 test("inventory discovers injected Nix command sites", async () => {
-  await runInTemp("nix-gaps-injected-nix", async (tmp) => {
+  await runInScratchTemp("nix-gaps-injected-nix", async (tmp) => {
     const root = path.join(tmp, "inventory-root");
     await fs.outputFile(path.join(root, "build-tools/node/x.ts"), "await runNix([]);\n");
     assert.equal((await inspectProductionCommandSites(root, policy)).count, 1);

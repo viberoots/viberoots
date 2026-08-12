@@ -6,6 +6,7 @@ import { parseVerifyExecutionPolicy, type VerifyExecutionPolicy } from "./remote
 
 export type VerifyConsole = "auto" | "super" | "simple";
 export type VerifySelectorMode = "default" | "project-closure";
+export type VerifySeedMode = "auto" | "always" | "never";
 
 export type VerifyArgs = {
   coverage: boolean;
@@ -14,6 +15,7 @@ export type VerifyArgs = {
   selector: VerifySelectorMode;
   requestedProjects: string[];
   explainSelection: boolean;
+  seedMode?: VerifySeedMode;
 };
 
 const ROOT_ZX_TEST_PREFIX = "build-tools/tools/tests/";
@@ -37,6 +39,15 @@ function parseSelector(raw: string): VerifySelectorMode {
   throw new Error(`unknown verify selector: ${normalized}`);
 }
 
+function parseSeedMode(raw: string): VerifySeedMode {
+  const normalized = String(raw || "").trim();
+  if (!normalized) return "auto";
+  if (normalized === "auto" || normalized === "always" || normalized === "never") {
+    return normalized;
+  }
+  throw new Error(`unknown verify seed mode: ${normalized}`);
+}
+
 export function parseVerifyArgs(opts?: {
   argvTokens?: string[];
   env?: NodeJS.ProcessEnv;
@@ -47,6 +58,7 @@ export function parseVerifyArgs(opts?: {
   let console: VerifyConsole = "auto";
   let selectorFlag = "";
   let explainSelection = false;
+  let seedModeFlag = "";
   const projectFlags: string[] = [];
   const passthrough: string[] = [];
 
@@ -62,6 +74,15 @@ export function parseVerifyArgs(opts?: {
     }
     if (t === "--explain-selection") {
       explainSelection = true;
+      continue;
+    }
+    if (t.startsWith("--seed-mode=")) {
+      seedModeFlag = t.slice("--seed-mode=".length).trim();
+      continue;
+    }
+    if (t === "--seed-mode") {
+      seedModeFlag = String(tokens[i + 1] || "").trim();
+      i++;
       continue;
     }
     if (t.startsWith("--selector=")) {
@@ -108,6 +129,7 @@ export function parseVerifyArgs(opts?: {
   }
 
   const selector = parseSelector(selectorFlag || String(env.VERIFY_SELECTOR || ""));
+  const seedMode = parseSeedMode(seedModeFlag || String(env.VBR_VERIFY_SEED_MODE || ""));
   const requestedProjects = toSortedUnique(
     projectFlags.length > 0 ? projectFlags : parseProjectsCsv(String(env.VERIFY_PROJECTS || "")),
   );
@@ -136,6 +158,7 @@ export function parseVerifyArgs(opts?: {
     selector,
     requestedProjects,
     explainSelection,
+    seedMode,
   };
 }
 

@@ -7,7 +7,11 @@ import {
   buildArtifactPolicyEvidence,
   classifyArtifactBuild,
 } from "../../lib/artifact-build-policy";
-import { REVIEWED_PUBLIC_KEYS, REVIEWED_SUBSTITUTERS } from "../../lib/artifact-nix-policy";
+import {
+  REVIEWED_PUBLIC_KEYS,
+  REVIEWED_SUBSTITUTERS,
+  reviewedArtifactSandboxPaths,
+} from "../../lib/artifact-nix-policy";
 import { canonicalArtifactToolsRoot } from "../../lib/artifact-environment";
 import { canonicalArtifactGraphEnvironment } from "../../dev/artifact-graph-executor";
 import {
@@ -21,7 +25,8 @@ import {
 export const EFFECTIVE_ARTIFACT_TEST_CONFIG = {
   sandbox: { value: true },
   "sandbox-fallback": { value: false },
-  "sandbox-paths": { value: {} },
+  "sandbox-paths": { value: [...reviewedArtifactSandboxPaths()] },
+  "extra-sandbox-paths": { value: {} },
   builders: { value: "" },
   substituters: { value: [...REVIEWED_SUBSTITUTERS] },
   "trusted-public-keys": { value: [...REVIEWED_PUBLIC_KEYS] },
@@ -62,7 +67,7 @@ export function registerArtifactBuildPolicyBasicContracts(register: typeof test)
       toolPaths: {},
       nixConfig: {
         ...EFFECTIVE_ARTIFACT_TEST_CONFIG,
-        "sandbox-paths": { value: ["/host/secret"] },
+        "sandbox-paths": { value: [...reviewedArtifactSandboxPaths(), "/host/secret"] },
       },
       nixStoreUrl: "daemon",
     });

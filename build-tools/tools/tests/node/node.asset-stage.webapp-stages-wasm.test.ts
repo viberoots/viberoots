@@ -66,28 +66,29 @@ nix_go_tiny_wasm_lib(
         await $`scaf new ts webapp-static demo-web --yes --skip-lockfile-gen`;
         const appDir = path.join(tmp, "projects", "apps", "demo-web");
         await fs.outputFile(
+          path.join(appDir, "src", "wasm-contract", "top.wasm"),
+          Buffer.from("0061736d01000000", "hex"),
+        );
+        await fs.outputFile(
           path.join(appDir, "TARGETS"),
-          `load("@prelude//:rules.bzl", "genrule")
-load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module")
+          `load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module", "node_webapp")
 
-genrule(
+node_webapp(
     name = "app_raw",
-    out = "dist",
-    cmd = "mkdir -p \\"$OUT\\" && printf 'app marker\\n' > \\"$OUT/index.txt\\"",
+    labels = ["lang:node", "kind:app", "webapp:static"],
 )
 
 node_wasm_inline_module(
     name = "wasm_inline",
     src = "src/wasm-contract/top.wasm",
+    out = "generated/index.js",
 )
 
 node_asset_stage(
     name = "app",
     app = ":app_raw",
     assets = [
-        {"src": "src/wasm-contract/top.wasm", "dest": "top.wasm"},
-        {"src": ":wasm_inline", "dest": "wasm-inline/index.js"},
-        {"src": "src/wasm-contract/top.wasm", "dest": "server/wasm/top.wasm"},
+        {"src": ":wasm_inline", "output_path": "generated/index.js", "dest": "wasm-inline/index.js"},
         {"src": "//projects/libs/demo-wasm:wasm", "dest": "tinygo.wasm", "artifact_name": "wasm.wasm"},
     ],
     labels = ["lang:node", "kind:app", "webapp:static"],
@@ -105,15 +106,29 @@ node_asset_stage(
 
         const target = "//projects/apps/demo-web:app";
         await reconcileTempDependencyInputs(tmp, _$);
+        const parentOutPath = await publicBuildOutPath({
+          tmp,
+          $,
+          target: "//projects/apps/demo-web:app_raw",
+          wasmBackend: "wasi_single",
+        });
         const outPath = await publicBuildOutPath({
           tmp,
           $,
           target,
           wasmBackend: "wasi_single",
         });
-        assert.ok(await fs.pathExists(path.join(outPath, "index.txt")));
+        assert.deepEqual(
+          await fs.readFile(path.join(outPath, "index.html")),
+          await fs.readFile(path.join(parentOutPath, "dist", "index.html")),
+          "expected node_asset_stage to preserve its declared app parent's public output",
+        );
         assert.ok(await fs.pathExists(path.join(outPath, "top.wasm")));
         assert.ok(await fs.pathExists(path.join(outPath, "wasm-inline", "index.js")));
+        assert.match(
+          await fs.readFile(path.join(outPath, "wasm-inline", "index.js"), "utf8"),
+          /wasmBytesBase64/u,
+        );
         assert.ok(await fs.pathExists(path.join(outPath, "server", "wasm", "top.wasm")));
         const stagedWasm = path.join(outPath, "tinygo.wasm");
         const stat = await fs.stat(stagedWasm);

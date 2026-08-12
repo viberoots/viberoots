@@ -355,6 +355,30 @@ test("verify temp cleanup preserves a nested active workspace and global TARGETS
   }
 });
 
+test("nested verify preserves sibling fixtures owned by the enclosing verify", async () => {
+  const fixtureRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "verify-enclosing-tmp-root-"));
+  const user = os.userInfo().username || "";
+  const suffix = user ? `-${user}` : "";
+  const systemTmpRoot = path.join(fixtureRoot, "system-tmp");
+  const sharedTmpdir = path.join(systemTmpRoot, `viberoots-verify${suffix}.noindex`, "tmpdir");
+  const nestedWorkspace = path.join(sharedTmpdir, "nested-workspace");
+  const activeSibling = path.join(sharedTmpdir, "sibling-test", "active.txt");
+  const env: NodeJS.ProcessEnv = { VBR_VERIFY_OWNER_PID: "12345" };
+
+  try {
+    await fsp.mkdir(nestedWorkspace, { recursive: true });
+    await fsp.mkdir(path.dirname(activeSibling), { recursive: true });
+    await fsp.writeFile(activeSibling, "active\n", "utf8");
+
+    await ensureRepoLocalTmpRoot(nestedWorkspace, { env, platform: "darwin", systemTmpRoot });
+
+    assert.equal(await fsp.readFile(activeSibling, "utf8"), "active\n");
+    assert.equal(env.TMPDIR, await fsp.realpath(sharedTmpdir));
+  } finally {
+    await fsp.rm(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
 test("verify temp cleanup preserves a workspace reached through a symlinked tmp child", async () => {
   const fixtureRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "verify-symlink-tmp-root-"));
   const user = os.userInfo().username || "";

@@ -54,6 +54,9 @@ test(
         await scaffoldAndPrepareWorkspace(tmp, _$, "webapp-ssr-vite", appName);
         const { outPath, importer } = await buildSelectedSsr(tmp, _$, label, "vite");
         await assertSsrAdapterConformance({ label, outPath, importer, framework: "vite" });
+        const packagedNodeModules = path.join(outPath, "node_modules");
+        await fsp.access(packagedNodeModules);
+        assert.match(await fsp.realpath(packagedNodeModules), /^\/nix\/store\//u);
 
         const appAbs = path.join(tmp, importer);
         await pnpmInstallForDevTest({

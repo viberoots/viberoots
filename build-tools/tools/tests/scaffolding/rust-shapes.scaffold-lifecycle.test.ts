@@ -22,15 +22,12 @@ test(
         for (let attempt = 0; attempt < 2; attempt++) {
           await $({
             cwd: consumer,
-            env: { ...process.env, WORKSPACE_ROOT: consumer, VBR_NIX_CACHE_POLICY: "off" },
+            env: { ...process.env, WORKSPACE_ROOT: consumer },
             stdio: "pipe",
-          })`nix run --accept-flake-config path:${workspaceFlake}#viberoots -- init-workspace`;
+          })`nix run --option eval-cache false --accept-flake-config path:${workspaceFlake}#viberoots -- init-workspace`;
         }
         const sourcePath = await fs.realpath(path.join(consumer, ".viberoots", "current"));
-        const lifecycleEnv = (extra: NodeJS.ProcessEnv = {}) => ({
-          ...commandEnv(consumer, extra),
-          VBR_NIX_CACHE_POLICY: "off",
-        });
+        const lifecycleEnv = (extra: NodeJS.ProcessEnv = {}) => commandEnv(consumer, extra);
         const shapes = [
           ["lib", "rust_lib"],
           ["proc-macro", "rust_macro"],
@@ -64,11 +61,12 @@ test(
           "//projects/libs/rust_wasm:rust_wasm-wasi",
         ];
         await $({ cwd: consumer, env: lifecycleEnv() })`b ${buildTargets}`;
-        await $({ cwd: consumer, env: lifecycleEnv() })`
-          v //projects/libs/rust_lib:rust_lib-test
+        const verifyEnv = lifecycleEnv();
+        await $({ cwd: consumer, env: verifyEnv })`
+          v --seed-mode=never //projects/libs/rust_lib:rust_lib-test
         `;
-        await $({ cwd: consumer, env: lifecycleEnv() })`
-          v --coverage //projects/libs/rust_lib:rust_lib-test
+        await $({ cwd: consumer, env: verifyEnv })`
+          v --seed-mode=never --coverage //projects/libs/rust_lib:rust_lib-test
         `;
         const summaryPath = path.join(consumer, "coverage", "coverage-summary.json");
         const summary = JSON.parse(await fs.readFile(summaryPath, "utf8"));
@@ -97,11 +95,11 @@ mod tests {
         );
         const changedSourceFailure = await $({
           cwd: consumer,
-          env: lifecycleEnv(),
+          env: verifyEnv,
           stdio: "pipe",
           reject: false,
           nothrow: true,
-        })`v //projects/libs/rust_lib:rust_lib-test`;
+        })`v --seed-mode=never //projects/libs/rust_lib:rust_lib-test`;
         assert.notEqual(changedSourceFailure.exitCode, 0);
         const changedSourceOutput = `${String(changedSourceFailure.stdout)}\n${String(
           changedSourceFailure.stderr,
@@ -121,8 +119,8 @@ mod tests {
             "assert_eq!(super::answer(), 43)",
           ),
         );
-        await $({ cwd: consumer, env: lifecycleEnv() })`
-          v //projects/libs/rust_lib:rust_lib-test
+        await $({ cwd: consumer, env: verifyEnv })`
+          v --seed-mode=never //projects/libs/rust_lib:rust_lib-test
         `;
         const notRunnable = await $({
           cwd: consumer,

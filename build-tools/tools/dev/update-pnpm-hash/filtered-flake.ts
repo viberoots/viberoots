@@ -11,6 +11,7 @@ import {
   defaultFilteredFlakeSnapshotRelPaths,
   defaultFilteredFlakeSnapshotRsyncSources,
   filteredFlakeRsyncExcludeArgs,
+  relPathsForImmutableViberootsInput,
   selectedNodeSnapshotRelPaths,
   selectedNodeSnapshotRsyncSources,
 } from "../nix-build-filtered-flake-lib";
@@ -141,9 +142,15 @@ export async function makeFilteredFlakeRef(opts: {
     const requestedRelPaths = opts.importer
       ? selectedNodeSnapshotRelPaths(opts.importer, workspacePackageDirs)
       : defaultFilteredFlakeSnapshotRelPaths();
+    const authoritativeRelPaths = relPathsForImmutableViberootsInput(
+      requestedRelPaths,
+      immutableViberootsInputRoot,
+    );
     const snapshotSources = opts.importer
-      ? selectedNodeSnapshotRsyncSources(await existingRelPaths(src, requestedRelPaths))
-      : defaultFilteredFlakeSnapshotRsyncSources(await existingRelPaths(src, requestedRelPaths));
+      ? selectedNodeSnapshotRsyncSources(await existingRelPaths(src, authoritativeRelPaths))
+      : defaultFilteredFlakeSnapshotRsyncSources(
+          await existingRelPaths(src, authoritativeRelPaths),
+        );
     await runCommand({
       command: ensureNixStoreToolPathSync("rsync", artifactEnv),
       args: [
@@ -196,6 +203,9 @@ export async function makeFilteredFlakeRef(opts: {
     ) {
       viberootsInputRoot = (await materializeFilteredViberootsSource(snapDirReal, artifactEnv))
         .storePath;
+    }
+    if (viberootsInputRoot) {
+      await fsp.rm(path.join(snapDirReal, "viberoots"), { recursive: true, force: true });
     }
     return {
       // Root the path input at the complete filtered snapshot. A path input

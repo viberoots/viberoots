@@ -6,10 +6,17 @@ import process from "node:process";
 import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { resolveToolPath } from "../../lib/tool-paths";
 import { activeNixGcProcesses } from "./preflight";
+import {
+  makeFailSoftLineWriter,
+  makeDiskProcessCaptureGate,
+  startDarwinDiskIoSampler,
+  type DiskIoSample,
+} from "./safety-rails-disk-telemetry";
 import { writeVerifySafetyRailsTriggerSnapshot } from "./safety-rails-snapshot";
 import {
   formatLoadAvg,
   formatProcessCounts,
+  makeRetainedTopProcessSampler,
   makeThrottledProcessSampler,
   sampleTopProcesses,
   summarizeVerifySafetyRailsTelemetry,
@@ -118,6 +125,8 @@ export type VerifySafetyRailsPollDeps = {
   shouldSampleTransientRoot?: (curFreeGiB: number, lowSpaceGiB: number) => boolean;
   sampleProcessCounts?: () => Promise<ProcessCounts | null>;
   sampleTopProcesses?: () => Promise<TopProcessSample | null>;
+  diskIoSample?: () => DiskIoSample | null;
+  shouldCaptureTopProcesses?: (loadTriggered: boolean, sample: DiskIoSample | null) => boolean;
   writeSnapshot: (dir: string, reason: string) => Promise<void>;
   onTrigger: (reason: string) => Promise<void>;
   killProcessGroup: (processGroupIdToKill: number, signal: NodeJS.Signals) => void;
@@ -147,19 +156,40 @@ export async function pollVerifySafetyRailsOnce(opts: {
   const processCounts = opts.deps.sampleProcessCounts
     ? await opts.deps.sampleProcessCounts().catch(() => null)
     : null;
+  const diskIo = opts.deps.diskIoSample?.() ?? null;
   await appendLine(
     opts.telemetryPath,
-    `${Date.now()} freeGiB=${cur} transientGiB=${curTransientGiB} reclaimableFreeGiB=${cur + curTransientGiB} ${formatLoadAvg()} ${formatProcessCounts(processCounts)}`,
+    `${Date.now()} freeGiB=${cur} transientGiB=${curTransientGiB} reclaimableFreeGiB=${cur + curTransientGiB} ${formatLoadAvg()} ${formatProcessCounts(processCounts)} disk_mbps=${diskIo?.mbps.toFixed(2) ?? "?"} disk_tps=${diskIo?.tps.toFixed(0) ?? "?"}`,
   );
   const [load1] = os.loadavg();
   const highLoadThreshold = opts.highLoadTopProcessesThreshold ?? Number.POSITIVE_INFINITY;
-  if (Number.isFinite(load1) && load1 >= highLoadThreshold && opts.deps.sampleTopProcesses) {
-    const topProcesses = await opts.deps.sampleTopProcesses().catch(() => null);
-    if (topProcesses && topProcesses.lines.length > 0) {
+  const loadTriggered = Number.isFinite(load1) && load1 >= highLoadThreshold;
+  const shouldCapture =
+    opts.deps.shouldCaptureTopProcesses?.(loadTriggered, diskIo) ?? loadTriggered;
+  if (shouldCapture && opts.deps.sampleTopProcesses) {
+    const trigger = loadTriggered ? "load" : "disk";
+    const topProcesses = await opts.deps
+      .sampleTopProcesses()
+      .catch(() => ({ lines: [], status: "error" as const }));
+    const status =
+      topProcesses?.status ??
+      (topProcesses && topProcesses.lines.length > 0 ? "success" : "unavailable");
+    await appendLine(
+      opts.telemetryPath,
+      `[verify] high-load top-process sample status=${status} trigger=${trigger} load1=${load1.toFixed(2)} disk_mbps=${diskIo?.mbps.toFixed(2) ?? "?"} disk_tps=${diskIo?.tps.toFixed(0) ?? "?"}`,
+    );
+    if (status === "success" && topProcesses && topProcesses.lines.length > 0) {
       for (const line of topProcesses.lines) {
         await appendLine(
           opts.telemetryPath,
           `[verify] high-load top-process load1=${load1.toFixed(2)} ${line}`,
+        );
+      }
+    } else if (topProcesses?.retainedLines && topProcesses.retainedLines.length > 0) {
+      for (const line of topProcesses.retainedLines) {
+        await appendLine(
+          opts.telemetryPath,
+          `[verify] high-load top-process fallback status=${status} load1=${load1.toFixed(2)} ${line}`,
         );
       }
     }
@@ -200,7 +230,7 @@ export async function startVerifySafetyRails(opts: {
   analysisDir: string;
   processGroupIdToKill: number;
   onTrigger?: (reason: string) => Promise<void>;
-}): Promise<{ stop: () => void; telemetryPath: string | null }> {
+}): Promise<{ stop: () => Promise<void>; telemetryPath: string | null }> {
   const lowSpace = defaultOrNonNegative(parseNum(process.env.VERIFY_LOW_SPACE_GB), 5);
   const intervalSec = defaultOrAtLeast(parseNum(process.env.VERIFY_SAFETY_RAILS_POLL_SECS), 5, 1);
   const processSampleSec = defaultOrAtLeast(
@@ -231,7 +261,7 @@ export async function startVerifySafetyRails(opts: {
 
   const base = await freeGiBForPath("/nix/store");
   if (base == null) {
-    return { stop: () => {}, telemetryPath: null };
+    return { stop: async () => {}, telemetryPath: null };
   }
   const transientRoot = String(process.env.TMPDIR || "").trim();
   const baseTransientGiB = transientRoot ? await dirGiBForPath(transientRoot) : 0;
@@ -262,11 +292,26 @@ export async function startVerifySafetyRails(opts: {
   let stopped = false;
   let pollInFlight = false;
   const throttledProcessSample = makeThrottledProcessSampler(processSampleSec);
+  const retainedTopProcessSample = makeRetainedTopProcessSampler();
+  const shouldCaptureTopProcesses = makeDiskProcessCaptureGate();
   const shouldSampleTransientRoot = makeTransientRootSampler({
     transientRoot,
     sampleSec: transientSampleSec,
     nearThresholdSampleSec: transientNearThresholdSampleSec,
     marginGiB: transientSampleMarginGiB,
+  });
+  const diskTelemetryWrites = makeFailSoftLineWriter(
+    async (line) => await appendLine(telemetry, line),
+  );
+  const diskIo = startDarwinDiskIoSampler({
+    onSample: (sample) => {
+      diskTelemetryWrites.append(
+        `[verify] disk-io sample status=success mbps=${sample.mbps.toFixed(2)} tps=${sample.tps.toFixed(0)}`,
+      );
+    },
+    onStatus: (status) => {
+      diskTelemetryWrites.append(`[verify] disk-io sample status=${status}`);
+    },
   });
   const timer = setInterval(() => {
     void (async () => {
@@ -292,7 +337,9 @@ export async function startVerifySafetyRails(opts: {
               await opts.onTrigger?.(reason);
             },
             sampleProcessCounts: throttledProcessSample,
-            sampleTopProcesses,
+            sampleTopProcesses: retainedTopProcessSample,
+            diskIoSample: diskIo.latest,
+            shouldCaptureTopProcesses,
             killProcessGroup: (pgid, signal) => {
               process.kill(-pgid, signal);
             },
@@ -312,9 +359,11 @@ export async function startVerifySafetyRails(opts: {
 
   return {
     telemetryPath: telemetry,
-    stop: () => {
+    stop: async () => {
       stopped = true;
       clearInterval(timer);
+      await diskIo.stop();
+      await diskTelemetryWrites.flush();
     },
   };
 }

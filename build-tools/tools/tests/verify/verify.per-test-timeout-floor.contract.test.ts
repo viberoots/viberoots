@@ -21,6 +21,7 @@ test("verify forwards a minimum 20 minute pnpm and test timeout budget", async (
     "`TEST_NIX_TIMEOUT_SECS=${opts.testNixTimeoutSecs}`",
     "`NIX_PNPM_FETCH_TIMEOUT=${opts.testNixTimeoutSecs}`",
     "`NIX_PNPM_INSTALL_TIMEOUT=${opts.testNixTimeoutSecs}`",
+    "`VBR_ARTIFACT_COMMAND_TIMEOUT_SECS=${opts.testNixTimeoutSecs}`",
   ]) {
     if (!buck2TestEnvTxt.includes(fragment)) {
       throw new Error(`verify buck2 runner must forward ${fragment}`);

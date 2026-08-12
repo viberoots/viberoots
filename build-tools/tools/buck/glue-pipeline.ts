@@ -100,6 +100,14 @@ export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promis
     });
   }
 
+  // Provider labels are dependencies of configured graph nodes. Reconcile the
+  // filesystem-discovered importer providers before cquery so a changed lockfile
+  // set cannot leave graph export depending on a stale provider package.
+  if (!skipProviderSync) {
+    const syncScript = buildToolPath(toolSourceRoot, "tools/buck/sync-providers.ts");
+    await runNodeWithZx({ nodeBin, zxInitPath: zxInit, script: syncScript, cwd: repoRoot, env });
+  }
+
   // Step 1: ensure graph exists (idempotent)
   if (verbose) console.error(`[glue-pipeline] reconcile graph → ${graphPath}`);
   await refreshGraph(!!opts.forceGraph);

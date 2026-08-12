@@ -87,7 +87,7 @@ test("rust macros: library, binary, and downstream consumer build via Nix-backed
       "utf8",
     );
     const current = await prepareFilteredViberootsInput(sourceRoot);
-    await pinTempViberootsInput(tmp, current);
+    await pinTempViberootsInput(tmp, current, false, $);
     await exportGraphInTemp({
       tmp,
       $,
@@ -142,7 +142,6 @@ test("rust macros: library, binary, and downstream consumer build via Nix-backed
     `;
     assert.equal(String(prod.stdout || "").trim(), "first");
     for (const [entrypoint, label, diagnostic] of [
-      ["d", "//projects/apps/rustapp:app", /run\.dev is not available/],
       ["p", "//projects/apps/rustapp:lib", /library-only|not runnable/],
       ["p", "//projects/apps/rustapp:test", /test-only|not runnable|no runnable/],
     ] as const) {

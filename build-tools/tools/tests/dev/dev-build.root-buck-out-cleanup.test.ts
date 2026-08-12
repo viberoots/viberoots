@@ -8,6 +8,11 @@ import {
   cleanupDevBuildRootBuckOut,
   duplicateSharedBuckDaemonPidsFromLines,
 } from "../../dev/dev-build/root-buck-out-cleanup";
+import {
+  legacyDarwinSharedIsolationNames,
+  sharedDevBuildIsolationName,
+  sharedExporterIsolationName,
+} from "../../dev/dev-build/isolation";
 
 test("dev-build root cleanup preserves shared state for reused builds", async () => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "dev-build-root-cleanup-"));
@@ -56,6 +61,32 @@ test("dev-build broad root cleanup removes shared isolation locks", async () => 
     } else {
       process.env.VBR_DEVBUILD_BROAD_BUCK_OUT_CLEANUP = previous;
     }
+    await fsp.rm(root, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+test("Darwin migration retires legacy shared roots and preserves .noindex replacements", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "dev-build-root-cleanup-"));
+  try {
+    const legacy = legacyDarwinSharedIsolationNames(root, "darwin");
+    const current = [
+      sharedDevBuildIsolationName(root, "darwin"),
+      sharedExporterIsolationName(root, "darwin"),
+    ];
+    for (const isolation of [...legacy, ...current]) {
+      await fsp.mkdir(path.join(root, "buck-out", isolation), { recursive: true });
+    }
+
+    const removed = await cleanupDevBuildRootBuckOut(root, "darwin");
+
+    assert.deepEqual(removed.sort(), legacy.sort());
+    for (const isolation of legacy) {
+      await assert.rejects(fsp.stat(path.join(root, "buck-out", isolation)));
+    }
+    for (const isolation of current) {
+      assert.equal((await fsp.stat(path.join(root, "buck-out", isolation))).isDirectory(), true);
+    }
+  } finally {
     await fsp.rm(root, { recursive: true, force: true }).catch(() => {});
   }
 });

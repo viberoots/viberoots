@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import {
+  assertNoCodexLaunch,
   binWrapper,
   escapeRegExp,
   makeFakeAgentTools,
@@ -53,7 +54,7 @@ test("codex --remove-all-worktrees removes every valid named worktree", async ()
     assert.match(log, /git branch -D worktree-alpha/);
     assert.match(log, /git branch -D worktree-beta/);
     assert.doesNotMatch(log, /worktree-stale/);
-    assert.doesNotMatch(log, /codex /);
+    assertNoCodexLaunch(log);
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }
@@ -83,7 +84,7 @@ test("codex --remove-all-worktrees ignores appended launch arguments", async () 
     const log = await fsp.readFile(fake.log, "utf8");
     assert.match(log, new RegExp(`git worktree remove ${escapeRegExp(alpha)}`));
     assert.match(log, /git branch -D worktree-alpha/);
-    assert.doesNotMatch(log, /codex /);
+    assertNoCodexLaunch(log);
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }

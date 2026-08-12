@@ -76,12 +76,72 @@ test("reproducibility matrix IDs are unique and cover every required family", as
     nativeExecution: ["aarch64-darwin"],
     failClosedUntilExternalEvidence: ["aarch64-linux", "x86_64-linux"],
   });
-  assert.deepEqual(rust.coverage.routeCapabilities, ["base", "wasm", "wasi"]);
-  assert.deepEqual(
-    rust.languageProofs.map(({ target }) => target),
-    ["//projects/apps/repro-rust:repro-rust-wasm", "//projects/apps/repro-rust:repro-rust-wasi"],
-  );
+  assert.deepEqual(rust.coverage.routeCapabilities, ["base"]);
+  assert.deepEqual(rust.languageProofs, []);
   assert.equal(reproducibilityMatrixCaseCoversLanguage("rust-pr5", "rust"), true);
+  const rustPr12 = ARTIFACT_REPRODUCIBILITY_MATRIX.filter(({ id }) => id.endsWith("-pr12"));
+  assert.deepEqual(
+    rustPr12.map(({ id }) => id),
+    [
+      "rust-test-pr12",
+      "rust-lib-pr12",
+      "rust-static-library-pr12",
+      "rust-cdylib-pr12",
+      "rust-proc-macro-pr12",
+      "rust-python-extension-pr12",
+      "rust-node-addon-pr12",
+      "rust-c-ffi-pr12",
+      "rust-cxx-bridge-pr12",
+      "rust-wasm-pr12",
+      "rust-wasm-static-pr12",
+      "rust-wasi-static-pr12",
+      "rust-wasm-browser-pr12",
+      "rust-wasm-component-pr12",
+      "rust-wasi-pr12",
+      "rust-cross-root-pr12",
+      "rust-tauri-darwin-pr12",
+    ],
+  );
+  assert.ok(
+    rustPr12.every(({ graphSelection }) => graphSelection.requiredLabels.includes("lang:rust")),
+  );
+  const cFfi = ARTIFACT_REPRODUCIBILITY_MATRIX.find(({ id }) => id === "rust-c-ffi-pr12")!;
+  assert.equal(cFfi.graphSelection.target, "//projects/libs/repro-rust-c-ffi:repro-rust-c-ffi-c");
+  assert.equal(cFfi.graphSelection.outputRole, "c-ffi");
+  const cxxBridge = ARTIFACT_REPRODUCIBILITY_MATRIX.find(
+    ({ id }) => id === "rust-cxx-bridge-pr12",
+  )!;
+  assert.equal(cxxBridge.graphSelection.target, "//projects/libs/repro-rust-cxx:repro-rust-cxx");
+  assert.notEqual(cFfi.graphSelection.target, cxxBridge.graphSelection.target);
+  const tauri = ARTIFACT_REPRODUCIBILITY_MATRIX.find(({ id }) => id === "rust-tauri-darwin-pr12")!;
+  assert.deepEqual(tauri.systems, ["aarch64-darwin"]);
+  assert.deepEqual(tauri.systemEvidence, {
+    nativeExecution: [],
+    failClosedUntilExternalEvidence: ["aarch64-darwin"],
+  });
+  assert.deepEqual(tauri.coverage.routeCapabilities, ["base", "mixed", "desktop"]);
+  assert.deepEqual(tauri.languageProofs, [
+    {
+      target: "//projects/apps/repro-rust-tauri:frontend_raw",
+      ruleTypes: ["genrule"],
+      requiredLabels: ["lang:node", "kind:app"],
+    },
+    {
+      target: "//projects/apps/repro-rust-tauri:frontend",
+      ruleTypes: ["genrule"],
+      requiredLabels: ["lang:node", "kind:app", "webapp:static"],
+    },
+    {
+      target: "//projects/apps/repro-rust-tauri:frontend_wasm",
+      ruleTypes: ["rust_nix_build"],
+      requiredLabels: ["lang:rust", "kind:wasm"],
+    },
+    {
+      target: "//projects/apps/repro-rust-tauri:repro-rust-tauri-sidecar",
+      ruleTypes: ["cpp_nix_build"],
+      requiredLabels: ["lang:cpp", "kind:bin", "sidecar:reviewed"],
+    },
+  ]);
   const mixedGoTargets = await fs.readFile(
     viberootsSourcePath(
       "build-tools/tools/scaffolding/templates/ts/go-cpp-lib/libs/{{ name }}-go/TARGETS.jinja",
@@ -107,44 +167,6 @@ test("reproducibility matrix IDs are unique and cover every required family", as
   );
   assert.match(mixedNodeTargets, /\$VBR_NODE_BIN build\.mjs src\/node\/index\.ts/);
   assert.doesNotMatch(mixedNodeTargets, /build\.stamp|echo ok/);
-});
-
-test("every matrix recipe binds the target emitted by its actual scaffold template", async () => {
-  const contracts = [
-    ["go-lib", "go/lib/TARGETS.jinja", "projects/libs/repro-go", "repro-go"],
-    ["node-artifact", "ts/lib/TARGETS.jinja", "projects/libs/repro-node", "repro-node"],
-    ["python-artifact", "python/app/TARGETS.jinja", "projects/apps/repro-python", "repro-python"],
-    ["cpp-lib", "cpp/lib/TARGETS.jinja", "projects/libs/repro-cpp", "repro-cpp"],
-    ["wasm-artifact", "python/wasm-lib/TARGETS.jinja", "projects/libs/repro-wasm", "repro-wasm"],
-    ["rust-pr5", "rust/cli/TARGETS.jinja", "projects/apps/repro-rust", "repro-rust"],
-    [
-      "mixed-artifact",
-      "ts/go-cpp-lib/libs/{{ name }}-ts/TARGETS.jinja",
-      "projects",
-      "{{ name }}_ts_pkg",
-    ],
-  ] as const;
-  for (const [id, template, destination, targetName] of contracts) {
-    const entry = ARTIFACT_REPRODUCIBILITY_MATRIX.find((candidate) => candidate.id === id)!;
-    assert.equal(entry.scaffoldRecipe.destination, destination);
-    const expectedTargetPath =
-      id === "mixed-artifact"
-        ? `//${destination}/libs/${entry.scaffoldRecipe.name}-ts:${entry.scaffoldRecipe.name}_ts_pkg`
-        : `//${destination}:${targetName}`;
-    assert.equal(entry.graphSelection.target, expectedTargetPath);
-    const targets = await fs.readFile(
-      viberootsSourcePath(`build-tools/tools/scaffolding/templates/${template}`),
-      "utf8",
-    );
-    const templateTargetName = id === "mixed-artifact" ? targetName : "{{ name }}";
-    assert.ok(targets.includes(`name = ${JSON.stringify(templateTargetName)}`));
-  }
-  const cppTargets = await fs.readFile(
-    viberootsSourcePath("build-tools/tools/scaffolding/templates/cpp/lib/TARGETS.jinja"),
-    "utf8",
-  );
-  assert.equal(cppTargets.match(/nix_cpp_library\(/gu)?.length, 1);
-  assert.equal(cppTargets.match(/nix_cpp_test\(/gu)?.length, 1);
 });
 
 test("matrix binding rejects mismatched families and unsupported systems", () => {

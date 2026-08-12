@@ -26,6 +26,7 @@
   },
   "rust": {
     "cli": "projects/apps/{name}",
+    "cross-root": "projects",
     "cxx-bridge": "projects/libs/{name}",
     "lib": "projects/libs/{name}",
     "node-addon": "projects/libs/{name}",

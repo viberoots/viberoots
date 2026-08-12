@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { immutableStorePathNarHash } from "../../dev/filtered-flake-immutable-source";
 import { repairSnapshotViberootsInput } from "../../dev/filtered-flake-viberoots-input";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 import {
@@ -107,6 +108,42 @@ test("filtered flake reports an immutable source missing its lock explicitly", a
       makeConsumerSnapshot(root, false),
       /immutable viberoots source has flake\.nix but no flake\.lock/,
     );
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("immutable source narHash falls back to hashing when path-info omits narHash", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-input-narhash-fallback-"));
+  const fakeNix = path.join(root, "nix");
+  const expected = `sha256-${"A".repeat(43)}=`;
+  try {
+    await fsp.writeFile(
+      fakeNix,
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        'if [[ "$1 $2" == "path-info --json" ]]; then',
+        '  printf \'{"%s":{"narSize":1}}\\n\' "$3"',
+        "  exit 0",
+        "fi",
+        'if [[ "$1 $2 $3" == "hash path --sri" ]]; then',
+        `  printf '${expected}\\n'`,
+        "  exit 0",
+        "fi",
+        "exit 64",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await fsp.chmod(fakeNix, 0o755);
+
+    const actual = await immutableStorePathNarHash(
+      fakeNix,
+      `/nix/store/${"a".repeat(32)}-source`,
+      process.env,
+    );
+    assert.equal(actual, expected);
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
   }

@@ -19,6 +19,9 @@ artifact family, and flake reference from the immutable evaluation bundle; calle
 those fields independently. The stored `run-record.json` binds the evidence to the exact reviewed
 builder registry for aggregation. Artifact outputs are staged through the active reviewed remote
 store authority into the registry-declared internal evidence store; this is not release publication.
+Semantic manifests are read with `nix store cat` through that same active reviewed remote authority.
+A remote `/nix/store` path is never treated as evidence that the producer host can read the path
+locally.
 
 The variable run observation starts before temp-consumer scaffolding. It times scaffolding, both
 evaluation-bundle materializations, owned-root cleanup, initial build, forced rebuild, and warm
@@ -39,9 +42,41 @@ commands as post-finalization or self-containing instead of claiming they were o
 admission independently validates the resulting immutable observation and run-record store paths.
 
 The comparator accepts exactly two records from distinct checkout and builder identities on the same
-Nix system. Every artifact identity field must match. The aggregator requires the complete canonical
-6-by-3 matrix plus every declared production publication subject and emits one canonical
+Nix system. Every artifact identity field must match. The aggregator requires every
+matrix-case/system pair declared by the canonical matrix plus every declared production publication subject and emits one canonical
 `aggregate.json`; extra or missing entries fail closed.
+Most language cases cover all three release-builder systems. Platform-specific applications may
+declare a narrower reviewed system set. The protected producer skips such a case on other systems,
+while aggregation still requires two independent builders for every system the case declares.
+Rust's final matrix includes native CLI, library, test, proc-macro, Python extension, Node addon,
+C++ bridge, cross-root composition, raw/WASI modules, bare/WASI static archives, browser packages,
+components, and credential-free Tauri application cases. The Tauri case is
+`aarch64-darwin` only; that does not authorize Linux Tauri publication.
+Each protected builder slot also executes the public Rust patch identity matrix only after the
+signed registry, exact transport, active smoke, builder policy, and system identity are validated.
+The protected producer keeps reviewed-remote authority in one process. After it validates the exact
+signed registry, transport, active smoke, policy, system, and builder identity, it uses the
+production reproducibility consumer producer to scaffold every Rust matrix case. The driver applies
+a package-local Rust source patch and evaluates, realizes, resolves output-to-derivation identity,
+and reads the production semantic manifest for baseline, patched, and restored states through the
+active runner's exact `runNix`. It recomputes the selected graph contract at runtime and hashes the
+real compiled output closure for explicit behavior evidence. Darwin's selected closure includes
+the Tauri application, Node webapp and asset stage, WASM frontend artifact, configuration,
+resources, and C sidecar. No copied-but-unused production sources or metadata-only bindings are
+accepted. No driver invokes Buck, `v`, a local store read, or an ambient `NIX_REMOTE` child. No
+serialized capability, environment token, or reusable child authority exists. Canonical artifact
+builds and ordinary tests remain daemon-only. Similarly named local selectors are regression
+coverage only and cannot produce protected evidence.
+A local Jenkins-agent run cannot be labeled as builder-one or builder-two evidence. Native,
+cross-root, extension, WASM, and
+interop cases require a changed patched derivation/output and exact baseline identity after
+removal. Darwin slots additionally apply a real package-local Rust dependency patch to the Tauri
+consumer and require its semantic package and derivation/output identities to change and then
+restore exactly. Per-cell JSON evidence binds the protected source revision, reviewed builder
+authority and slot, remote-store requirement, canonical selector set, result, and identity/output
+digests. Aggregation requires all six exact records and embeds them in the signed aggregate;
+archive ordering is not admission authority. Rust remains experimental and its language-manifest
+`remoteExecution` claim stays false until the external protected lane passes.
 Matrix cells upload unsigned content-addressed run-record, observation, and artifact-output roots and
 never receive a private key. The protected aggregate stage permits unsigned ingestion only for the
 exact stashed roots, fully validates the fixed record set and each output's derivation, NAR, and
@@ -75,6 +110,19 @@ claims and matrix comparisons are not accepted.
 Back out a failing publication by disabling the publishing job, retaining both builder records and
 outputs, and correcting the declared input or builder authority. Do not publish one builder's output,
 rewrite the evidence, reuse evidence across systems, or weaken the comparison.
+
+The Rust language manifest records the implemented sandbox/network boundary while withholding
+remote-execution and publication-admission claims. Rust remains `experimental`: a complete matrix produces signed
+candidate qualification, not publication admission. Only an immutable `graduated` language
+manifest can produce a release-admitted language proof. Promotion still requires the protected Rust
+matrix on two independent builders for every declared system. Deterministic Tauri construction
+rejects signing credentials and emits `releaseSigned:false` and `releaseAdmitted:false`.
+`admit-tauri-release.ts` copies and verifies the signed aggregate, release policy, external
+attestation, qualified output, and SPDX document through the canonical protected-store verifier
+before parsing them. It hashes the exact semantic-manifest and SPDX bytes from their immutable
+store paths; `tauri-release-admission.ts` then requires those digests, the signed Darwin patch-proof
+digest, the reviewed external signer and notary, and the qualified unsigned identity to agree. No
+repository fixture is external signing evidence.
 
 ## Environment modes
 
@@ -121,8 +169,8 @@ requires:
 
 - sandboxing is enabled;
 - sandbox fallback is disabled;
-- requested `sandbox-paths` and `extra-sandbox-paths` are both empty, and Nix's merged effective
-  `sandbox-paths` value is empty;
+- requested `extra-sandbox-paths` is empty, and the merged effective `sandbox-paths` value exactly
+  matches the platform policy: empty except for `/bin/bash` on Darwin;
 - local artifact builds disable ambient remote builders;
 - substituters and public keys match the reviewed authority;
 - the active store reports the multi-user daemon boundary.
@@ -137,9 +185,12 @@ the dev shell. Do not add a client environment override or host-path exception.
 
 On Darwin, the standard Nix stdenv platform trust base still declares the operating-system paths
 required to start sandboxed processes (for example the system runtime loader and entropy devices).
-Viberoots adds no custom `sandboxProfile` or `__impureHostDeps`; tests inspect representative
-derivations against that reviewed platform trust base. "No host-path exceptions" in this policy
-means no viberoots-added or user-configured exception beyond Nix's platform stdenv.
+The current Darwin `/bin/sh` launcher dispatches to `/bin/bash`, so artifact commands admit that
+single executable as a reviewed platform sandbox path. The policy is empty on other platforms and
+inspection rejects any additional path. Viberoots adds no custom `sandboxProfile` or stdenv
+override; tests inspect representative derivations against that reviewed platform trust base. "No
+host-path exceptions" in this policy means no client-configured or unreviewed exception beyond this
+Darwin launcher dependency.
 
 ## Network boundary
 

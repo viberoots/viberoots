@@ -5,9 +5,9 @@ import {
   type ArtifactReproducibilityEvidence,
 } from "../lib/artifact-reproducibility-evidence";
 import {
-  ARTIFACT_REPRODUCIBILITY_MATRIX,
   ARTIFACT_REPRODUCIBILITY_MATRIX_DIGEST,
   RELEASE_BUILDER_SYSTEMS,
+  reproducibilityMatrixSystemPairs,
 } from "../lib/artifact-reproducibility-matrix";
 import {
   assertIndependentReviewedRemoteBuilders,
@@ -18,10 +18,10 @@ import type {
   ArtifactReproducibilityAggregate,
   PublicationSubject,
 } from "./artifact-reproducibility-aggregate";
-import {
-  assertLanguageGraduationProofs,
-  assertObservationSummary,
-} from "./artifact-reproducibility-aggregate-gates";
+import { assertObservationSummary } from "./artifact-reproducibility-aggregate-gates";
+import { assertLanguageQualificationProofs } from "./artifact-reproducibility-language-qualification";
+import { assertProtectedRustPatchEvidenceSet } from "./protected-rust-patch-evidence";
+import { assertRemoteCiToolsSourceIdentity } from "./remote-ci-tools-source-identity";
 
 export function assertArtifactReproducibilityAggregate(opts: {
   aggregate: ArtifactReproducibilityAggregate;
@@ -34,16 +34,19 @@ export function assertArtifactReproducibilityAggregate(opts: {
   exactAggregateKeys(aggregate, [
     "matrixComparisons",
     "matrixDigest",
-    "languageGraduation",
+    "languageQualification",
     "observationSummary",
     "publicationComparisons",
     "publicationSubjectSetDigest",
+    "protectedRustPatchEvidence",
     "registryStorePath",
     "schema",
     "sourceRevision",
+    "toolClosureSourceIdentity",
+    "toolSourceRevision",
   ]);
   if (
-    aggregate.schema !== "viberoots.artifact-reproducibility-aggregate.v3" ||
+    aggregate.schema !== "viberoots.artifact-reproducibility-aggregate.v6" ||
     aggregate.matrixDigest !== ARTIFACT_REPRODUCIBILITY_MATRIX_DIGEST ||
     aggregate.registryStorePath !== opts.registryStorePath
   )
@@ -51,19 +54,32 @@ export function assertArtifactReproducibilityAggregate(opts: {
   if (!/^[a-f0-9]{40,64}$/u.test(aggregate.sourceRevision)) {
     throw new Error("reproducibility aggregate source revision is invalid");
   }
+  assertRemoteCiToolsSourceIdentity(
+    aggregate.toolClosureSourceIdentity,
+    aggregate.toolSourceRevision,
+  );
   const registered = new Map(registry.builders.map((builder) => [builder.identity, builder]));
-  const matrixKeys = ARTIFACT_REPRODUCIBILITY_MATRIX.flatMap(({ id }) =>
-    RELEASE_BUILDER_SYSTEMS.map((system) => `${id}\0${system}`),
+  const matrixKeys = reproducibilityMatrixSystemPairs().map(
+    ({ matrixId, system }) => `${matrixId}\0${system}`,
   );
   validateComparisons({
     comparisons: aggregate.matrixComparisons,
     expectedKeys: matrixKeys,
     kind: "matrix",
+    toolSourceRevision: aggregate.toolSourceRevision,
     registered,
     registryStorePath: opts.registryStorePath,
   });
   assertObservationSummary(aggregate.observationSummary);
-  assertLanguageGraduationProofs(aggregate.languageGraduation, aggregate.matrixComparisons);
+  assertLanguageQualificationProofs(aggregate.languageQualification, aggregate.matrixComparisons);
+  assertProtectedRustPatchEvidenceSet({
+    evidence: aggregate.protectedRustPatchEvidence,
+    registry,
+    registryStorePath: opts.registryStorePath,
+    sourceRevision: aggregate.sourceRevision,
+    toolSourceRevision: aggregate.toolSourceRevision,
+    toolClosureSourceIdentity: aggregate.toolClosureSourceIdentity,
+  });
   if (!aggregate.publicationComparisons.length) {
     throw new Error("reproducibility aggregate requires production publication comparisons");
   }
@@ -80,6 +96,7 @@ export function assertArtifactReproducibilityAggregate(opts: {
     registered,
     registryStorePath: opts.registryStorePath,
     sourceRevision: aggregate.sourceRevision,
+    toolSourceRevision: aggregate.toolSourceRevision,
   });
   for (const comparison of aggregate.publicationComparisons) {
     const subject = comparison.artifactIdentity.subjectAuthority;
@@ -102,6 +119,7 @@ function validateComparisons(opts: {
   registered: Map<string, ReviewedRemoteBuilderRegistry["builders"][number]>;
   registryStorePath: string;
   sourceRevision?: string;
+  toolSourceRevision?: string;
 }): void {
   if (!Array.isArray(opts.comparisons) || opts.comparisons.length !== opts.expectedKeys.length) {
     throw new Error(`${opts.kind} comparisons do not have exact required coverage`);
@@ -139,6 +157,7 @@ function validateComparisons(opts: {
       id !== comparison.subjectId ||
       reconstructed.system !== comparison.system ||
       (opts.kind === "publication" && reconstructed.sourceRevision !== opts.sourceRevision) ||
+      reconstructed.toolSourceRevision !== opts.toolSourceRevision ||
       artifactIdentityDigest(reconstructed) !== comparison.artifactIdentityDigest
     ) {
       throw new Error(`${opts.kind} comparison identity does not match ${key}`);

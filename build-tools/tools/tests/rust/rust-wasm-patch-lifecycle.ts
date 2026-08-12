@@ -5,7 +5,10 @@ import { pathToFileURL } from "node:url";
 import { artifactNixIndependentPolicyArgs } from "../../lib/artifact-nix-policy";
 import { exportGraphInTemp } from "../lib/test-helpers";
 import { commandEnv } from "../viberoots/remote-consumer-boundary";
-import { buildCanonicalBundle } from "./rust.source-selection.identity-bundle";
+import {
+  buildCanonicalBundle,
+  buildCanonicalBundleOutputs,
+} from "./rust.source-selection.identity-bundle";
 import { itoaChecksum, itoaSource, itoaVersion } from "./rust-wasm-acceptance-fixture";
 import type { WasmAcceptanceContext } from "./rust-wasm-acceptance-cache-patch";
 import { executeStaticDependencyConsumer } from "./rust-wasm-cross-language-runtime";
@@ -37,7 +40,15 @@ export async function verifyPatchLifecycle(
   context: WasmAcceptanceContext,
   nix: string,
 ): Promise<void> {
-  const { tmp, command: $, root, outputs, currentInput, artifactToolsRoot } = context;
+  const {
+    tmp,
+    command: $,
+    root,
+    outputs,
+    provenanceOutputs,
+    currentInput,
+    artifactToolsRoot,
+  } = context;
   const reviewedNixPolicy = artifactNixIndependentPolicyArgs("reviewed");
   const emptyNixPolicy = artifactNixIndependentPolicyArgs("empty");
   const expression = `let f = builtins.getFlake ${JSON.stringify(
@@ -91,30 +102,29 @@ export async function verifyPatchLifecycle(
   if (!context.allowMissingWasiToolchain) {
     names.push("wasi_static", "wasi_component", "wasi_demo");
   }
-  const buildFamily = async (): Promise<string[]> => {
-    const family: string[] = [];
+  const buildFamily = async (): Promise<{ outputs: string[]; provenanceOutputs: string[] }> => {
+    const family = { outputs: [] as string[], provenanceOutputs: [] as string[] };
     for (const name of names) {
-      family.push(
-        (
-          await buildCanonicalBundle(
-            tmp,
-            "graph-generator-selected",
-            currentInput,
-            process.env,
-            `//projects/apps/rust-wasm:${name}`,
-            artifactToolsRoot,
-            true,
-          )
-        ).outPath,
+      const built = await buildCanonicalBundleOutputs(
+        tmp,
+        "graph-generator-selected",
+        currentInput,
+        process.env,
+        `//projects/apps/rust-wasm:${name}`,
+        artifactToolsRoot,
+        true,
+        ["out", "provenance"],
       );
+      family.outputs.push(built.out.outPath);
+      family.provenanceOutputs.push(built.provenance.outPath);
     }
     return family;
   };
-  const baselineManifests = await readMaterializations(outputs);
-  const patched = await buildFamily();
+  const baselineManifests = await readMaterializations(provenanceOutputs);
+  const { outputs: patched, provenanceOutputs: patchedProvenance } = await buildFamily();
   assert.ok(patched.every((output, index) => output !== outputs[index]));
-  await assertPatchedFamily(context, names, patched);
-  const patchedManifests = await readMaterializations(patched);
+  await assertPatchedFamily(context, names, patched, patchedProvenance);
+  const patchedManifests = await readMaterializations(patchedProvenance);
   const lockedSourceIdentity = {
     cargoLockSha256: patchedManifests[0]!.sourceIdentity.cargoLock.sha256,
     patches: patchedManifests[0]!.sourceIdentity.patches,
@@ -139,8 +149,10 @@ export async function verifyPatchLifecycle(
   await $({ env: patchEnv })`${cli} start rust itoa --target ${target}`;
   await $({ env: patchEnv })`${cli} remove rust itoa --target ${target}`;
   await exportGraphInTemp({ tmp, $ });
-  assert.deepEqual(await buildFamily(), outputs);
-  assert.deepEqual(await readMaterializations(outputs), baselineManifests);
+  const restored = await buildFamily();
+  assert.deepEqual(restored.outputs, outputs);
+  assert.deepEqual(restored.provenanceOutputs, provenanceOutputs);
+  assert.deepEqual(await readMaterializations(provenanceOutputs), baselineManifests);
   await assert.rejects(fs.access(path.join(root, "patches")), /ENOENT/);
   await verifySourceMutationLineage(context, baselineManifests[2]!);
 }
@@ -149,6 +161,7 @@ async function assertPatchedFamily(
   context: WasmAcceptanceContext,
   names: string[],
   outputs: string[],
+  provenanceOutputs: string[],
 ): Promise<void> {
   const { tmp, command: $, currentInput, artifactToolsRoot } = context;
   const raw = await WebAssembly.instantiate(
@@ -167,7 +180,13 @@ async function assertPatchedFamily(
   ]) {
     const output = outputs[names.indexOf(name)]!;
     const manifest = JSON.parse(
-      await fs.readFile(path.join(output, "share/viberoots-rust/wasm-manifest.json"), "utf8"),
+      await fs.readFile(
+        path.join(
+          provenanceOutputs[names.indexOf(name)]!,
+          "share/viberoots-rust/wasm-manifest.json",
+        ),
+        "utf8",
+      ),
     );
     const result =
       await $`${path.join(manifest.tools.wasmtime, "bin/wasmtime")} run --invoke ${"dependency-answer()"} ${path.join(output, "lib/rust_wasm_fixture.component.wasm")}`;
@@ -205,6 +224,7 @@ async function verifySourceMutationLineage(
       "//projects/apps/rust-wasm:raw",
       context.artifactToolsRoot,
       true,
+      "provenance",
     );
     const manifest = (await readMaterializations([mutated.outPath]))[0]!;
     assert.notEqual(manifest.sourceRevision, baseline.sourceRevision);
@@ -221,7 +241,8 @@ async function verifySourceMutationLineage(
     "//projects/apps/rust-wasm:raw",
     context.artifactToolsRoot,
     true,
+    "provenance",
   );
-  assert.equal(restored.outPath, context.outputs[2]);
+  assert.equal(restored.outPath, context.provenanceOutputs[2]);
   assert.deepEqual((await readMaterializations([restored.outPath]))[0], baseline);
 }

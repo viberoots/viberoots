@@ -17,10 +17,41 @@ export function registerTempCommandEnvironment(
   commandEnvironments.set($tmp, env);
 }
 
+export function retargetTempCommandToolSource(
+  $tmp: object,
+  workspaceRoot: string,
+  sourceRoot: string,
+): void {
+  const commandEnv = commandEnvironments.get($tmp);
+  if (!commandEnv) {
+    throw new Error("runInTemp: tool-source retarget requires a registered command environment");
+  }
+  if (path.resolve(String(commandEnv.WORKSPACE_ROOT || "")) !== path.resolve(workspaceRoot)) {
+    throw new Error("runInTemp: tool-source retarget does not own the declared workspace root");
+  }
+  const nextZxInit = path.join(sourceRoot, "build-tools", "tools", "dev", "zx-init.mjs");
+  const previousZxInit = String(commandEnv.ZX_INIT || "").trim();
+  commandEnv.VIBEROOTS_ROOT = sourceRoot;
+  commandEnv.VIBEROOTS_SOURCE_ROOT = sourceRoot;
+  commandEnv.VIBEROOTS_FLAKE_INPUT_ROOT = sourceRoot;
+  commandEnv.ZX_INIT = nextZxInit;
+  if (previousZxInit && commandEnv.NODE_OPTIONS) {
+    commandEnv.NODE_OPTIONS = commandEnv.NODE_OPTIONS.split(previousZxInit).join(nextZxInit);
+  }
+  process.env.VIBEROOTS_ROOT = sourceRoot;
+  process.env.VIBEROOTS_SOURCE_ROOT = sourceRoot;
+  process.env.VIBEROOTS_FLAKE_INPUT_ROOT = sourceRoot;
+  process.env.ZX_INIT = nextZxInit;
+  if (previousZxInit && process.env.NODE_OPTIONS) {
+    process.env.NODE_OPTIONS = process.env.NODE_OPTIONS.split(previousZxInit).join(nextZxInit);
+  }
+}
+
 export async function reconcileTempDependencyInputs(
   tmp: string,
   $tmp: any,
   sourceRoot = String(process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || ""),
+  envOverrides: NodeJS.ProcessEnv = {},
 ): Promise<void> {
   const canonicalSourceRoot = sourceRoot
     ? await fsp.realpath(sourceRoot).catch(() => path.resolve(sourceRoot))
@@ -33,7 +64,11 @@ export async function reconcileTempDependencyInputs(
   if (!commandEnv) {
     throw new Error("runInTemp: reconciliation requires a registered command environment");
   }
-  await $tmp({ cwd: tmp, stdio: "inherit" })`${updateTool}`;
+  await $tmp({
+    cwd: tmp,
+    stdio: "inherit",
+    env: { ...commandEnv, ...envOverrides },
+  })`${updateTool}`;
   const repairedArtifactToolsRoot = canonicalArtifactToolsRoot(tmp);
   commandEnv.VBR_ARTIFACT_TOOLS_ROOT = repairedArtifactToolsRoot;
   process.env.VBR_ARTIFACT_TOOLS_ROOT = repairedArtifactToolsRoot;

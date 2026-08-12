@@ -15,6 +15,7 @@ import { nixCachePolicyBindingDigest } from "../../lib/nix-cache-policy-capabili
 import { sanitizeInheritedNixConfig } from "../../lib/nix-config-env";
 import { parseNixCacheConfigValues } from "../../lib/nix-cache-readiness";
 import { resolveToolPathSync } from "../../lib/tool-paths";
+import { mergeDevEnvironmentPreservingReviewedCache } from "../lib/test-helpers/run-in-temp/runtime-env";
 
 const baseOptions: Parameters<typeof buildVerifyTestEnvArgs>[0] = {
   iso: "v-123",
@@ -32,6 +33,28 @@ function envValue(envArgs: string[], name: string): string | undefined {
   const prefix = `${name}=`;
   return envArgs.find((arg) => arg.startsWith(prefix))?.slice(prefix.length);
 }
+
+test("temp dev env cannot replace reviewed cache authority", () => {
+  const env = {
+    NIX_CONFIG: "substituters = https://reviewed.example",
+    VBR_NIX_CACHE_ROLE_AUTHORITY: "verify-nested-v1",
+    VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG: "substituters = https://reviewed.example",
+  };
+  mergeDevEnvironmentPreservingReviewedCache(
+    env,
+    [
+      "NIX_CONFIG=substituters = https://ambient.example",
+      "VBR_NIX_CACHE_ROLE_AUTHORITY=ambient",
+      "VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG=ambient",
+      "DEV_SHELL_TOOL=available",
+      "",
+    ].join("\0"),
+  );
+  assert.equal(env.NIX_CONFIG, "substituters = https://reviewed.example");
+  assert.equal(env.VBR_NIX_CACHE_ROLE_AUTHORITY, "verify-nested-v1");
+  assert.equal(env.VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG, "substituters = https://reviewed.example");
+  assert.equal((env as Record<string, string>).DEV_SHELL_TOOL, "available");
+});
 
 test("verify child env carries bound cache roles across nested Buck boundaries", () => {
   const previous = {
@@ -71,8 +94,16 @@ test("verify child env carries bound cache roles across nested Buck boundaries",
     );
     assert.ok(childConfig);
     assert.equal(envValue(envArgs, "NIX_CONFIG"), childConfig);
+    assert.equal(envValue(envArgs, "VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG"), childConfig);
     assert.equal(envValue(envArgs, "VBR_NIX_CACHE_ROLE_REQUIRED"), required);
     assert.equal(envValue(envArgs, "VBR_NIX_CACHE_ROLE_OPTIONAL"), optional);
+    assert.equal(
+      Buffer.from(
+        String(envValue(envArgs, "VBR_NIX_CACHE_ROLE_CONFIG_B64") || ""),
+        "base64",
+      ).toString("utf8"),
+      childConfig,
+    );
     assert.equal(envValue(envArgs, "VBR_NIX_CACHE_ROLE_POLICY"), "auto");
     assert.equal(
       envValue(envArgs, "VBR_NIX_CACHE_ROLE_BINDING"),
@@ -124,6 +155,7 @@ test("verify child canonicalizes baseline roles and excludes removed optional ca
     fs.rmSync(emptyNixConf, { recursive: true, force: true });
   }
   assert.doesNotMatch(childConfig, /removed\.example/);
+  assert.equal(envValue(envArgs, "VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG"), childConfig);
   assert.equal(envValue(envArgs, "VBR_NIX_CACHE_ROLE_REQUIRED"), required);
   assert.equal(envValue(envArgs, "VBR_NIX_CACHE_ROLE_OPTIONAL"), "");
   const transportedConfig = Buffer.from(
@@ -143,10 +175,23 @@ test("nested cache role aliases are consumed once and reject forged bindings", (
     requiredSubstituters: ["https://required.example"],
     optionalSubstituters: ["https://optional.example"],
   };
-  const env = { NIX_CONFIG: reviewedConfig, ...nestedCacheRoleTransportEnv(reviewed) };
+  const env: NodeJS.ProcessEnv = {
+    NIX_CONFIG: `${reviewedConfig}\nextra-substituters = https://ambient.example`,
+    ...nestedCacheRoleTransportEnv(reviewed),
+  };
   const consumed = consumeNestedCacheRoleTransport(env);
-  assert.equal(consumed.length, 10);
+  assert.equal(consumed.length, 14);
   assert.ok(consumed.includes(`NIX_CONFIG=${reviewedConfig}`));
+  assert.equal(env.NIX_CONFIG, reviewedConfig);
+  assert.equal(env.VBR_NIX_CACHE_ROLE_REQUIRED, "https://required.example");
+  assert.equal(env.VBR_NIX_CACHE_ROLE_OPTIONAL, "https://optional.example");
+  assert.equal(env.VBR_NIX_CACHE_ROLE_POLICY, "auto");
+  assert.equal(env.VBR_NIX_CACHE_ROLE_BINDING, nixCachePolicyBindingDigest(reviewed));
+  assert.equal(
+    Buffer.from(String(env.VBR_NIX_CACHE_ROLE_CONFIG_B64 || ""), "base64").toString("utf8"),
+    reviewedConfig,
+  );
+  assert.equal(env.VBR_NIX_CACHE_ROLE_AUTHORITY, "verify-nested-v1");
   assert.equal(consumeNestedCacheRoleTransport(env).length, 0);
 
   const forged = {

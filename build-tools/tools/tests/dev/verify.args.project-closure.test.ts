@@ -63,6 +63,23 @@ test("verify args: CLI selector inputs override env aliases", () => {
   assert.deepEqual(parsed.requestedProjects, ["workspace/apps/admin"]);
 });
 
+test("verify args: seed mode is consumed without changing explicit targets", () => {
+  const parsed = parseVerifyArgs({
+    argvTokens: ["--seed-mode=never", "//projects/apps/demo:demo-test"],
+    env: { VBR_VERIFY_SEED_MODE: "always" },
+  });
+
+  assert.equal(parsed.seedMode, "never");
+  assert.deepEqual(parsed.targets, ["//projects/apps/demo:demo-test"]);
+});
+
+test("verify args: seed mode rejects unknown values", () => {
+  assert.throws(
+    () => parseVerifyArgs({ argvTokens: ["--seed-mode=sometimes"], env: {} }),
+    /unknown verify seed mode: sometimes/,
+  );
+});
+
 test("verify args: project-closure requires projects and rejects explicit targets", () => {
   assert.throws(
     () =>

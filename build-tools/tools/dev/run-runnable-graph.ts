@@ -16,6 +16,10 @@ import { withoutEvaluationSelectors } from "./evaluation-bundle-env";
 import { runBoundedArtifactCommand } from "../lib/artifact-command-runner";
 import { canonicalArtifactReentryEnvironment } from "./canonical-artifact-entrypoint";
 import type { ReviewedNixConfigOutcome } from "./canonical-reviewed-nix-config";
+import {
+  runnableNixCacheConfig,
+  runnableNixCachePolicyCapability,
+} from "./run-runnable-cache-policy";
 
 function runnableArtifactBaseEnv(): Record<string, string> {
   return withoutArtifactEnvironmentInfluence(withoutEvaluationSelectors(process.env)) as Record<
@@ -97,6 +101,11 @@ export async function buildRunnableManifest(
     purpose: opts.purpose || "local",
     artifactToolsRoot: opts.artifactToolsRoot,
   });
+  const nixCachePolicyCapability = runnableNixCachePolicyCapability();
+  const reviewedNixConfig =
+    opts.nixCacheHealth?.config || runnableNixCacheConfig(nixCachePolicyCapability);
+  const internalReviewedNixConfig =
+    !nixCachePolicyCapability && reviewedNixConfig ? { NIX_CONFIG: reviewedNixConfig } : {};
   const baseEnv = runnableArtifactBaseEnv();
   const sourceSelectors = {
     VBR_FILTERED_FLAKE_SNAPSHOT: "1",
@@ -109,10 +118,11 @@ export async function buildRunnableManifest(
         env: baseEnv,
         internal: {
           ...sourceSelectors,
-          ...(opts.nixCacheHealth?.config ? { NIX_CONFIG: opts.nixCacheHealth.config } : {}),
+          ...internalReviewedNixConfig,
         },
         label: "build runnable manifest",
         artifactToolsRoot: opts.artifactToolsRoot,
+        ...(nixCachePolicyCapability ? { nixCachePolicyCapability } : {}),
         args: [
           "--no-write-lock-file",
           "--option",
@@ -166,6 +176,11 @@ export async function buildSelectedOutPath(
   const purpose = options.purpose || "local";
   const graphPath = path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
   await requireArtifactGraph({ workspaceRoot, graphPath, target, artifactToolsRoot });
+  const nixCachePolicyCapability = runnableNixCachePolicyCapability();
+  const reviewedNixConfig =
+    options.nixCacheHealth?.config || runnableNixCacheConfig(nixCachePolicyCapability);
+  const internalReviewedNixConfig =
+    !nixCachePolicyCapability && reviewedNixConfig ? { NIX_CONFIG: reviewedNixConfig } : {};
   const source = await chooseRunnableFlakeRef({
     workspaceRoot,
     sourceMode,
@@ -188,9 +203,7 @@ export async function buildSelectedOutPath(
           attrPath: pnpmStoreAttrFromImporter(targetImporter),
           env: {
             ...runnableArtifactBaseEnv(),
-            ...(options.nixCacheHealth?.config
-              ? { NIX_CONFIG: options.nixCacheHealth.config }
-              : {}),
+            ...(reviewedNixConfig ? { NIX_CONFIG: reviewedNixConfig } : {}),
             VBR_FILTERED_FLAKE_SNAPSHOT: "1",
             VBR_PNPM_FILTERED_SNAPSHOT_ROOT: source.workspaceRoot || workspaceRoot,
           },
@@ -208,10 +221,11 @@ export async function buildSelectedOutPath(
       env: selectedEnv,
       internal: {
         ...sourceSelectors,
-        ...(options.nixCacheHealth?.config ? { NIX_CONFIG: options.nixCacheHealth.config } : {}),
+        ...internalReviewedNixConfig,
       },
       label,
       artifactToolsRoot,
+      ...(nixCachePolicyCapability ? { nixCachePolicyCapability } : {}),
       args: [
         "--no-write-lock-file",
         "--option",

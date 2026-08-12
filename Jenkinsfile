@@ -126,6 +126,13 @@ pipeline {
                   else
                     export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 TZ=Etc/UTC
                   fi
+                  VBR_ARTIFACT_TOOLS_ROOT="${VBR_REPRODUCIBILITY_REMOTE_CI_TOOLS}" \
+                    "${VBR_REPRODUCIBILITY_REMOTE_CI_TOOLS}/bin/zx-wrapper" \
+                    "${VBR_REPRODUCIBILITY_REMOTE_CI_TOOLS}/share/viberoots-source/build-tools/tools/ci/produce-protected-rust-patch-evidence.ts" \
+                    --system "${SYSTEM}" --builder-slot "${BUILDER_SLOT}" --registry "${VBR_REPRODUCIBILITY_REGISTRY_STORE_PATH}" \
+                    --transport-root "${VBR_REPRODUCIBILITY_TRANSPORT_ROOT}" --remote-ci-tools "${VBR_REPRODUCIBILITY_REMOTE_CI_TOOLS}" \
+                    --builder-policy "${VBR_REPRODUCIBILITY_BUILDER_POLICY}" \
+                    --output "$PWD/buck-out/reproducibility/public-rust-patch-${SYSTEM}-${BUILDER_SLOT}.json"
                   for probe in \
                     'CC=/host/compiler' \
                     'PYTHON=/host/language-runtime' \
@@ -169,18 +176,14 @@ pipeline {
                   env -u NODE_PATH VBR_GC_MODE=off VBR_ARTIFACT_TOOLS_ROOT="${VBR_REPRODUCIBILITY_REMOTE_CI_TOOLS}" \
                     "${VBR_REPRODUCIBILITY_REMOTE_CI_TOOLS}/bin/zx-wrapper" \
                     "${VBR_REPRODUCIBILITY_REMOTE_CI_TOOLS}/share/viberoots-source/build-tools/tools/ci/produce-artifact-reproducibility-matrix-cell.ts" \
-                    --system "${SYSTEM}" \
-                    --builder-slot "${BUILDER_SLOT}" \
-                    --registry "${VBR_REPRODUCIBILITY_REGISTRY_STORE_PATH}" \
-                    --transport-root "${VBR_REPRODUCIBILITY_TRANSPORT_ROOT}" \
-                    --remote-ci-tools "${VBR_REPRODUCIBILITY_REMOTE_CI_TOOLS}" \
-                    --builder-policy "${VBR_REPRODUCIBILITY_BUILDER_POLICY}" \
-                    --evidence-store-aws-credentials-file "${VBR_REPRODUCIBILITY_EVIDENCE_AWS_CREDENTIALS_FILE}" \
-                    --output-root "buck-out/reproducibility/cell-${SYSTEM}-${BUILDER_SLOT}"
+                    --system "${SYSTEM}" --builder-slot "${BUILDER_SLOT}" \
+                    --registry "${VBR_REPRODUCIBILITY_REGISTRY_STORE_PATH}" --transport-root "${VBR_REPRODUCIBILITY_TRANSPORT_ROOT}" \
+                    --remote-ci-tools "${VBR_REPRODUCIBILITY_REMOTE_CI_TOOLS}" --builder-policy "${VBR_REPRODUCIBILITY_BUILDER_POLICY}" \
+                    --evidence-store-aws-credentials-file "${VBR_REPRODUCIBILITY_EVIDENCE_AWS_CREDENTIALS_FILE}" --output-root "buck-out/reproducibility/cell-${SYSTEM}-${BUILDER_SLOT}"
                         '''
                       }
                     }
-                    stash name: "repro-records-${SYSTEM}-${BUILDER_SLOT}", includes: "buck-out/reproducibility/cell-${SYSTEM}-${BUILDER_SLOT}/records.txt,buck-out/reproducibility/cell-${SYSTEM}-${BUILDER_SLOT}/observations.txt"
+                    stash name: "repro-records-${SYSTEM}-${BUILDER_SLOT}", includes: "buck-out/reproducibility/cell-${SYSTEM}-${BUILDER_SLOT}/records.txt,buck-out/reproducibility/cell-${SYSTEM}-${BUILDER_SLOT}/observations.txt,buck-out/reproducibility/public-rust-patch-${SYSTEM}-${BUILDER_SLOT}.json"
                   } finally {
                     deleteDir()
                   }
@@ -229,16 +232,13 @@ pipeline {
             env -u NODE_PATH VBR_GC_MODE=off VBR_ARTIFACT_TOOLS_ROOT="${VBR_REPRODUCIBILITY_REMOTE_CI_TOOLS}" \
               "${VBR_REPRODUCIBILITY_REMOTE_CI_TOOLS}/bin/zx-wrapper" \
               "${VBR_REPRODUCIBILITY_REMOTE_CI_TOOLS}/share/viberoots-source/build-tools/tools/ci/aggregate-artifact-reproducibility-evidence.ts" \
-              --registry "${VBR_REPRODUCIBILITY_REGISTRY_STORE_PATH}" \
-              --records-root "buck-out/reproducibility" \
-              --production-graph "$PWD/.viberoots/workspace/buck/graph.json" \
-              --signing-key-file "${VBR_REPRODUCIBILITY_SIGNING_KEY_FILE}" \
-              --evidence-store-aws-credentials-file "${VBR_REPRODUCIBILITY_EVIDENCE_AWS_CREDENTIALS_FILE}" \
-              --output-root "buck-out/reproducibility/aggregate-parent/aggregate" \
+              --registry "${VBR_REPRODUCIBILITY_REGISTRY_STORE_PATH}" --records-root "buck-out/reproducibility" \
+              --production-graph "$PWD/.viberoots/workspace/buck/graph.json" --signing-key-file "${VBR_REPRODUCIBILITY_SIGNING_KEY_FILE}" \
+              --evidence-store-aws-credentials-file "${VBR_REPRODUCIBILITY_EVIDENCE_AWS_CREDENTIALS_FILE}" --output-root "buck-out/reproducibility/aggregate-parent/aggregate" \
               > "buck-out/reproducibility/aggregate-observation-paths.json"
                 '''
               }
-              archiveArtifacts artifacts: 'buck-out/reproducibility/aggregate-observation-paths.json', fingerprint: true
+              archiveArtifacts artifacts: 'buck-out/reproducibility/aggregate-observation-paths.json,buck-out/reproducibility/public-rust-patch-*.json', fingerprint: true
             } finally {
               deleteDir()
             }

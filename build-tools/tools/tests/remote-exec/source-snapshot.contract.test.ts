@@ -174,7 +174,7 @@ test("source_snapshot action uses declared zx-wrapper runner without flake or ha
 
   assert.match(
     command,
-    /cmd = \[[^,\]]*build-tools\/tools\/dev\/__source-snapshot-zx-wrapper__\/source-snapshot-zx-wrapper, --preserve-symlinks, --preserve-symlinks-main, --import, \.\/[^,\]]*build-tools\/tools\/dev\/__zx-init\.mjs__\/zx-init\.mjs, \.\/[^,\]]*source-snapshot-runner\.modules\/dev\/source-snapshot\.ts,/,
+    /cmd = \[[^,\]]*build-tools\/tools\/dev\/__source-snapshot-zx-wrapper__\/source-snapshot-zx-wrapper, --preserve-symlinks, --preserve-symlinks-main, --import, \.\/[^,\]]*source-snapshot-runner\.modules\/build-tools\/tools\/dev\/zx-init\.mjs, \.\/[^,\]]*source-snapshot-runner\.modules\/dev\/source-snapshot\.ts,/,
   );
   assert.doesNotMatch(command, /nix, run|path:\.#zx-wrapper/);
   assert.doesNotMatch(command, /cmd = \[[^,\]]*source-snapshot\.ts,/);

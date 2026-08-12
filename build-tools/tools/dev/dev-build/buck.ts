@@ -24,6 +24,7 @@ import {
 } from "../../lib/artifact-environment";
 import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import path from "node:path";
 import type { NixCachePolicyCapability } from "../../lib/nix-cache-policy-capability";
 
@@ -124,6 +125,8 @@ export async function runBuckCommand(opts: {
   const cmd = useStderrFilter
     ? `${baseCmd} 2> >(grep -Ev 'buck2_client_ctx::file_tailers::tailer: Failed to read from .*/buckd\\.(stderr|stdout): task [0-9]+ was cancelled|buck2_event_log::writer: Failed to flush log file .*: Broken pipe \\([^)]+\\)' >&2)`
     : baseCmd;
+  const isolationRoot = path.join(opts.root, "buck-out", isolation);
+  await mkdirWithMacosMetadataExclusion(isolationRoot).catch(() => {});
   const proc = await withSharedBuckIsolationStartupLock(opts.root, isolation, async () => {
     const buckCmd = $({
       stdio: verbose ? "inherit" : "pipe",

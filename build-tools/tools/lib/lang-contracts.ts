@@ -160,7 +160,6 @@ const experimentalHermeticBooleanKeys = [
   "immutableBundleInputs",
   "storeQualifiedToolchain",
   "selectorTransport",
-  "remoteExecution",
 ] as const;
 
 export function languageEnablementGaps(contract?: LanguageHermeticContract): string[] {

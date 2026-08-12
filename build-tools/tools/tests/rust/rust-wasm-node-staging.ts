@@ -22,13 +22,13 @@ export async function verifyNodeStages(
     [
       'load("@prelude//:rules.bzl", "genrule")',
       'load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module")',
-      `genrule(name = "package", out = "package", cmd = "mkdir -p $OUT && printf '{\\"schemaVersion\\":\\"viberoots.node-wasm-assets.v1\\"}' > $OUT/asset-manifest.json && printf 'export const ready = true;\\\\n' > $OUT/index.js && printf '{\\"type\\":\\"module\\"}\\\\n' > $OUT/package.json")`,
-      'node_wasm_inline_module(name = "inline", src = "//projects/apps/rust-wasm:browser", artifact_name = "rust_wasm_fixture_bg.wasm", out = "rust-inline.js")',
-      'node_asset_stage(name = "webapp", app = ":package", assets = [{"src": "//projects/apps/rust-wasm:browser", "artifact_name": "rust_wasm_fixture_bg.wasm", "dest": "client/wasm/rust.wasm"}], labels = ["lang:node", "kind:app", "webapp:static"])',
-      'node_asset_stage(name = "ssr", app = ":package", assets = [{"src": "//projects/apps/rust-wasm:browser", "artifact_name": "rust_wasm_fixture_bg.wasm", "dest": "server/wasm/rust.wasm"}], labels = ["lang:node", "kind:app", "webapp:ssr"])',
-      'node_asset_stage(name = "service", app = ":package", assets = [{"src": "//projects/apps/rust-wasm:raw", "dest": "server/wasm/raw.wasm"}], labels = ["lang:node", "kind:app", "deployment-component:service"])',
-      'node_asset_stage(name = "component", app = ":package", assets = [{"src": "//projects/apps/rust-wasm:component", "artifact_name": "rust_wasm_fixture.component.wasm", "dest": "components/calculator.wasm"}], labels = ["lang:node", "kind:app", "deployment-component:artifact"])',
-      'node_asset_stage(name = "cli", app = ":package", assets = [{"src": ":inline", "dest": "lib/wasm/rust-inline.js"}], labels = ["lang:node", "kind:bin"])',
+      `genrule(name = "package", out = "package", cmd = "mkdir -p $OUT/dist && printf '{\\"schemaVersion\\":\\"viberoots.node-wasm-assets.v1\\"}' > $OUT/asset-manifest.json && printf 'export const ready = true;\\\\n' > $OUT/index.js && printf '{\\"type\\":\\"module\\"}\\\\n' > $OUT/package.json && cp $OUT/asset-manifest.json $OUT/index.js $OUT/package.json $OUT/dist/")`,
+      'node_wasm_inline_module(name = "inline", src = "//projects/apps/rust-wasm:browser", provenance = "//projects/apps/rust-wasm:browser[provenance]", artifact_name = "rust_wasm_fixture_bg.wasm", out = "rust-inline.js")',
+      'node_asset_stage(name = "webapp", app = ":package", assets = [{"src": "//projects/apps/rust-wasm:browser", "provenance": "//projects/apps/rust-wasm:browser[provenance]", "artifact_name": "rust_wasm_fixture_bg.wasm", "dest": "client/wasm/rust.wasm"}], labels = ["lang:node", "kind:app", "webapp:static"])',
+      'node_asset_stage(name = "ssr", app = ":package", assets = [{"src": "//projects/apps/rust-wasm:browser", "provenance": "//projects/apps/rust-wasm:browser[provenance]", "artifact_name": "rust_wasm_fixture_bg.wasm", "dest": "server/wasm/rust.wasm"}], labels = ["lang:node", "kind:app", "webapp:ssr"])',
+      'node_asset_stage(name = "service", app = ":package", assets = [{"src": "//projects/apps/rust-wasm:raw", "provenance": "//projects/apps/rust-wasm:raw[provenance]", "dest": "server/wasm/raw.wasm"}], labels = ["lang:node", "kind:app", "deployment-component:service"])',
+      'node_asset_stage(name = "component", app = ":package", assets = [{"src": "//projects/apps/rust-wasm:component", "provenance": "//projects/apps/rust-wasm:component[provenance]", "artifact_name": "rust_wasm_fixture.component.wasm", "dest": "components/calculator.wasm"}], labels = ["lang:node", "kind:app", "deployment-component:artifact"])',
+      'node_asset_stage(name = "cli", app = ":package", assets = [{"src": ":inline", "output_path": "rust-inline.js", "dest": "lib/wasm/rust-inline.js"}], labels = ["lang:node", "kind:bin"])',
       "",
     ].join("\n"),
   );
@@ -73,9 +73,28 @@ export async function verifyNodeStages(
       await fs.readFile(path.join(stages[index], "asset-manifest.json"), "utf8"),
     );
     assert.equal(manifest.schemaVersion, "viberoots.node-wasm-assets.v1");
-    assert.equal(manifest.assets.length, 1);
-    assert.equal(manifest.assets[0].destination, destination);
     const bytes = await fs.readFile(path.join(stages[index], destination));
+    if (destination.endsWith(".js")) {
+      assert.deepEqual(
+        manifest.assets,
+        [],
+        `${destination} is a JavaScript consumer and must not be recorded as raw WASM`,
+      );
+      const match = bytes.toString("utf8").match(/^export const wasmProducer = (\{[^\n]+\});$/m);
+      assert.ok(match, `${destination} must embed its WASM producer lineage`);
+      const producer = JSON.parse(match[1]!);
+      assert.match(producer.storePath, /^\/nix\/store\//);
+      assert.equal(producer.outputIdentity, path.basename(producer.storePath));
+      assert.match(producer.sourceRevision, /^[a-f0-9]{64}$/);
+      assert.match(producer.compositionDigest, /^[a-f0-9]{64}$/);
+      continue;
+    }
+    assert.equal(
+      manifest.assets.length,
+      1,
+      `${destination} staged manifest must contain exactly one asset: ${JSON.stringify(manifest)}`,
+    );
+    assert.equal(manifest.assets[0].destination, destination);
     assert.equal(
       manifest.assets[0].sha256,
       `sha256-${createHash("sha256").update(bytes).digest("hex")}`,

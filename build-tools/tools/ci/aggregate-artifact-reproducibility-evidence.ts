@@ -4,8 +4,8 @@ import path from "node:path";
 import { enterCanonicalArtifactEntrypoint } from "../dev/canonical-artifact-entrypoint";
 import { getFlagStr } from "../lib/cli";
 import {
-  ARTIFACT_REPRODUCIBILITY_MATRIX,
   RELEASE_BUILDER_SYSTEMS,
+  reproducibilityMatrixSystemPairs,
 } from "../lib/artifact-reproducibility-matrix";
 import {
   aggregateArtifactReproducibilityEvidence,
@@ -32,9 +32,13 @@ import {
   protectedArtifactOutputIdentities,
   unsignedEvidenceIngressArgs,
 } from "./artifact-reproducibility-protected-handoff";
-
+import { verifyRemoteCiToolsSourceIdentity } from "./remote-ci-tools-source-identity";
+import { resolveArtifactRevisionDomains } from "./artifact-revision-domains";
+import {
+  readArtifactCellManifests as readCellManifests,
+  readProtectedRustPatchEvidenceFiles as readProtectedRustPatchEvidence,
+} from "./artifact-reproducibility-aggregate-files";
 const artifactToolsRoot = enterCanonicalArtifactEntrypoint();
-
 async function main(): Promise<void> {
   const registryStorePath = required("registry");
   assertStoreFile(registryStorePath, "reviewed registry");
@@ -55,14 +59,15 @@ async function main(): Promise<void> {
   const outputRoot = path.resolve(required("output-root"));
   const recordFiles = await readCellManifests(recordsRoot, "records.txt");
   const observationFiles = await readCellManifests(recordsRoot, "observations.txt");
+  const protectedRustPatchEvidence = await readProtectedRustPatchEvidence(recordsRoot);
   const productionGraphPath = onlyStorePath(
     (await runNix(["store", "add-file", required("production-graph")])).stdout,
   );
   assertStoreFile(productionGraphPath, "production graph");
   const publicationSubjects = resolvePublicationSubjects(await readJson(productionGraphPath));
   const expectedRecords =
-    (ARTIFACT_REPRODUCIBILITY_MATRIX.length + publicationSubjects.length) *
-    RELEASE_BUILDER_SYSTEMS.length *
+    (reproducibilityMatrixSystemPairs().length +
+      publicationSubjects.length * RELEASE_BUILDER_SYSTEMS.length) *
     2;
   if (recordFiles.length !== expectedRecords || new Set(recordFiles).size !== expectedRecords) {
     throw new Error(`aggregate input manifests require ${expectedRecords} unique run records`);
@@ -97,14 +102,16 @@ async function main(): Promise<void> {
       };
     }),
   );
-  const expectedSourceRevision = (
-    await runArtifactTool({
-      tool: "git",
-      args: ["rev-parse", "HEAD"],
+  const { sourceRevision: expectedSourceRevision, toolSourceRevision } =
+    await resolveArtifactRevisionDomains({
       workspaceRoot: process.cwd(),
       artifactToolsRoot,
-    })
-  ).stdout.trim();
+    });
+  const toolClosureSourceIdentity = await verifyRemoteCiToolsSourceIdentity({
+    remoteCiTools: artifactToolsRoot,
+    expectedToolSourceRevision: toolSourceRevision,
+    runNix,
+  });
   const aggregate = aggregateArtifactReproducibilityEvidence({
     registry,
     registryStorePath,
@@ -116,14 +123,19 @@ async function main(): Promise<void> {
     ),
     expectedSourceRevision,
     expectedToolClosureRoot: artifactToolsRoot,
+    expectedToolClosureSourceIdentity: toolClosureSourceIdentity,
+    protectedRustPatchEvidence,
   });
   const outputIdentities = protectedArtifactOutputIdentities(records);
-  await runNix(
-    unsignedEvidenceIngressArgs(
-      evidenceStore,
-      outputIdentities.map(({ outputPath }) => outputPath),
+  const artifactRoots = [
+    ...new Set(
+      outputIdentities.flatMap(({ outputPath, provenanceOutputPath }) => [
+        outputPath,
+        provenanceOutputPath,
+      ]),
     ),
-  );
+  ];
+  await runNix(unsignedEvidenceIngressArgs(evidenceStore, artifactRoots));
   await assertHydratedArtifactOutputIdentities(outputIdentities, runNix);
   const signingKeyFile = required("signing-key-file");
   await Promise.all(
@@ -132,16 +144,12 @@ async function main(): Promise<void> {
     ),
   );
   await Promise.all(
-    outputIdentities.map(
-      async ({ outputPath }) =>
+    artifactRoots.map(
+      async (outputPath) =>
         await signAndVerifyProtectedStoreClosure(outputPath, signingKeyFile, runNix),
     ),
   );
-  const protectedRoots = [
-    ...recordRoots,
-    ...observationRoots,
-    ...outputIdentities.map(({ outputPath }) => outputPath),
-  ];
+  const protectedRoots = [...recordRoots, ...observationRoots, ...artifactRoots];
   const awsSharedCredentialsFile = required("evidence-store-aws-credentials-file");
   await copyArtifactPathsToEvidenceStore({
     workspaceRoot: process.cwd(),
@@ -166,7 +174,7 @@ async function main(): Promise<void> {
       "store",
       "add-path",
       "--name",
-      "viberoots-artifact-reproducibility-aggregate-v3",
+      "viberoots-artifact-reproducibility-aggregate-v6",
       outputRoot,
     ],
     workspaceRoot: process.cwd(),
@@ -194,22 +202,6 @@ async function main(): Promise<void> {
     })}\n`,
   );
 }
-
-async function readCellManifests(root: string, name: string): Promise<string[]> {
-  return (
-    await Promise.all(
-      RELEASE_BUILDER_SYSTEMS.flatMap((system) =>
-        ["one", "two"].map(async (slot) =>
-          (await fs.readFile(path.join(root, `cell-${system}-${slot}`, name), "utf8"))
-            .split("\n")
-            .map((entry) => entry.trim())
-            .filter(Boolean),
-        ),
-      ),
-    )
-  ).flat();
-}
-
 async function readJson(file: string): Promise<unknown> {
   return JSON.parse(await fs.readFile(file, "utf8"));
 }

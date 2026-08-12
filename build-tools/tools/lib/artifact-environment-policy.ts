@@ -96,6 +96,7 @@ const ARTIFACT_NEUTRAL_ENV = new Set([
   "NIX_SSL_CERT_DIR",
   "NIX_SSL_CERT_FILE",
   "NODE_EXTRA_CA_CERTS",
+  "NODE_COMPILE_CACHE",
   "RUSTDOC",
   "RUSTFMT",
   "RUST_ANALYZER_PATH",
@@ -105,6 +106,7 @@ const ARTIFACT_NEUTRAL_ENV = new Set([
 ]);
 
 export function isArtifactAffectingEnvName(name: string): boolean {
+  if (ARTIFACT_NEUTRAL_ENV.has(name)) return false;
   return (
     ARTIFACT_ENV_EXACT.has(name) ||
     ARTIFACT_ENV_PREFIXES.some((prefix) => name.startsWith(prefix)) ||
@@ -117,7 +119,10 @@ export function withoutArtifactEnvironmentInfluence(env: NodeJS.ProcessEnv): Nod
   return Object.fromEntries(
     Object.entries(env).filter(
       ([name, value]) =>
-        value !== undefined && !ARTIFACT_SELECTORS.has(name) && !isArtifactAffectingEnvName(name),
+        value !== undefined &&
+        !ARTIFACT_SELECTORS.has(name) &&
+        !ARTIFACT_NEUTRAL_ENV.has(name) &&
+        !isArtifactAffectingEnvName(name),
     ),
   );
 }

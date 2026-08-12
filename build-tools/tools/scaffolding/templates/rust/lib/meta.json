@@ -2,5 +2,10 @@
   "language": "rust",
   "template": "lib",
   "description": "Experimental Rust library",
-  "resolverDestination": "projects/libs/{name}"
+  "resolverDestination": "projects/libs/{name}",
+  "help": {
+    "usage": "scaf new rust lib <name> [--path=DEST]",
+    "notes": ["Creates a locked Rust library with Buck build and test targets."],
+    "examples": ["scaf new rust lib demo --yes"]
+  }
 }

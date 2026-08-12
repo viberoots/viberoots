@@ -17,6 +17,13 @@ import { beginArtifactCellObservation } from "./artifact-reproducibility-cell-ba
 import { withArtifactReproducibilityTempConsumer } from "./artifact-reproducibility-temp-consumer";
 import { producePublicationCellRecords } from "./artifact-reproducibility-publication-cell";
 import { copyArtifactPathsToEvidenceStore } from "./evidence-store-write-transport";
+import { verifyRemoteCiToolsSourceIdentity } from "./remote-ci-tools-source-identity";
+import { resolveArtifactRevisionDomains } from "./artifact-revision-domains";
+import {
+  matrixCellRecordFiles as recordAndObservation,
+  matrixCellScript as script,
+  matrixCellStorePath as onlyStorePath,
+} from "./artifact-reproducibility-matrix-cell-files";
 
 const artifactToolsRoot = enterCanonicalArtifactEntrypoint();
 
@@ -25,6 +32,16 @@ async function main(): Promise<void> {
     throw new Error("reproducibility matrix production is a protected CI-only entrypoint");
   }
   const workspaceRoot = process.cwd();
+  const remoteCiTools = required("remote-ci-tools");
+  const { toolSourceRevision } = await resolveArtifactRevisionDomains({
+    workspaceRoot,
+    artifactToolsRoot,
+  });
+  await verifyRemoteCiToolsSourceIdentity({
+    remoteCiTools,
+    expectedToolSourceRevision: toolSourceRevision,
+    runNix: async (args) => await runArtifactNix({ args, workspaceRoot, artifactToolsRoot }),
+  });
   const evidenceToolEnv = buildCanonicalArtifactEnvironment(workspaceRoot, { artifactToolsRoot });
   const system = required("system");
   if (!RELEASE_BUILDER_SYSTEMS.includes(system as never)) {
@@ -54,6 +71,7 @@ async function main(): Promise<void> {
   const records: string[] = [];
   const observations: string[] = [];
   for (const matrixCase of ARTIFACT_REPRODUCIBILITY_MATRIX) {
+    if (!matrixCase.systems.includes(system)) continue;
     const caseRoot = path.join(outputRoot, matrixCase.id);
     await fs.mkdir(caseRoot, { mode: 0o700 });
     const baseline = await beginArtifactCellObservation({
@@ -148,7 +166,7 @@ async function main(): Promise<void> {
         "--builder-policy",
         required("builder-policy"),
         "--remote-ci-tools",
-        required("remote-ci-tools"),
+        remoteCiTools,
         "--transport-file",
         transportFile,
         "--builder-identity",
@@ -177,7 +195,7 @@ async function main(): Promise<void> {
     outputRoot,
     system,
     builderPolicy: required("builder-policy"),
-    remoteCiTools: required("remote-ci-tools"),
+    remoteCiTools,
     transportFile,
     registryStorePath,
     builder,
@@ -200,33 +218,6 @@ async function main(): Promise<void> {
     flag: "wx",
     mode: 0o444,
   });
-}
-
-async function recordAndObservation(recordRoot: string): Promise<{
-  recordPath: string;
-  observationPath: string;
-}> {
-  const recordPath = path.join(recordRoot, "run-record.json");
-  const record = JSON.parse(await fs.readFile(recordPath, "utf8")) as {
-    observationStorePath?: unknown;
-  };
-  const observationPath = String(record.observationStorePath || "");
-  if (!/^\/nix\/store\/[a-z0-9]{32}-[^/]+\/run-observation\.json$/u.test(observationPath)) {
-    throw new Error("reproducibility record omitted its immutable observation path");
-  }
-  return { recordPath, observationPath };
-}
-
-function script(artifactToolsRoot: string, name: string): string {
-  return path.join(artifactToolsRoot, "share/viberoots-source/build-tools/tools/ci", name);
-}
-
-function onlyStorePath(value: string): string {
-  const paths = value.trim().split(/\s+/u).filter(Boolean);
-  if (paths.length !== 1 || !/^\/nix\/store\/[a-z0-9]{32}-[^/]+$/u.test(paths[0]!)) {
-    throw new Error("reproducibility producer must return exactly one immutable record root");
-  }
-  return paths[0]!;
 }
 
 function required(name: string): string {

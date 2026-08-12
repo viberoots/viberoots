@@ -18,6 +18,19 @@ let
     if builtins.isAttrs viberootsInput then viberootsInput.outPath else viberootsInput;
   repoRoot = workspaceRootPath;
   viberootsRoot = viberootsRootPath;
+  filterViberootsRuntime = import ./packages/filter-viberoots-runtime.nix { lib = nixpkgs.lib; };
+  viberootsRuntimeRoot = builtins.path {
+    path = viberootsRoot;
+    name = "source";
+    filter = filterViberootsRuntime viberootsRoot;
+  };
+  viberootsSourceIdentity = {
+    toolSourceRevision =
+      if builtins.isAttrs viberootsInput then viberootsInput.rev or "" else "";
+    sourceTreeDigest =
+      if builtins.isAttrs viberootsInput then viberootsInput.narHash or "" else "";
+    sourceStorePath = builtins.toString viberootsRoot;
+  };
   evaluationBundle = import ./evaluation-bundle.nix { inherit repoRoot; };
   rustToolchainOverlay = final: _prev:
     let
@@ -143,7 +156,7 @@ let
     };
 in
 {
-  inherit pkgs wasmtimePkgs system zx-wrapper devshell prelude uv2nixLib evaluationBundle liveFsRoot mkNodeMods repoRoot viberootsRoot viberootsNodeMods version releaseTag;
+  inherit pkgs wasmtimePkgs system zx-wrapper devshell prelude uv2nixLib evaluationBundle liveFsRoot mkNodeMods repoRoot viberootsRoot viberootsRuntimeRoot viberootsNodeMods viberootsSourceIdentity version releaseTag;
   nixpkgsRegistry = resolvedNixpkgsRegistry;
   buck2Input = buck2;
 } // (if includeNodeMods then { nodeMods = mkNodeMods { }; } else { })

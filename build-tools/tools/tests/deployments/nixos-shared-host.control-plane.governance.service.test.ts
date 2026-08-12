@@ -31,12 +31,16 @@ async function deployWithChecks(opts: {
   artifactDir: string;
   controlPlaneUrl: string;
   serverPort: number;
+  nothrow?: boolean;
 }) {
   const result = await opts.$({
     cwd: opts.tmp,
     env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
     stdio: "pipe",
+    reject: !opts.nothrow,
+    nothrow: opts.nothrow,
   })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${opts.deploymentLabel} --artifact-dir ${opts.artifactDir} --admit-and-deploy deploy/demo-dev --control-plane-url ${opts.controlPlaneUrl} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(opts.serverPort)} --smoke-connect-protocol https:`;
+  if (opts.nothrow) return result;
   return JSON.parse(String(result.stdout));
 }
 
@@ -133,15 +137,18 @@ test("service-backed shared-host deploy fails closed when automatic governance d
       } as NodeJS.ProcessEnv,
     });
     try {
-      await assert.rejects(
-        deployWithChecks({
-          tmp,
-          $,
-          deploymentLabel,
-          artifactDir,
-          controlPlaneUrl: controlPlane.url,
-          serverPort: server.port,
-        }),
+      const rejected = await deployWithChecks({
+        tmp,
+        $,
+        deploymentLabel,
+        artifactDir,
+        controlPlaneUrl: controlPlane.url,
+        serverPort: server.port,
+        nothrow: true,
+      });
+      assert.notEqual(rejected.exitCode, 0);
+      assert.match(
+        `${String(rejected.stderr || "")}\n${String(rejected.stdout || "")}`,
         /lane governance verification failed[\s\S]*required checks drift/,
       );
     } finally {

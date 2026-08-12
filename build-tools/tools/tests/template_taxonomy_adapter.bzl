@@ -19,6 +19,7 @@ CANONICAL_TEMPLATE_IDS = [
     "python/wasm-app",
     "python/wasm-lib",
     "rust/cli",
+    "rust/cross-root",
     "rust/cxx-bridge",
     "rust/lib",
     "rust/node-addon",

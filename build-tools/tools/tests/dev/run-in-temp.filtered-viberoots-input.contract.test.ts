@@ -38,6 +38,12 @@ test("runInTemp locks a filtered viberoots input instead of the live source root
   assert.match(source, /prepareFilteredViberootsInput\(activeViberootsRoot\)/);
   assert.match(source, /filteredFlakeRsyncExcludeArgs\(\)/);
   assert.match(source, /defaultFilteredFlakeSnapshotRelPaths\(\)/);
+  assert.equal(
+    source.match(/relPathsWithoutNestedViberoots\(defaultFilteredFlakeSnapshotRelPaths\(\)\)/g)
+      ?.length,
+    2,
+    "both viberoots and consumer snapshots must exclude a nested viberoots checkout",
+  );
   assert.match(source, /rel === "\.viberoots" \|\| rel\.startsWith\("\.viberoots\/"\)/);
   assert.match(source, /VIBEROOTS_FLAKE_INPUT_ROOT = viberootsInput\.storePath/);
   assert.match(source, /rewriteTempViberootsInput\(tmp, viberootsInput\)/);
@@ -70,6 +76,7 @@ test("runInTemp locks a filtered viberoots input instead of the live source root
   for (const generatedPath of [
     '".viberoots/current"',
     '".viberoots/workspace/prelude"',
+    '"viberoots"',
     '"viberoots/prelude"',
   ]) {
     assert.ok(source.includes(generatedPath));
@@ -105,9 +112,10 @@ test("runInTemp locks a filtered viberoots input instead of the live source root
   );
   assert.ok(
     source.indexOf("const commandEnv = commandEnvironments.get($tmp)") <
-      source.indexOf('await $tmp({ cwd: tmp, stdio: "inherit" })`${updateTool}`'),
+      source.indexOf("await $tmp({"),
     "unregistered temp command factories must fail before public reconciliation",
   );
+  assert.match(source, /env: \{ \.\.\.commandEnv, \.\.\.envOverrides \}/);
   assert.match(source, /commandEnv\.VBR_ARTIFACT_TOOLS_ROOT = repairedArtifactToolsRoot/);
   assert.ok(
     source.indexOf("canonicalArtifactToolsRoot(tmp)") <

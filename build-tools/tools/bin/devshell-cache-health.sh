@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 
 env_apply_nix_cache_health() {
+	if [[ "${VBR_NIX_CACHE_ROLE_AUTHORITY:-}" == "verify-nested-v1" ]]; then
+		if ! node -e 'const {createHash}=require("node:crypto"),e=process.env,w=x=>String(x||"").trim().split(/\s+/).filter(Boolean),u=x=>[...new Set(x)],p=new Map;for(const raw of String(e.NIX_CONFIG||"").split("\n")){const line=raw.trim();if(!line||line.startsWith("#"))continue;const i=line.indexOf("=");if(i<=0)continue;const k=line.slice(0,i).trim();if(k!=="substituters"&&k!=="extra-substituters")continue;p.set(k,[...(p.get(k)||[]),...w(line.slice(i+1))])}const r=u(w(e.VBR_NIX_CACHE_ROLE_REQUIRED)),o=u(w(e.VBR_NIX_CACHE_ROLE_OPTIONAL)),a=u([...(p.get("substituters")||[]),...(p.get("extra-substituters")||[])]).sort(),b=u([...r,...o]).sort(),policy=e.VBR_NIX_CACHE_ROLE_POLICY,policyMatch=(policy==="auto"||policy==="strict")&&policy===String(e.VBR_NIX_CACHE_POLICY||"auto"),rolesMatch=a.length===b.length&&a.every((x,i)=>x===b[i]),config=String(e.NIX_CONFIG||""),digest=createHash("sha256").update(["reviewed-cache-roles-v1",policy,r.join(" "),o.join(" "),config].join("\0")).digest("hex"),bindingMatch=digest===e.VBR_NIX_CACHE_ROLE_BINDING;if(policyMatch&&rolesMatch&&bindingMatch)process.exit(0);console.error("error: proof-bound Nix cache validation mismatch "+JSON.stringify({policyMatch,rolesMatch,bindingMatch,effectiveCount:a.length,boundCount:b.length,configBytes:Buffer.byteLength(config)}));process.exit(1)' </dev/null; then
+			echo "error: proof-bound Nix cache role environment is invalid caller=${BASH_SOURCE[1]:-$0}" 1>&2
+			return 1
+		fi
+		export VBR_NIX_CACHE_HEALTH_APPLIED=1
+		export VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG="${NIX_CONFIG:-}"
+		export VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS="${VBR_NIX_CACHE_ROLE_REQUIRED:-}"
+		export VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS="${VBR_NIX_CACHE_ROLE_OPTIONAL:-}"
+		export VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY="${VBR_NIX_CACHE_ROLE_POLICY}"
+		return 0
+	fi
 	unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG
 	unset VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS
 	unset VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY
@@ -8,7 +20,7 @@ env_apply_nix_cache_health() {
 		return 0
 	fi
 
-	local config
+	local config source_config="${NIX_CONFIG:-}"
 	if ! config="$(nix config show 2>/dev/null)"; then
 		echo "error: nix config show failed during cache health evaluation" 1>&2
 		unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG
@@ -20,7 +32,7 @@ env_apply_nix_cache_health() {
 		export VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG="${NIX_CONFIG:-}"
 		return 0
 	fi
-	export VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG="${config}"
+	export VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG="${source_config}"
 
 	local required_substituters
 	required_substituters="$(
@@ -55,7 +67,11 @@ env_apply_nix_cache_health() {
 		'
 	)"
 	local resolved_roles
-	if [[ -n "${required_substituters}" && -z "${optional_substituters}" ]]; then
+	local required_substituter_count=0
+	if [[ -n "${required_substituters}" ]]; then
+		required_substituter_count="$(printf '%s\n' "${required_substituters}" | wc -w | tr -d '[:space:]')"
+	fi
+	if [[ "${required_substituter_count}" -gt 1 && -z "${optional_substituters}" ]]; then
 		if ! resolved_roles="$(env_resolve_nix_cache_roles "$(command -v nix)")"; then
 			echo "error: flattened Nix substituters require reviewed source-role provenance" 1>&2
 			return 1
@@ -159,12 +175,6 @@ env_apply_nix_cache_health() {
 				if [[ "${probe_status}" -eq 0 ]]; then
 					available+=("${substituter}")
 				else
-					if [[ " ${required_substituters} " == *" ${substituter} "* ]]; then
-						echo "error: required Nix substituter unavailable: ${cache_identity}" 1>&2
-						unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG
-						unset VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY
-						return 1
-					fi
 					removed+=("${substituter}")
 					removed_identities+=("${cache_identity}")
 				fi

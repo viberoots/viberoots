@@ -1,98 +1,23 @@
 import assert from "node:assert/strict";
-import { execFile, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
-import { exactDescendantCommandPids } from "../lib/process-tree";
+import { exactDescendantCommandPids, processTreeRows } from "../lib/process-tree";
 import { parsePublicBuildOutPath } from "../lib/test-helpers/public-build";
 import { killBuckDaemonsForRepo } from "../lib/test-helpers/buck-kill";
+import { timeDiagnosticAsync } from "../lib/test-helpers/timing";
 import { commandEnv } from "../viberoots/remote-consumer-boundary";
 import { makeConsumer, makeRemoteSource } from "../viberoots/remote-consumer-fixture-helpers";
-import { readPinnedSubmoduleConsumerLock } from "./rust.tauri-submodule-lock.fixture";
+import { inspectTauriDerivationIdentity } from "./rust.tauri-consumer-fixture";
+import { activateTauriSubmodule } from "./rust.tauri-scaffold-lifecycle-activation";
+import { stopTauriProduction } from "./rust.tauri-scaffold-lifecycle-process";
 
-const execFileAsync = promisify(execFile);
 type SourceMode = "flake" | "submodule";
+const MAX_LAUNCH_OUTPUT_CHARS = 64 * 1024;
 
-async function processRows() {
-  const result = await execFileAsync("/bin/ps", ["-axo", "pid=,ppid=,pgid=,command="]);
-  return result.stdout
-    .split("\n")
-    .map((line) => line.trim().match(/^(\d+)\s+(\d+)\s+(\d+)\s+(.*)$/))
-    .filter((match): match is RegExpMatchArray => match !== null)
-    .map((match) => ({
-      pid: Number(match[1]),
-      ppid: Number(match[2]),
-      pgid: Number(match[3]),
-      command: match[4],
-    }));
-}
-
-async function activateSubmodule(
-  consumer: string,
-  source: string,
-  workspaceFlake: string,
-  $: typeof globalThis.$,
-): Promise<void> {
-  const pinnedConsumerLock = await readPinnedSubmoduleConsumerLock(workspaceFlake);
-  await $({
-    cwd: consumer,
-    env: {
-      ...process.env,
-      GIT_ALLOW_PROTOCOL: "file",
-      WORKSPACE_ROOT: consumer,
-      VBR_NIX_CACHE_POLICY: "off",
-    },
-    stdio: "pipe",
-  })`nix run --accept-flake-config path:${workspaceFlake}#viberoots -- use-submodule --workspace-root ${consumer} --url file://${source} --trust-url --no-direnv`;
-  await fsp.writeFile(path.join(workspaceFlake, "flake.lock"), pinnedConsumerLock);
-  assert.equal(
-    await fsp.readFile(path.join(workspaceFlake, "flake.lock"), "utf8"),
-    pinnedConsumerLock,
-    "submodule activation did not restore the reviewed consumer lock",
-  );
-  assert.match(
-    await fsp.readFile(path.join(consumer, ".gitmodules"), "utf8"),
-    /file:\/\/\/nix\/store\//,
-  );
-  assert.equal(
-    await fsp.realpath(path.join(consumer, ".viberoots", "current")),
-    path.join(consumer, "viberoots"),
-  );
-  assert.match(
-    await fsp.readFile(path.join(workspaceFlake, "flake.nix"), "utf8"),
-    /path:\.\/viberoots-flake-input/,
-  );
-  await $({
-    cwd: consumer,
-    env: {
-      ...commandEnv(consumer),
-      GIT_ALLOW_PROTOCOL: "file",
-      VBR_NIX_CACHE_POLICY: "off",
-    },
-  })`viberoots init-consumer --mode submodule --workspace-root ${consumer} --source viberoots --no-direnv`;
-}
-
-async function stopProduction(childPid: number): Promise<void> {
-  try {
-    process.kill(-childPid, "SIGTERM");
-  } catch {
-    // The child may already have completed its own cleanup.
-  }
-  const deadline = Date.now() + 10_000;
-  while (Date.now() < deadline) {
-    if (!(await processRows()).some((row) => row.pgid === childPid)) return;
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  try {
-    process.kill(-childPid, "SIGKILL");
-  } catch {
-    // Nothing remains to terminate.
-  }
-  assert.equal(
-    (await processRows()).some((row) => row.pgid === childPid),
-    false,
-    "Tauri production process group survived cleanup",
-  );
+function appendBoundedOutput(current: string, chunk: unknown): string {
+  const next = current + String(chunk);
+  return next.length <= MAX_LAUNCH_OUTPUT_CHARS ? next : next.slice(-MAX_LAUNCH_OUTPUT_CHARS);
 }
 
 export async function runTauriScaffoldLifecycle(
@@ -100,18 +25,33 @@ export async function runTauriScaffoldLifecycle(
   mode: SourceMode,
   $: typeof globalThis.$,
 ): Promise<void> {
-  const source = await makeRemoteSource(tmp, $);
-  const consumer = await makeConsumer(tmp, `tauri-scaffold-${mode}`, source, $);
+  const phase = async <T>(name: string, fn: () => Promise<T>): Promise<T> =>
+    await timeDiagnosticAsync(`tauri lifecycle ${mode} ${name}`, fn);
+  const source = await phase(
+    "remote source preparation",
+    async () => await makeRemoteSource(tmp, $),
+  );
+  const consumer = await phase(
+    "consumer preparation",
+    async () => await makeConsumer(tmp, `tauri-scaffold-${mode}`, source, $),
+  );
   const workspaceFlake = path.join(consumer, ".viberoots", "workspace");
   let productionPid: number | undefined;
   try {
-    if (mode === "submodule") await activateSubmodule(consumer, source, workspaceFlake, $);
+    if (mode === "submodule") {
+      await phase(
+        "submodule activation",
+        async () => await activateTauriSubmodule(consumer, source, workspaceFlake, $),
+      );
+    }
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      await $({
-        cwd: consumer,
-        env: { ...process.env, WORKSPACE_ROOT: consumer, VBR_NIX_CACHE_POLICY: "off" },
-        stdio: "pipe",
-      })`nix run --accept-flake-config path:${workspaceFlake}#viberoots -- init-workspace`;
+      await phase(`workspace initialization ${attempt + 1}`, async () => {
+        await $({
+          cwd: consumer,
+          env: { ...process.env, WORKSPACE_ROOT: consumer },
+          stdio: "pipe",
+        })`nix run --option eval-cache false --accept-flake-config path:${workspaceFlake}#viberoots -- init-workspace`;
+      });
     }
     if (mode === "submodule") {
       const filteredInput = path.join(workspaceFlake, "viberoots-flake-input");
@@ -137,14 +77,13 @@ export async function runTauriScaffoldLifecycle(
       true,
       `${mode} source authority was not activated`,
     );
-    const lifecycleEnv = (extra: NodeJS.ProcessEnv = {}) => ({
-      ...commandEnv(consumer, extra),
-      VBR_NIX_CACHE_POLICY: "auto",
+    const lifecycleEnv = (extra: NodeJS.ProcessEnv = {}) => commandEnv(consumer, extra);
+    await phase("scaffold generation", async () => {
+      await $({
+        cwd: consumer,
+        env: lifecycleEnv(),
+      })`scaf new rust tauri-app tauri_demo --yes`;
     });
-    await $({
-      cwd: consumer,
-      env: lifecycleEnv(),
-    })`scaf new rust tauri-app tauri_demo --yes`;
     await $({ cwd: consumer, env: lifecycleEnv() })`git config user.email test@example.com`;
     await $({ cwd: consumer, env: lifecycleEnv() })`git config user.name test`;
     await $({ cwd: consumer, env: lifecycleEnv() })`git add projects`;
@@ -152,13 +91,19 @@ export async function runTauriScaffoldLifecycle(
       await $({ cwd: consumer, env: lifecycleEnv() })`git add .gitmodules viberoots`;
     }
     await $({ cwd: consumer, env: lifecycleEnv() })`git commit -m tauri-scaffold`;
-    const updateEnv =
-      mode === "flake" ? lifecycleEnv({ VIBEROOTS_FLAKE_INPUT_ROOT: sourcePath }) : lifecycleEnv();
-    await $({ cwd: consumer, env: updateEnv })`u`;
+    const updateEnv = lifecycleEnv({
+      TEST_TIMING: "1",
+      ...(mode === "flake" ? { VIBEROOTS_FLAKE_INPUT_ROOT: sourcePath } : {}),
+    });
+    await phase("workspace update", async () => {
+      await $({ cwd: consumer, env: updateEnv })`u`;
+    });
     const beforeInstall = await $({ cwd: consumer, env: lifecycleEnv(), stdio: "pipe" })`
       git diff --binary HEAD
     `;
-    await $({ cwd: consumer, env: updateEnv })`i --without-secrets`;
+    await phase("workspace install", async () => {
+      await $({ cwd: consumer, env: updateEnv })`i --without-secrets`;
+    });
     const afterInstall = await $({ cwd: consumer, env: lifecycleEnv(), stdio: "pipe" })`
       git diff --binary HEAD
     `;
@@ -169,21 +114,33 @@ export async function runTauriScaffoldLifecycle(
     );
 
     const target = "//projects/apps/tauri_demo:tauri_demo";
-    const built = await $({
-      cwd: consumer,
-      env: lifecycleEnv(),
-      stdio: "pipe",
-    })`b ${target} --show-output`;
+    await phase(
+      "Tauri derivation identity",
+      async () => await inspectTauriDerivationIdentity(consumer, lifecycleEnv(), target, $),
+    );
+    const built = await phase(
+      "Tauri build",
+      async () =>
+        await $({
+          cwd: consumer,
+          env: lifecycleEnv(),
+          stdio: "pipe",
+        })`b ${target} --show-output`,
+    );
     const outPath = parsePublicBuildOutPath(
       `${String(built.stdout)}\n${String(built.stderr)}`,
       target,
       consumer,
     );
-    const testQuery = await $({
-      cwd: consumer,
-      env: lifecycleEnv(),
-      stdio: "pipe",
-    })`buck2 cquery --target-platforms prelude//platforms:default --json --output-attribute default_features //projects/apps/tauri_demo:tauri_demo-test`;
+    const testQuery = await phase(
+      "generated target query",
+      async () =>
+        await $({
+          cwd: consumer,
+          env: lifecycleEnv(),
+          stdio: "pipe",
+        })`buck2 --isolation-dir tauri-scaffold-contract.noindex cquery --target-platforms prelude//platforms:default --json --output-attribute default_features //projects/apps/tauri_demo:tauri_demo-test`,
+    );
     const testNodes = Object.values(
       JSON.parse(String(testQuery.stdout)) as Record<string, { default_features?: boolean }>,
     );
@@ -193,10 +150,15 @@ export async function runTauriScaffoldLifecycle(
       "generated Tauri test did not export default_features=False",
     );
     try {
-      await $({
-        cwd: consumer,
-        env: lifecycleEnv(),
-      })`v //projects/apps/tauri_demo:tauri_demo-test`;
+      await phase("nested verify", async () => {
+        await $({
+          cwd: consumer,
+          // This nested verify runs one generated target that cannot create runInTemp fixtures.
+          // The outer verify already prepared its shared seed; staging another complete seed here
+          // only multiplies repository cloning and Git metadata work under suite fan-out.
+          env: lifecycleEnv(),
+        })`v --seed-mode=never //projects/apps/tauri_demo:tauri_demo-test`;
+      });
     } catch (error) {
       const verifyLogDir = path.join(consumer, ".viberoots", "workspace", "buck", "verify-logs");
       const logs = await fsp.readdir(verifyLogDir).catch(() => []);
@@ -221,23 +183,54 @@ export async function runTauriScaffoldLifecycle(
     );
     const appExecutable = String(manifest.appExecutable || "");
     await fsp.access(appExecutable);
-    const child = spawn("p", [target], {
-      cwd: consumer,
-      env: lifecycleEnv(),
-      detached: true,
-      stdio: ["ignore", "pipe", "pipe"],
+    await phase("production launch", async () => {
+      let launchOutput = "";
+      let exited:
+        | {
+            code: number | null;
+            signal: NodeJS.Signals | null;
+          }
+        | undefined;
+      const child = spawn("p", [target], {
+        cwd: consumer,
+        env: lifecycleEnv(),
+        detached: true,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      child.stdout?.on("data", (chunk) => {
+        launchOutput = appendBoundedOutput(launchOutput, chunk);
+      });
+      child.stderr?.on("data", (chunk) => {
+        launchOutput = appendBoundedOutput(launchOutput, chunk);
+      });
+      child.once("exit", (code, signal) => {
+        exited = { code, signal };
+      });
+      productionPid = child.pid;
+      const deadline = Date.now() + 120_000;
+      let exactPids: number[] = [];
+      while (child.pid && Date.now() < deadline) {
+        exactPids = exactDescendantCommandPids(await processTreeRows(), child.pid, appExecutable);
+        if (exactPids.length > 0) break;
+        if (exited) break;
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+      assert.ok(
+        exactPids.length > 0,
+        [
+          "`p` did not launch the exact packaged Tauri executable",
+          `appExecutable=${appExecutable}`,
+          exited ? `p exited code=${exited.code} signal=${exited.signal}` : "p still running",
+          launchOutput.trim(),
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      );
     });
-    productionPid = child.pid;
-    const deadline = Date.now() + 120_000;
-    let exactPids: number[] = [];
-    while (child.pid && Date.now() < deadline) {
-      exactPids = exactDescendantCommandPids(await processRows(), child.pid, appExecutable);
-      if (exactPids.length > 0) break;
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    }
-    assert.ok(exactPids.length > 0, "`p` did not launch the exact packaged Tauri executable");
   } finally {
-    if (productionPid) await stopProduction(productionPid);
-    await killBuckDaemonsForRepo(tmp, $);
+    await phase("cleanup", async () => {
+      if (productionPid) await stopTauriProduction(productionPid);
+      await killBuckDaemonsForRepo(tmp, $);
+    });
   }
 }

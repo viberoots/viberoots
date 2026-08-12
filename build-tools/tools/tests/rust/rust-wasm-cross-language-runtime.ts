@@ -46,6 +46,33 @@ export async function executeStaticDependencyConsumer(
   return (instance.exports.dependencyAnswer as () => number)();
 }
 
+export async function verifyRewrittenStaticArchiveConsumers(
+  tmp: string,
+  current: string,
+  tools: string,
+  includeWasi: boolean,
+): Promise<void> {
+  const names = ["raw_cpp_rust", ...(includeWasi ? ["raw_wasi_cpp_rust"] : [])];
+  for (const name of names) {
+    const built = await buildCanonicalBundle(
+      tmp,
+      "graph-generator-selected",
+      current,
+      process.env,
+      `//projects/apps/rust-wasm:${name}`,
+      tools,
+      true,
+    );
+    const instance = await instantiateWithRuntimeImports(
+      await fs.readFile(path.join(built.outPath, "lib/rust_wasm_fixture.wasm")),
+    );
+    assert.equal((instance.exports.answer as () => number)(), 42);
+  }
+  assert.equal(await executeStaticDependencyConsumer(tmp, current, tools, false), 42);
+  if (includeWasi)
+    assert.equal(await executeStaticDependencyConsumer(tmp, current, tools, true), 42);
+}
+
 export async function verifyTinyGoConsumer(
   tmp: string,
   current: string,

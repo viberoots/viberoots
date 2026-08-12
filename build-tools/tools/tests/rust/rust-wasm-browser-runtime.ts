@@ -6,11 +6,15 @@ import path from "node:path";
 
 export async function verifyBrowserPackageInPinnedEngine(
   output: string,
+  provenanceOutput: string,
   tmp: string,
 ): Promise<void> {
   const pkg = path.join(output, "pkg");
   const manifest = JSON.parse(
-    await fs.readFile(path.join(output, "share/viberoots-rust/wasm-manifest.json"), "utf8"),
+    await fs.readFile(
+      path.join(provenanceOutput, "share/viberoots-rust/wasm-manifest.json"),
+      "utf8",
+    ),
   );
   const executable = String(manifest.tools?.browserExecutable || "");
   assert.match(

@@ -205,21 +205,25 @@ test("read-only validation rejects project Cargo config before tool execution", 
 
 test("Cargo repair rejects workspace cargo-home config without publishing", async () => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-rust-source-policy-"));
+  const inheritedSharedCargoHome = process.env.VBR_SHARED_CARGO_HOME;
   try {
     const initial = "version = 3\n";
     const fixture = await cargoRoot(root, initial);
-    const cargoHome = path.join(root, ".viberoots/workspace/cargo-home");
+    const cargoHome = path.join(root, ".viberoots/cargo-home.noindex");
     await fsp.mkdir(cargoHome, { recursive: true });
     await fsp.writeFile(
       path.join(cargoHome, "config"),
       '[source.crates-io]\nreplace-with = "alternate"\n',
     );
+    process.env.VBR_SHARED_CARGO_HOME = cargoHome;
     await assert.rejects(
       repairRustDependencies(root, false, false, path.join(root, "must-not-run-cargo")),
-      /Cargo configuration is unsupported.*cargo-home\/config/,
+      /Cargo configuration is unsupported.*cargo-home\.noindex\/config/,
     );
     assert.equal(await fsp.readFile(fixture.lock, "utf8"), initial);
   } finally {
+    if (inheritedSharedCargoHome === undefined) delete process.env.VBR_SHARED_CARGO_HOME;
+    else process.env.VBR_SHARED_CARGO_HOME = inheritedSharedCargoHome;
     await fsp.rm(root, { recursive: true, force: true });
   }
 });

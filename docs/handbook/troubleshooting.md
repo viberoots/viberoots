@@ -3,6 +3,19 @@
 For Rust browser packages, WASI link closures, component-model execution, and deployment staging,
 start with [Rust WebAssembly Operations](rust-wasm-operations.md#troubleshooting).
 
+## Rust or Tauri protected release is rejected
+
+- Confirm the language still reports `experimental`. Repository sandbox/network and publication
+  gates being wired does not graduate Rust or admit a release.
+- A missing `aarch64-linux` or `x86_64-linux` Rust matrix pair requires the reviewed builders for
+  that exact system. Cross-evaluation or a Darwin result is not replacement evidence.
+- The credential-free Tauri case requires two independent `aarch64-darwin` builder records. Its
+  artifact manifest intentionally says `releaseSigned:false` and `releaseAdmitted:false`.
+- Credentialed signing/notarization, provenance, and SBOM evidence must come from the reviewed
+  external release lane. Do not inject signing variables into `b`, Cargo, Tauri, Buck, or Nix.
+- Preserve the rejected records and signed aggregate. Fix the missing builder, platform, source,
+  or external signing authority and rerun the complete case rather than weakening admission.
+
 ## Stale Cargo metadata
 
 - Symptom: `i`, post-clone, devshell entry, or `b` reports a stale `Cargo.lock` and `repair: run u`.

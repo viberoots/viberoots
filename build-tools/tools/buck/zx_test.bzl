@@ -9,6 +9,10 @@ load("@viberoots//build-tools/lang:remote_action_policy.bzl", "external_runner_c
 load("@viberoots//build-tools/lang:source_snapshot.bzl", "SourceSnapshotInfo")
 def _zx_test_impl(ctx):
     script = ctx.attrs.script
+    script_repo_path = script.short_path
+    package_prefix = ctx.label.package + "/" if ctx.label.package else ""
+    if package_prefix and not script_repo_path.startswith(package_prefix):
+        script_repo_path = package_prefix + script_repo_path
     viberoots_script_path = ctx.attrs.viberoots_script_path
     if viberoots_script_path and viberoots_script_path != "build-tools/tools/project-enforcement/project-enforcement-runner.ts":
         fail("viberoots_script_path is reserved for the canonical project-enforcement runner")
@@ -125,7 +129,7 @@ def _zx_test_impl(ctx):
             + "LOGDIR=\"$TEST_LOG_DIR/$SAFE\"; mkdir -p \"$LOGDIR\"; "
             + "if [ \"$(uname -s 2>/dev/null || true)\" = \"Darwin\" ]; then [ ! -e \"$LOGDIR/.metadata_never_index\" ] && : > \"$LOGDIR/.metadata_never_index\"; fi; "
             + "ORIG_BUCK2=\"$(command -v buck2)\"; "
-            + "SHIMROOT=\"$WORKSPACE_ROOT/buck-out/zx_shims/$SAFE\"; SHIMBIN=\"$SHIMROOT/bin\"; mkdir -p \"$SHIMBIN\"; "
+            + "SHIMROOT=\"$WORKSPACE_ROOT/buck-out/zx_shims/$SAFE\"; if [ \"$(uname -s 2>/dev/null || true)\" = \"Darwin\" ]; then SHIMROOT=\"${SHIMROOT}.noindex\"; fi; SHIMBIN=\"$SHIMROOT/bin\"; mkdir -p \"$SHIMBIN\"; "
             + "if [ \"$(uname -s 2>/dev/null || true)\" = \"Darwin\" ]; then [ ! -e \"$WORKSPACE_ROOT/buck-out/zx_shims/.metadata_never_index\" ] && : > \"$WORKSPACE_ROOT/buck-out/zx_shims/.metadata_never_index\"; [ ! -e \"$SHIMROOT/.metadata_never_index\" ] && : > \"$SHIMROOT/.metadata_never_index\"; [ ! -e \"$SHIMBIN/.metadata_never_index\" ] && : > \"$SHIMBIN/.metadata_never_index\"; fi; "
             + "WRAP=\"$SHIMBIN/buck2\"; "
             + "cat > \"$WRAP\" <<'EOSH'\n"
@@ -133,6 +137,10 @@ def _zx_test_impl(ctx):
             + "set -euo pipefail\n"
             + "orig=\"__BUCK2_BIN__\"\n"
             + "if [[ -z \"${orig}\" ]]; then echo \"buck2 shim error: embedded buck2 path missing\" >&2; exit 127; fi\n"
+            + "has_isolation=0\n"
+            + "for arg in \"$@\"; do case \"$arg\" in --isolation-dir|--isolation-dir=*) has_isolation=1; break ;; esac; done\n"
+            + "if [[ \"$has_isolation\" = 0 && -z \"${BUCK_NESTED_ISO:-}\" ]]; then echo \"buck2 shim error: nested isolation is missing\" >&2; exit 2; fi\n"
+            + "if [[ \"$has_isolation\" = 0 ]]; then set -- --isolation-dir \"$BUCK_NESTED_ISO\" \"$@\"; fi\n"
             + "exec env -u BUCK_TEST_TARGET -u VBR_VERIFY_LOG_FILE -u VBR_VERIFY_PROCESS_STATE_FILE -u VBR_BUCK_REAPER_STATE_FILE \"$orig\" \"$@\"\n"
             + "EOSH\n"
             + "sed -i.bak -e \"s|__BUCK2_BIN__|$ORIG_BUCK2|g\" \"$WRAP\"; rm -f \"$WRAP.bak\"; "
@@ -161,7 +169,7 @@ def _zx_test_impl(ctx):
             + "if [ -n \"$WD\" ]; then kill \"$WD\" >/dev/null 2>&1 || true; fi; "
             + "exit \"$STATUS\""
         )
-        % (ctx.label, ctx.label.package, script.short_path, script.short_path, script.short_path, viberoots_script_path, viberoots_script_path)
+        % (ctx.label, ctx.label.package, script_repo_path, script.short_path, script_repo_path, viberoots_script_path, viberoots_script_path)
     )
     local_command = [
         "bash",
@@ -241,6 +249,17 @@ def _zx_test_impl(ctx):
         mode = policy_mode,
         evidence = policy_evidence,
     )
+    local_resources = {}
+    required_local_resources = []
+    if ctx.attrs.heavy_fanout_pool != None:
+        local_resources["viberoots_heavy_fanout"] = ctx.attrs.heavy_fanout_pool.label
+        required_local_resources.append(
+            RequiredTestLocalResource(
+                "viberoots_heavy_fanout",
+                listing = False,
+                execution = True,
+            ),
+        )
     return inject_test_run_info(ctx, ExternalRunnerTestInfo(
             type = "custom",
             command = command,
@@ -250,6 +269,8 @@ def _zx_test_impl(ctx):
             executor_overrides = executor_overrides,
             run_from_project_root = True,
             use_project_relative_paths = True,
+            local_resources = local_resources,
+            required_local_resources = required_local_resources,
         )) + [
         DefaultInfo(
             default_output = stamp,
@@ -269,6 +290,10 @@ zx_test = clone_rule(
         "tool_closure": attrs.option(attrs.source(), default = None),
         "remote_builder_smoke": attrs.option(attrs.source(), default = None),
         "template_inputs": attrs.list(attrs.source(), default = []),
+        "heavy_fanout_pool": attrs.option(
+            attrs.dep(providers = [LocalResourceInfo]),
+            default = None,
+        ),
         "viberoots_script_path": attrs.string(default = ""),
         "remote_execution": attrs.one_of(
             attrs.string(),

@@ -2,6 +2,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { type FlakeLock, usesMatchingImmutableInput } from "./workspace-lock-repair";
 
 type FlakeInputNode = {
   locked?: Record<string, unknown>;
@@ -14,20 +15,28 @@ export type RemoteSourceStatus = {
   sourcePath: string;
 };
 
+export type RemoteSourceStatusDeps = {
+  execFileSync?: typeof execFileSync;
+  immutableSourceAccessible?: (source: string) => boolean;
+};
+
 function workspaceFlakeRoot(workspaceRoot: string): string {
   return path.join(workspaceRoot, ".viberoots", "workspace");
 }
 
-function readViberootsNode(workspaceRoot: string): FlakeInputNode | null {
+function readWorkspaceLock(workspaceRoot: string): FlakeLock | null {
   try {
-    const lock = JSON.parse(
+    return JSON.parse(
       fs.readFileSync(path.join(workspaceFlakeRoot(workspaceRoot), "flake.lock"), "utf8"),
-    );
-    const nodes = lock?.nodes || {};
-    return nodes.viberoots || nodes.viberootsInput || null;
+    ) as FlakeLock;
   } catch {
     return null;
   }
+}
+
+function readViberootsNode(lock: FlakeLock | null): FlakeInputNode | null {
+  const nodes = lock?.nodes || {};
+  return (nodes.viberoots || nodes.viberootsInput || null) as FlakeInputNode | null;
 }
 
 function refFromNodePart(part: Record<string, unknown> | undefined): string {
@@ -47,18 +56,40 @@ function refFromNodePart(part: Record<string, unknown> | undefined): string {
   return "";
 }
 
-export function remoteSourceStatus(workspaceRoot: string): RemoteSourceStatus | null {
+export function remoteSourceStatus(
+  workspaceRoot: string,
+  deps: RemoteSourceStatusDeps = {},
+): RemoteSourceStatus | null {
   const flakeRoot = workspaceFlakeRoot(workspaceRoot);
   if (!fs.existsSync(path.join(flakeRoot, "flake.nix"))) return null;
-  const node = readViberootsNode(workspaceRoot);
+  const lock = readWorkspaceLock(workspaceRoot);
+  const node = readViberootsNode(lock);
   const locked = node?.locked || {};
   const requestedRef = refFromNodePart(node?.original) || refFromNodePart(locked);
   const lockedRevision = String(locked.rev || locked.narHash || "").trim();
-  const sourcePath = execFileSync(
-    "nix",
-    ["eval", "--raw", "--accept-flake-config", `path:${flakeRoot}#lib.viberootsSourcePath`],
-    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-  ).trim();
+  const lockedPath = String(locked.path || "").trim();
+  const runExecFileSync = deps.execFileSync;
+  const sourcePath =
+    lock && usesMatchingImmutableInput(lock, flakeRoot, lockedPath, deps.immutableSourceAccessible)
+      ? lockedPath
+      : runExecFileSync
+        ? String(
+            runExecFileSync(
+              "nix",
+              [
+                "eval",
+                "--raw",
+                "--accept-flake-config",
+                `path:${flakeRoot}#lib.viberootsSourcePath`,
+              ],
+              { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+            ),
+          ).trim()
+        : execFileSync(
+            "nix",
+            ["eval", "--raw", "--accept-flake-config", `path:${flakeRoot}#lib.viberootsSourcePath`],
+            { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+          ).trim();
   return { requestedRef, lockedRevision, sourcePath };
 }
 

@@ -114,6 +114,9 @@ function spawnSnapshot(
   const prev = { ...process.env };
   scrubInheritedGitConfigEnv();
   delete process.env.XDG_CONFIG_HOME;
+  for (const name of ["NIX_BIN", "PATCH_BIN", "GIT_BIN", "OPENSSL_BIN", "GZIP_BIN"]) {
+    delete process.env[name];
+  }
   Object.assign(process.env, {
     BUCK_LOG: "warn,buck2_event_log::writer=off,buck2_execute=trace",
     NODE_V8_COVERAGE: path.join(tmp, "coverage", "raw"),
@@ -193,6 +196,7 @@ test("project enforcement keeps its exact timeout under broad verify budgets", (
   assert.deepEqual(executorArgs.slice(0, 2), ["--timeout", "30"]);
   assert.ok(executorArgs.includes("TEST_NODE_OPTIONS=--test-timeout=30000"));
   assert.ok(executorArgs.includes("TEST_NIX_TIMEOUT_SECS=30"));
+  assert.ok(executorArgs.includes("VBR_ARTIFACT_COMMAND_TIMEOUT_SECS=30"));
 });
 
 test("spawnVerifyBuck2Tests remote argv/env snapshots cover every mode", () => {

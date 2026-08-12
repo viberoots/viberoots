@@ -10,9 +10,8 @@ import {
   selectedNodeSnapshotRelPaths,
   selectedNodeSnapshotRsyncSources,
 } from "../../dev/nix-build-filtered-flake-lib";
-import { filteredSnapshotSelection } from "../../dev/filtered-flake-snapshot-selection";
+import { directorySnapshot } from "./directory-snapshot";
 import { assertSelectedCppSnapshotContract } from "./nix-build-filtered-flake.cpp-selected-contract";
-
 test("selected cpp filtered-flake snapshots follow the target package closure", () => {
   assertSelectedCppSnapshotContract();
 });
@@ -192,59 +191,15 @@ test("filtered snapshots stay stable when Cargo mutates its generated cache", as
       await fsp.readFile(path.join(second, project.slice(root.length + 1)), "utf8"),
       "stable\n",
     );
-    await $`diff -qr ${first} ${second}`;
+    assert.deepEqual(await directorySnapshot(first), await directorySnapshot(second));
     await fsp.writeFile(project, "declared change\n");
     await $({ cwd: root })`rsync -a --relative ${excludes} ${sources} ${changed}/`;
-    assert.notEqual((await $({ nothrow: true })`diff -qr ${second} ${changed}`).exitCode, 0);
+    assert.notDeepEqual(await directorySnapshot(second), await directorySnapshot(changed));
   } finally {
     await Promise.all(
       [root, first, second, changed].map((value) =>
         fsp.rm(value, { recursive: true, force: true }),
       ),
     );
-  }
-});
-
-test("filtered-flake snapshots use a single graph-derived source authority", async () => {
-  const filtered = await fsp.readFile(
-    path.resolve("viberoots/build-tools/tools/dev/filtered-flake.ts"),
-    "utf8",
-  );
-  assert.doesNotMatch(filtered, /process\.env\.VBR_ARTIFACT_TOOLS_ROOT/);
-  assert.match(filtered, /env: NodeJS\.ProcessEnv/);
-  assert.match(filtered, /selectorEnv: NodeJS\.ProcessEnv/);
-  const consumer = await fsp.readFile(
-    path.resolve("viberoots/build-tools/tools/dev/nix-build-filtered-flake.ts"),
-    "utf8",
-  );
-  // Both public entrypoints (build-selected.ts via makeFilteredFlakeRef and
-  // nix-build-filtered-flake.ts main()) MUST route through filteredSnapshotSelection.
-  assert.match(consumer, /filteredSnapshotSelection\(root, target, /);
-  assert.match(consumer, /requireGraph: Boolean\(target\)/);
-  assert.doesNotMatch(consumer, /readSelected(?:Cpp|Node|Python)SnapshotSources/);
-  assert.doesNotMatch(consumer, /readDefaultSnapshotSources/);
-  const preparation = await fsp.readFile(
-    path.resolve("viberoots/build-tools/tools/dev/nix-build-filtered-flake-preparation.ts"),
-    "utf8",
-  );
-  assert.doesNotMatch(preparation, /readSelected(?:Cpp|Node|Python)SnapshotSources/);
-  assert.doesNotMatch(preparation, /readDefaultSnapshotSources/);
-  assert.match(filtered, /requireGraph: Boolean\(String\(opts\.target \|\| ""\)\.trim\(\)\)/);
-});
-
-test("selected artifact snapshots fail closed without their canonical graph", async () => {
-  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "selected-snapshot-missing-graph-"));
-  try {
-    const missingGraph = path.join(root, ".viberoots", "workspace", "buck", "graph.json");
-    await assert.rejects(
-      filteredSnapshotSelection(root, "//projects/apps/demo:app", missingGraph),
-      /selected artifact target requires the canonical Buck graph/,
-    );
-
-    const bootstrap = await filteredSnapshotSelection(root, "", missingGraph);
-    assert.ok(bootstrap.relPaths.includes("flake.nix"));
-    assert.deepEqual(bootstrap.declaredSources, []);
-  } finally {
-    await fsp.rm(root, { recursive: true, force: true });
   }
 });

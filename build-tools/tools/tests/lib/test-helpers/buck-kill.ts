@@ -2,6 +2,7 @@ import "./worker-init";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { runManagedCommand } from "../../../lib/managed-command";
 import {
   buck2dProcsForRepo,
   buckIsolationDirsForRepo,
@@ -70,7 +71,7 @@ async function killBuckForkserversUnderRepo(repoRoot: string, $: any): Promise<v
   const isos = Array.from(
     new Set(offenders.map((o) => isoFromForkserverStateDir(repoRoot, o.cmd)).filter(Boolean)),
   );
-  await Promise.allSettled(isos.map((iso) => killBuckIsolation(repoRoot, iso, $)));
+  await Promise.allSettled(isos.map((iso) => killBuckIsolation(repoRoot, iso)));
   offenders = await forkserversUnderRepo(repoRoot, $);
   for (const o of offenders) {
     const iso = isoFromForkserverStateDir(repoRoot, o.cmd);
@@ -97,16 +98,14 @@ async function killBuckForkserversUnderRepo(repoRoot: string, $: any): Promise<v
   }
 }
 
-async function killBuckIsolation(repoRoot: string, iso: string, $: any): Promise<void> {
+async function killBuckIsolation(repoRoot: string, iso: string): Promise<void> {
   if (!repoRoot || !iso) return;
-  await $({
-    stdio: "ignore",
+  await runManagedCommand({
+    command: "buck2",
+    args: ["--isolation-dir", iso, "kill"],
     cwd: repoRoot,
-    reject: false,
-    nothrow: true,
-    timeout: BUCK_KILL_TIMEOUT_MS,
-    // lint: allow-hardcoded-buck-isolation: cleanup kills the isolation proven by forkserver state-dir
-  })`buck2 --isolation-dir ${iso} kill`;
+    timeoutMs: BUCK_KILL_TIMEOUT_MS,
+  });
 }
 
 async function forkserverParentMatchesIsolation(
@@ -198,15 +197,13 @@ async function killBuckDaemonsForSingleRepo(repoRoot: string, $: any): Promise<v
   if (want.size > 0 && procIsos.size > 0) {
     await Promise.allSettled(
       Array.from(procIsos).map(
-        (iso) =>
-          $({
-            stdio: "ignore",
+        async (iso) =>
+          await runManagedCommand({
+            command: "buck2",
+            args: ["--isolation-dir", iso, "kill"],
             cwd: repoRoot,
-            reject: false,
-            nothrow: true,
-            timeout: BUCK_KILL_TIMEOUT_MS,
-            // lint: allow-hardcoded-buck-isolation: cleanup must kill each discovered temp daemon
-          })`buck2 --isolation-dir ${iso} kill`,
+            timeoutMs: BUCK_KILL_TIMEOUT_MS,
+          }),
       ),
     );
   }

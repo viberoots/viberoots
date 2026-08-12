@@ -7,13 +7,33 @@ import { timeAsync } from "../timing";
 import { repoNodeBinDirectories } from "../../../../lib/repo-node-bin";
 import { withGitAutoMaintenanceDisabledEnv } from "../../../../lib/git-auto-maintenance-env";
 import { withSanitizedInheritedNixConfig } from "../../../../lib/nix-config-env";
+import { sharedCargoFixedSourceCacheRoot } from "../../../../dev/install/cargo-fixed-source-cache";
 import { sharedPnpmStoreHashCacheRoot } from "../../../../dev/update-pnpm-hash/verified-marker";
+import { sharedUnifiedStorePath } from "../../../../dev/install/importers";
 import type { SeededTempSetup } from "./contracts";
 import { LOCAL_FIXTURE_SERVICE_ENV } from "./contracts";
 import { applyTempNodePath, prependPath, prependTempRepoBin } from "./command-shims";
 import { pinnedCacertPathOncePerWorker, pinnedNixpkgsPathOncePerWorker } from "./nix-support";
 import { configureTempPnpmEnv, nixPathHasNixpkgsEntry } from "./seeded-overlays";
 import { absoluteXdgCacheHome } from "./test-roots";
+
+function isReviewedCacheEnvironmentKey(name: string): boolean {
+  return name === "NIX_CONFIG" || name === "NIX_CONF_DIR" || name.startsWith("VBR_NIX_CACHE_");
+}
+
+export function mergeDevEnvironmentPreservingReviewedCache(
+  exportEnv: Record<string, string>,
+  injected: string,
+): void {
+  for (const entry of injected ? injected.split("\0") : []) {
+    if (!entry) continue;
+    const idx = entry.indexOf("=");
+    if (idx <= 0) continue;
+    const name = entry.slice(0, idx);
+    if (isReviewedCacheEnvironmentKey(name)) continue;
+    exportEnv[name] = entry.slice(idx + 1);
+  }
+}
 
 export async function buildSeededRuntimeEnv(
   setup: SeededTempSetup,
@@ -48,18 +68,22 @@ export async function buildSeededRuntimeEnv(
     }
   }
   exportEnv.REPO_ROOT = process.cwd();
+  const sharedUnifiedStore = await sharedUnifiedStorePath(process.cwd());
+  if (sharedUnifiedStore) {
+    exportEnv.VBR_SHARED_UNIFIED_PNPM_STORE_PATH = sharedUnifiedStore;
+  }
   exportEnv.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT = sharedPnpmStoreHashCacheRoot(
+    process.env,
+    realHome,
+  );
+  exportEnv.VBR_SHARED_CARGO_FIXED_SOURCE_CACHE_ROOT = sharedCargoFixedSourceCacheRoot(
     process.env,
     realHome,
   );
   exportEnv.CGO_ENABLED = String(exportEnv.CGO_ENABLED || "").trim() || "0";
 
   const injected = String((envOut as any).stdout || "");
-  for (const entry of injected ? injected.split("\0") : []) {
-    if (!entry) continue;
-    const idx = entry.indexOf("=");
-    if (idx > 0) exportEnv[entry.slice(0, idx)] = entry.slice(idx + 1);
-  }
+  mergeDevEnvironmentPreservingReviewedCache(exportEnv, injected);
 
   exportEnv.IN_NIX_SHELL = exportEnv.IN_NIX_SHELL || "1";
   try {

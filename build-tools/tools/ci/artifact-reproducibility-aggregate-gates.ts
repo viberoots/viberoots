@@ -2,12 +2,6 @@ import {
   assertArtifactReproducibilityObservation,
   type ArtifactReproducibilityObservation,
 } from "../lib/artifact-reproducibility-observation";
-import {
-  RELEASE_BUILDER_SYSTEMS,
-  hasReproducibilityMatrixId,
-  reproducibilityMatrixCaseCoversLanguage,
-  reproducibilityMatrixCoverage,
-} from "../lib/artifact-reproducibility-matrix";
 import type { ArtifactReproducibilityRunRecord } from "./artifact-reproducibility-aggregate";
 import { assertArtifactReproducibilityEvidence } from "../lib/artifact-reproducibility-evidence";
 
@@ -22,12 +16,6 @@ export type ArtifactObservationSummary = {
   maxPhaseElapsedMs: number;
   totalNewNarSize: number;
   observationStorePaths: string[];
-};
-
-export type LanguageGraduationProof = {
-  languageId: string;
-  matrixIds: string[];
-  requiredRoutes: string[];
 };
 
 export function summarizeArtifactObservations(
@@ -84,68 +72,6 @@ export function summarizeArtifactObservations(
   };
 }
 
-export function proveGraduatedLanguageCoverage(
-  manifest: unknown,
-  matrixComparisons: readonly { subjectId: string; system: string }[],
-): LanguageGraduationProof[] {
-  const doc = manifest as {
-    enabled?: unknown;
-    languages?: unknown;
-  };
-  if (!Array.isArray(doc.enabled) || !Array.isArray(doc.languages)) {
-    throw new Error("protected aggregate requires the immutable language manifest");
-  }
-  const enabled = [...new Set(doc.enabled.map(String))].sort();
-  const languages = new Map(
-    doc.languages.map((entry) => [String((entry as { id?: unknown }).id || ""), entry]),
-  );
-  const successful = new Set<string>();
-  for (const id of new Set(matrixComparisons.map(({ subjectId }) => subjectId))) {
-    if (
-      RELEASE_BUILDER_SYSTEMS.every((system) =>
-        matrixComparisons.some(
-          (comparison) => comparison.subjectId === id && comparison.system === system,
-        ),
-      )
-    ) {
-      successful.add(id);
-    }
-  }
-  return enabled.map((languageId) => {
-    const language = languages.get(languageId) as
-      | { kinds?: unknown; hermetic?: { status?: unknown; reproducibilityMatrixIds?: unknown } }
-      | undefined;
-    const matrixIds = Array.isArray(language?.hermetic?.reproducibilityMatrixIds)
-      ? language.hermetic.reproducibilityMatrixIds.map(String).sort()
-      : [];
-    if (language?.hermetic?.status !== "graduated" || !matrixIds.length) {
-      throw new Error(`enabled language is not graduated in protected evidence: ${languageId}`);
-    }
-    for (const matrixId of matrixIds) {
-      if (
-        !hasReproducibilityMatrixId(matrixId) ||
-        !reproducibilityMatrixCaseCoversLanguage(matrixId, languageId) ||
-        !successful.has(matrixId)
-      ) {
-        throw new Error(`graduated language lacks a successful matrix comparison: ${languageId}`);
-      }
-    }
-    const requiredRoutes = new Set<string>(["base"]);
-    for (const kind of Array.isArray(language.kinds) ? language.kinds.map(String) : []) {
-      if (["wasm", "wasi", "mixed", "addon"].includes(kind)) requiredRoutes.add(kind);
-    }
-    const covered = reproducibilityMatrixCoverage(matrixIds, languageId);
-    for (const route of requiredRoutes) {
-      if (!covered.has(route as "base")) {
-        throw new Error(
-          `graduated language lacks protected ${route} route evidence: ${languageId}`,
-        );
-      }
-    }
-    return { languageId, matrixIds, requiredRoutes: [...requiredRoutes].sort() };
-  });
-}
-
 export function assertObservationSummary(summary: ArtifactObservationSummary): void {
   if (
     summary.schema !== "viberoots.artifact-reproducibility-observation-summary.v1" ||
@@ -162,42 +88,6 @@ export function assertObservationSummary(summary: ArtifactObservationSummary): v
     )
   ) {
     throw new Error("protected aggregate observation summary is invalid");
-  }
-}
-
-export function assertLanguageGraduationProofs(
-  proofs: readonly LanguageGraduationProof[],
-  comparisons: readonly { subjectId: string; system: string }[],
-): void {
-  if (!proofs.length) {
-    throw new Error("protected aggregate lacks graduated language evidence");
-  }
-  const ids = proofs.map(({ languageId }) => languageId);
-  if (ids.join("\0") !== [...new Set(ids)].sort().join("\0")) {
-    throw new Error("graduated language evidence is not canonical");
-  }
-  for (const proof of proofs) {
-    if (!proof.matrixIds.length || !proof.requiredRoutes.includes("base")) {
-      throw new Error(`graduated language evidence is incomplete: ${proof.languageId}`);
-    }
-    const coverage = reproducibilityMatrixCoverage(proof.matrixIds, proof.languageId);
-    for (const matrixId of proof.matrixIds) {
-      if (
-        !reproducibilityMatrixCaseCoversLanguage(matrixId, proof.languageId) ||
-        !RELEASE_BUILDER_SYSTEMS.every((system) =>
-          comparisons.some(
-            (comparison) => comparison.subjectId === matrixId && comparison.system === system,
-          ),
-        )
-      ) {
-        throw new Error(
-          `graduated language proof lacks successful comparisons: ${proof.languageId}`,
-        );
-      }
-    }
-    if (proof.requiredRoutes.some((route) => !coverage.has(route as "base"))) {
-      throw new Error(`graduated language proof lacks required routes: ${proof.languageId}`);
-    }
   }
 }
 

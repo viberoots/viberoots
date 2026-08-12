@@ -20,6 +20,7 @@ import {
   assertActualRustBuckSnapshotExecution,
   assertRustSourceBytesAgree,
   expectedPlan,
+  graphNodes,
   rustIdentity,
 } from "./rust.source-selection.identity-assertions";
 import { assertPreparedRemoteMaterialization } from "./rust.source-selection.identity-preparation";
@@ -95,14 +96,17 @@ test("Rust identity agrees through filtered bundles and declared source snapshot
       const fullGraph = JSON.parse(
         await fsp.readFile(path.join(full.bundleSource, DEFAULT_GRAPH_PATH), "utf8"),
       );
-      assert.deepEqual(rustIdentity(bundledGraph[0]), rustIdentity(localGraph[0]));
-      assert.deepEqual(rustIdentity(fullGraph[0]), rustIdentity(localGraph[0]));
+      const localNodes = graphNodes(localGraph);
+      const bundledNodes = graphNodes(bundledGraph);
+      const fullNodes = graphNodes(fullGraph);
+      assert.deepEqual(rustIdentity(bundledNodes[0]), rustIdentity(localNodes[0]));
+      assert.deepEqual(rustIdentity(fullNodes[0]), rustIdentity(localNodes[0]));
       const onlyRustPlans = <T extends { target: string }>(plans: T[]) =>
         plans.filter((plan) => [target, testTarget].includes(plan.target));
       const rustPlans = (graph: Array<Record<string, unknown>>) =>
         onlyRustPlans(sourcePlanEvidenceFromGraph(graph));
-      assert.deepEqual(rustPlans(bundledGraph), [expectedPlan(target), expectedPlan(testTarget)]);
-      assert.deepEqual(rustPlans(fullGraph), [expectedPlan(target), expectedPlan(testTarget)]);
+      assert.deepEqual(rustPlans(bundledNodes), [expectedPlan(target), expectedPlan(testTarget)]);
+      assert.deepEqual(rustPlans(fullNodes), [expectedPlan(target), expectedPlan(testTarget)]);
 
       const built = await $({
         cwd: workspace,
@@ -133,7 +137,7 @@ test("Rust identity agrees through filtered bundles and declared source snapshot
       const remoteGraph = JSON.parse(
         await fsp.readFile(path.join(snapshotRoot, DEFAULT_GRAPH_PATH), "utf8"),
       );
-      assert.deepEqual(rustIdentity(remoteGraph[0]), rustIdentity(localGraph[0]));
+      assert.deepEqual(rustIdentity(graphNodes(remoteGraph)[0]), rustIdentity(localNodes[0]));
       const snapshot = JSON.parse(await fsp.readFile(snapshotManifest, "utf8"));
       assert.deepEqual(onlyRustPlans(snapshot.sourcePlans), [
         expectedPlan(target),

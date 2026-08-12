@@ -40,7 +40,7 @@ async function commitFixture(
 async function configureIgnoredMaterialization(root: string): Promise<void> {
   await fsp.appendFile(
     path.join(root, ".git/info/exclude"),
-    "\n.viberoots/\nviberoots/.viberoots/\n",
+    "\n.nix-gcroots/\n.viberoots/\nviberoots/.viberoots/\n",
   );
   await execFileAsync(
     "git",

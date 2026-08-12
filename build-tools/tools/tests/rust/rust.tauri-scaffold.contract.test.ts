@@ -13,18 +13,31 @@ const read = (relative: string) => fsp.readFile(path.join(sourceRoot, relative),
 
 test("Tauri scaffold has managed locks and no hidden frontend command hook", async () => {
   const root = "build-tools/tools/scaffolding/templates/rust/tauri-app";
-  const [targets, cargo, cargoLock, config, frontend, icon, packageJSON, pnpmLock, viteConfig] =
-    await Promise.all([
-      read(`${root}/TARGETS.jinja`),
-      read(`${root}/Cargo.toml.jinja`),
-      read(`${root}/Cargo.lock.jinja`),
-      read(`${root}/tauri.conf.json.jinja`),
-      read(`${root}/frontend/src/main.js.jinja`),
-      fsp.readFile(path.join(sourceRoot, root, "icons/icon.png")),
-      read(`${root}/package.json.jinja`),
-      read(`${root}/pnpm-lock.yaml.jinja`),
-      read(`${root}/vite.config.mjs.jinja`),
-    ]);
+  const [
+    targets,
+    buildScript,
+    cargo,
+    cargoLock,
+    config,
+    frontend,
+    icon,
+    packageJSON,
+    pnpmLock,
+    sidecar,
+    viteConfig,
+  ] = await Promise.all([
+    read(`${root}/TARGETS.jinja`),
+    read(`${root}/build.rs.jinja`),
+    read(`${root}/Cargo.toml.jinja`),
+    read(`${root}/Cargo.lock.jinja`),
+    read(`${root}/tauri.conf.json.jinja`),
+    read(`${root}/frontend/src/main.js.jinja`),
+    fsp.readFile(path.join(sourceRoot, root, "icons/icon.png")),
+    read(`${root}/package.json.jinja`),
+    read(`${root}/pnpm-lock.yaml.jinja`),
+    read(`${root}/sidecar.c.jinja`),
+    read(`${root}/vite.config.mjs.jinja`),
+  ]);
   assert.match(targets, /node_asset_stage\(/);
   assert.match(targets, /frontend_dist = ":frontend"/);
   assert.match(targets, /rust_test\(/);
@@ -33,12 +46,19 @@ test("Tauri scaffold has managed locks and no hidden frontend command hook", asy
   assert.match(targets, /srcs = \["build\.rs", "src\/lib\.rs", "src\/main\.rs"\]/);
   assert.match(targets, /default_features = False/);
   assert.match(targets, /resources = \[\{"src": "help\.txt", "dest": "help\/help\.txt"\}\]/);
+  assert.match(targets, /sidecar_deps = \[\{"src": ":\{\{ name \}\}-sidecar"/);
+  assert.match(targets, /nix_cpp_binary\(/);
+  assert.match(targets, /labels = \["sidecar:reviewed"\]/);
+  assert.match(sidecar, /int main\(void\)/);
   assert.match(
     cargo,
     /\[\[bin\]\][\s\S]*test = false[\s\S]*bench = false[\s\S]*required-features = \["desktop"\]/,
   );
-  assert.match(cargo, /\[features\]\ndefault = \["desktop"\]\ndesktop = \[\]/);
-  assert.match(cargo, /tauri = \{ version = "=2\.7\.0"/);
+  assert.match(cargo, /\[lib\]\ncrate-type = \["cdylib", "rlib"\]/);
+  assert.match(cargo, /\[features\]\ndefault = \["desktop"\]\ndesktop = \["dep:tauri"\]/);
+  assert.match(cargo, /\[build-dependencies\]/);
+  assert.match(cargo, /tauri = \{ version = "=2\.7\.0"[\s\S]*optional = true/);
+  assert.match(buildScript, /var\("TARGET"\)[\s\S]*starts_with\("wasm32-"\)/);
   assert.match(cargoLock, /name = "\{\{ name \}\}"\nversion = "0\.1\.0"/);
   assert.doesNotMatch(cargoLock, /name = "obsolete_tauri_lock"/);
   assert.match(cargoLock, /name = "tauri"\nversion = "2\.7\.0"/);
@@ -79,8 +99,11 @@ test("Tauri scaffold has managed locks and no hidden frontend command hook", asy
   assert.match(packageJSON, /"vite": "5\.4\.10"/);
   assert.match(packageJSON, /"@tauri-apps\/api": "2\.7\.0"/);
   assert.match(pnpmLock, /lockfileVersion: "9\.0"/);
+  assert.match(pnpmLock, /importers:\n\s+\.:/);
   assert.match(pnpmLock, /"@tauri-apps\/api":\n\s+specifier: 2\.7\.0\n\s+version: 2\.7\.0/);
   assert.match(pnpmLock, /vite:\n\s+specifier: 5\.4\.10\n\s+version: 5\.4\.10/);
+  assert.match(targets, /name = "frontend_wasm"[\s\S]*default_features = False/);
+  assert.match(buildScript, /CARGO_FEATURE_DESKTOP/);
   assert.match(viteConfig, /root: "frontend"/);
   assert.doesNotMatch(viteConfig, /process\.env|command|spawn|exec/);
 });

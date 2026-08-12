@@ -24,8 +24,9 @@ test("protected manifest derives production roots and provenance only from the s
     backend: "nix-copy",
     reproducibilityAggregate: aggregate,
   });
-  assert.equal(manifest.schemaVersion, 3);
+  assert.equal(manifest.schemaVersion, 4);
   assert.equal(manifest.sourceRevision, aggregate.aggregate.sourceRevision);
+  assert.equal(manifest.toolSourceRevision, aggregate.aggregate.toolSourceRevision);
   assert.deepEqual(
     manifest.attrs.map(({ outputPaths }) => outputPaths[0]),
     outputs,

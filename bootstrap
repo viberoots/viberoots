@@ -322,6 +322,10 @@ macos_developer_tools_ready() {
 
 ensure_macos_developer_tools() {
   is_macos || return 0
+  if [[ "${VBR_BOOTSTRAP_SCAFFOLD_ONLY:-0}" == "1" ]]; then
+    ui_ok "xcode" "skipped for reviewed scaffold-only bootstrap"
+    return 0
+  fi
   if macos_developer_tools_ready; then
     ui_ok "xcode" "developer tools ready"
     return 0
@@ -1705,7 +1709,9 @@ if [[ "${mode}" == "submodule" ]]; then
   fi
 fi
 
-assert_viberoots_source_access "${effective_source}"
+if [[ "${VBR_BOOTSTRAP_SCAFFOLD_ONLY:-0}" != "1" ]]; then
+  assert_viberoots_source_access "${effective_source}"
+fi
 
 if bootstrap_ready; then
   run_writable_migrations

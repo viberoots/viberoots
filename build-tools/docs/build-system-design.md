@@ -103,7 +103,7 @@ to watch the importer worktree rather than an evaluation bundle.
   `nixpkgs_profile` selects the toolchain and ordinary `nixpkg_deps`; `nixpkg_pins` redirects only
   declared native dependency attrs. Rust tests execute compiled Cargo harnesses through Buck's
   bounded project-relative external runner, and only Rust binaries enter `run.prod` manifests.
-- Rust is an enabled **experimental** language through the PR-11 implementation checkpoint. The reviewed baseline adds
+- Rust remains an enabled **experimental** language after the PR-12 repository-policy checkpoint. The reviewed baseline adds
   direct/transitive C link intent, freestanding WebAssembly, a repository-owned WASI runner,
   scaffolded CLI projects, declared remote-ready evidence, source-based cross-root crates, and
   explicit `rlib`, `staticlib`, `cdylib`, host proc-macro, native CPython-extension, and Node-API
@@ -125,8 +125,11 @@ to watch the importer worktree rather than an evaluation bundle.
   resource/sidecar source-to-bundle mappings, pinned cargo-tauri, credential-free Apple Silicon
   ad-hoc application envelopes that are explicitly not release signatures,
   explicit production/development runnable contracts, and a deterministic scaffold. Linux Tauri
-  promotion, signing/notarization, release publication, sandbox certification, independent
-  builders, and three-system execution conformance remain PR-12 work.
+  promotion and credentialed signing/notarization remain external evidence. PR-12 registers the
+  native, extension, bridge, WASM, and Darwin Tauri families with the canonical sandbox/network and
+  protected reproducibility/publication authorities. The language manifest records those gates as
+  wired without claiming that the required Linux builders, independent-builder records, or
+  external signing evidence have run.
 - Artifact-producing public macro builds are migrated to Nix-backed paths using dynamic derivations.
 - Planner-visible probes/stubs are allowed only when explicitly documented as non-build exceptions.
 - Patching third-party modules is **ergonomic**, **idempotent**, and **cache-friendly**.

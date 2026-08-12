@@ -23,9 +23,7 @@ export function buildCanonicalIngressEnvironment(opts: {
   if (opts.stripAmbientArtifactInfluence && remainingIngressEnv.NIX_BUILD_CORES) {
     ingressEnv.NIX_BUILD_CORES = remainingIngressEnv.NIX_BUILD_CORES;
   }
-  assertNoArtifactSelectorInjection(ingressEnv, {
-    rejectUnknownArtifactAffecting: true,
-  });
+  assertNoArtifactSelectorInjection(ingressEnv, { rejectUnknownArtifactAffecting: true });
   return buildArtifactEnvironment({
     baseEnv: ingressEnv,
     mode: String(ingressEnv.CI || "").trim() ? "ci" : "local",

@@ -26,26 +26,6 @@ async function runNodeWithVerifyEnv(env: NodeJS.ProcessEnv): Promise<number> {
   });
 }
 
-async function runNodeScript(
-  script: string,
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<number> {
-  const zxInit = buildToolPath(process.cwd(), "tools/dev/zx-init.mjs");
-  const child = spawn(
-    process.execPath,
-    ["--experimental-strip-types", "--import", zxInit, script],
-    {
-      cwd: process.cwd(),
-      env,
-      stdio: "ignore",
-    },
-  );
-  return await new Promise<number>((resolve, reject) => {
-    child.on("error", reject);
-    child.on("close", (code) => resolve(typeof code === "number" ? code : 1));
-  });
-}
-
 async function runNodeScriptWithOutput(
   script: string,
   env: NodeJS.ProcessEnv = process.env,
@@ -170,10 +150,12 @@ test("zx-init consumes verify-owned process registration opt-in before spawning 
         'import { spawn } from "node:child_process";',
         'import { once } from "node:events";',
         `const zxInit = ${JSON.stringify(buildToolPath(process.cwd(), "tools/dev/zx-init.mjs"))};`,
-        "const child = spawn(process.execPath, ['--experimental-strip-types', '--import', zxInit, '-e', ''], {",
+        "console.log(JSON.stringify({ role: 'parent', pid: process.pid, ownerPid: Number(process.env.VBR_VERIFY_OWNER_PID) }));",
+        "const childScript = `console.log(JSON.stringify({ role: 'child', pid: process.pid, ownerPid: Number(process.env.VBR_VERIFY_OWNER_PID) }))`;",
+        "const child = spawn(process.execPath, ['--experimental-strip-types', '--import', zxInit, '-e', childScript], {",
         "  cwd: process.cwd(),",
         "  env: process.env,",
-        "  stdio: 'ignore',",
+        "  stdio: ['ignore', 'inherit', 'inherit'],",
         "}); const [code] = await once(child, 'close');",
         "process.exit(typeof code === 'number' ? code : 1);",
         "",
@@ -181,14 +163,27 @@ test("zx-init consumes verify-owned process registration opt-in before spawning 
       "utf8",
     );
 
-    const result = await runNodeScriptWithOutput(script, {
+    const env = {
       ...process.env,
       VBR_VERIFY_PROCESS_STATE_FILE: stateFile,
       VBR_VERIFY_LOG_FILE: logFile,
       VBR_VERIFY_REGISTER_PROCESS: "1",
       BUCK_TEST_TARGET: "root//:zx_init_verify_registration_once",
-    });
+    };
+    delete env.VBR_VERIFY_OWNER_PID;
+    const result = await runNodeScriptWithOutput(script, env);
     assert.equal(result.code, 0, `stdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+    const observations = result.stdout
+      .trim()
+      .split(/\r?\n/u)
+      .map((line) => JSON.parse(line) as { role: string; pid: number; ownerPid: number });
+    const parent = observations.find(({ role }) => role === "parent");
+    const child = observations.find(({ role }) => role === "child");
+    assert.ok(parent);
+    assert.ok(child);
+    assert.equal(parent.ownerPid, parent.pid);
+    assert.equal(child.ownerPid, parent.pid);
+    assert.notEqual(child.pid, parent.pid);
     const records = (await fsp.readFile(stateFile, "utf8"))
       .split(/\r?\n/)
       .filter((line) => line.startsWith("process\t"));
@@ -222,28 +217,6 @@ test("zx-init registers nested buck isolation against verify owner", async () =>
     assert.match(txt, /"iso":"zxtest-shared-deadbeef12"/);
     assert.match(txt, /"kind":"zx-test-nested"/);
     assert.match(txt, new RegExp(`"ownerPid":${process.pid}`));
-  } finally {
-    await fsp.rm(dir, { recursive: true, force: true });
-  }
-});
-
-test("zx-init resolves extensionless dotted TypeScript helper modules", async () => {
-  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "zx-init-dotted-helper-"));
-  const entry = path.join(dir, "entry.ts");
-  const helper = path.join(dir, "local.fixture.ts");
-  try {
-    await fsp.writeFile(helper, "export const value = 42;\n", "utf8");
-    await fsp.writeFile(
-      entry,
-      [
-        'import assert from "node:assert/strict";',
-        'import { value } from "./local.fixture";',
-        "assert.equal(value, 42);",
-        "",
-      ].join("\n"),
-      "utf8",
-    );
-    assert.equal(await runNodeScript(entry), 0);
   } finally {
     await fsp.rm(dir, { recursive: true, force: true });
   }

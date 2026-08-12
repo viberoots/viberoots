@@ -37,12 +37,29 @@ export async function runManagedCommand(opts: {
 }): Promise<ManagedCommandResult> {
   const timeoutMs = Math.max(0, Number(opts.timeoutMs || 0));
   const killGraceMs = Math.max(1, Number(opts.killGraceMs || 10_000));
-  const child = spawn(opts.command, opts.args, {
-    cwd: opts.cwd,
-    env: opts.env || process.env,
-    stdio: ["ignore", "pipe", "pipe"],
-    detached: true,
-  });
+  let earlyInterrupt: "SIGINT" | "SIGTERM" | null = null;
+  const captureEarlySigint = (): void => {
+    earlyInterrupt ||= "SIGINT";
+  };
+  const captureEarlySigterm = (): void => {
+    earlyInterrupt ||= "SIGTERM";
+  };
+  process.once("SIGINT", captureEarlySigint);
+  process.once("SIGTERM", captureEarlySigterm);
+  const child = (() => {
+    try {
+      return spawn(opts.command, opts.args, {
+        cwd: opts.cwd,
+        env: opts.env || process.env,
+        stdio: ["ignore", "pipe", "pipe"],
+        detached: true,
+      });
+    } catch (error) {
+      process.off("SIGINT", captureEarlySigint);
+      process.off("SIGTERM", captureEarlySigterm);
+      throw error;
+    }
+  })();
 
   let stdout = "";
   let stderr = "";
@@ -188,6 +205,9 @@ export async function runManagedCommand(opts: {
 
   process.once("SIGINT", onInterrupt);
   process.once("SIGTERM", onInterrupt);
+  process.off("SIGINT", captureEarlySigint);
+  process.off("SIGTERM", captureEarlySigterm);
+  if (earlyInterrupt) onInterrupt();
   const removeManagedCancellation = onManagedCancellation(onInterrupt);
 
   if (timeoutMs > 0) {

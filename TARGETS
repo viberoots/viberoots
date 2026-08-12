@@ -1,5 +1,6 @@
 # Buck2 targets
 load("@viberoots//build-tools/tools/tests:defs.bzl", "auto_zx_tests")
+load("@viberoots//build-tools/tools/buck:heavy_fanout_resource.bzl", "heavy_fanout_resource")
 load("@prelude//:rules.bzl", "export_file")
 
 # Auto-generate one zx_test per matching test file.
@@ -9,6 +10,12 @@ auto_zx_tests(
         "**/*.test.ts",
         "e2e-provider-wiring.ts",
     ],
+)
+
+heavy_fanout_resource(
+    name = "viberoots_heavy_fanout",
+    setup = "@viberoots//build-tools/tools/buck:heavy-fanout-resource.py",
+    visibility = ["PUBLIC"],
 )
 
 export_file(

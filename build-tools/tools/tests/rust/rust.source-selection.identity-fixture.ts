@@ -18,6 +18,7 @@ import {
 import { ensureBuckConfigForTempRepo } from "../lib/test-helpers/buck-config";
 import { ensureToolchainPathsForTempRepo } from "../lib/test-helpers/toolchain-paths";
 import { buildCurrentArtifactTools } from "./rust.source-selection.identity-bundle";
+import { assertRustIdentityGraph } from "./rust.source-selection.identity-contract";
 import { rustIdentityUpdateEnvironment } from "./rust.source-selection.identity-update-environment";
 
 const execFileAsync = promisify(execFile);
@@ -76,6 +77,9 @@ export async function prepareRustConsumer(workspace: string, $: any): Promise<st
     viberootsInputRoot: flakeInput,
     viberootsSourceRoot: flakeInput,
   });
+  await fsp.rm(path.join(workspace, "viberoots"), { recursive: true, force: true });
+  await fsp.rm(path.join(workspace, ".viberoots", "current"), { force: true });
+  await fsp.symlink(flakeInput, path.join(workspace, ".viberoots", "current"));
   await ensureToolchainPathsForTempRepo(workspace, $);
   await installCanonicalArtifactToolsAuthority(workspace, currentToolsRoot);
 
@@ -123,7 +127,7 @@ export async function prepareRustConsumer(workspace: string, $: any): Promise<st
       '            "rationale": "Rust identity parity fixture pin.",',
       "        },",
       "    },",
-      '    srcs = ["src/main.rs"],',
+      '    srcs = ["src/lib.rs"],',
       '    remote_builder_smoke = "remote-evidence/remote-builder-smoke.json",',
       '    source_snapshot_bundle = ":remote-snapshot",',
       '    tool_closure = "remote-evidence/tool-closure.json",',
@@ -148,6 +152,10 @@ export async function prepareRustConsumer(workspace: string, $: any): Promise<st
       'edition = "2021"',
       'build = "build.rs"',
       "",
+      "[lib]",
+      'name = "rust_parity"',
+      'path = "src/lib.rs"',
+      "",
       "[[bin]]",
       'name = "app"',
       'path = "src/main.rs"',
@@ -160,13 +168,23 @@ export async function prepareRustConsumer(workspace: string, $: any): Promise<st
   );
   await writeFixtureFile(
     path.join(packageRoot, "src", "main.rs"),
-    'fn main() {\n    println!("rust-source-selection-ok");\n}\n\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn prepared_worker_runs_tests() {\n        assert_eq!(2 + 2, 4, "prepared Rust test failed");\n    }\n}\n',
+    'fn main() {\n    println!("rust-source-selection-ok");\n}\n',
+  );
+  await writeFixtureFile(
+    path.join(packageRoot, "src", "lib.rs"),
+    '#[cfg(test)]\nmod tests {\n    #[test]\n    fn prepared_worker_runs_tests() {\n        assert_eq!(2 + 2, 4, "prepared Rust test failed");\n    }\n}\n',
   );
   await writeFixtureFile(
     path.join(packageRoot, "build.rs"),
-    'use std::process::Command;\n\nfn main() {\n    for package in ["zlib"] {\n        let ok = Command::new("pkg-config")\n            .args(["--exists", package])\n            .status()\n            .unwrap();\n        assert!(ok.success(), "missing declared native package: {}", package);\n    }\n}\n',
+    'use std::process::Command;\n\nfn main() {\n    let package = "zlib";\n    let ok = Command::new("pkg-config")\n        .args(["--exists", package])\n        .status()\n        .unwrap();\n    assert!(ok.success(), "missing declared native package: {package}");\n}\n',
   );
-  for (const relative of ["Cargo.lock", "Cargo.toml", "build.rs", path.join("src", "main.rs")]) {
+  for (const relative of [
+    "Cargo.lock",
+    "Cargo.toml",
+    "build.rs",
+    path.join("src", "lib.rs"),
+    path.join("src", "main.rs"),
+  ]) {
     const source = path.join(packageRoot, relative);
     const destination = path.join(packageRoot, "remote-src", relative);
     await fsp.mkdir(path.dirname(destination), { recursive: true });
@@ -215,17 +233,7 @@ export async function prepareRustConsumer(workspace: string, $: any): Promise<st
   );
   const graphPath = path.join(workspace, ".viberoots", "workspace", "buck", "graph.json");
   const graph = await fsp.readFile(graphPath, "utf8");
-  const appNode = (JSON.parse(graph) as Array<Record<string, unknown>>).find(
-    (node) => node.name === target,
-  );
-  if (
-    appNode?.cargo_package !== "rust-parity" ||
-    appNode.public_crate !== "rust_parity" ||
-    appNode.crate_type !== "bin" ||
-    appNode.host_role !== "target"
-  ) {
-    throw new Error("canonical update exported stale Rust composition attributes");
-  }
+  assertRustIdentityGraph(graph, target);
   for (const relative of ["Cargo.lock", "Cargo.toml", "build.rs", path.join("src", "main.rs")]) {
     await fsp.copyFile(
       path.join(packageRoot, relative),

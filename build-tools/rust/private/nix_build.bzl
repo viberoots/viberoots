@@ -5,9 +5,10 @@ load("@viberoots//build-tools/lang:remote_action_policy.bzl", "remote_ready_evid
 load("@viberoots//build-tools/lang:nix_artifact_inputs.bzl", "nix_artifact_action_inputs", "with_nix_artifact_action_attrs")
 load("@viberoots//build-tools/lang:native_link.bzl", "NativeLinkInfo", "native_runtime_outputs")
 load("@viberoots//build-tools/lang:source_snapshot.bzl", "SourceSnapshotInfo")
-load("@viberoots//build-tools/rust/private:crate_contract.bzl", "rust_crate_closure_inputs", "rust_crate_contract_attrs", "rust_crate_info")
-load("@viberoots//build-tools/rust/private:tauri_contract.bzl", "tauri_action_inputs", "tauri_rule_attrs")
-load("@viberoots//build-tools/rust/private:wasm_contract.bzl", "wasm_contract_rule_attrs")
+load("@viberoots//build-tools/rust/private:crate_contract.bzl", "rust_crate_closure_inputs", "rust_crate_info")
+load("@viberoots//build-tools/rust/private:tauri_contract.bzl", "tauri_action_inputs")
+load("@viberoots//build-tools/rust/private:nix_build_attrs.bzl", "rust_nix_build_attrs")
+load("@viberoots//build-tools/rust/private:wasm_artifact.bzl", "RustWasmArtifactInfo", "register_rust_wasm_provenance_action")
 
 def _rust_nix_build_impl(ctx):
     raw = ctx.attrs.self_label
@@ -166,11 +167,29 @@ def _rust_nix_build_impl(ctx):
         mode = "remote-ready" if remote_requested else "local-only",
         evidence = evidence,
     )
+    provenance = None
+    if wasm_family:
+        provenance = register_rust_wasm_provenance_action(
+            ctx,
+            planner_label,
+            source_snapshot,
+            source_snapshot_manifest,
+            snapshot_args,
+            control_inputs,
+            declared_inputs,
+            action_timeout_sec,
+            not remote_requested,
+        )
     runtime_outputs = native_runtime_outputs(ctx.attrs.link_deps + ctx.attrs.header_deps + ctx.attrs.runtime_deps)
+    sub_targets = {}
+    if provenance != None:
+        sub_targets["provenance"] = [DefaultInfo(default_output = provenance)]
     providers = [
-        DefaultInfo(default_output = out, other_outputs = runtime_outputs),
+        DefaultInfo(default_output = out, other_outputs = runtime_outputs, sub_targets = sub_targets),
         rust_crate_info(ctx),
     ]
+    if provenance != None:
+        providers.append(RustWasmArtifactInfo(runtime = out, provenance = provenance))
     if crate_type in ["staticlib", "cdylib"] and not wasm_family:
         providers.append(NativeLinkInfo(
             library = out,
@@ -180,71 +199,8 @@ def _rust_nix_build_impl(ctx):
         ))
     return providers + policy_info
 
-_ATTRS = {
-        "self_label": attrs.string(),
-        "planner_label": attrs.option(attrs.string(), default = None),
-        "kind": attrs.string(),  # "bin" | "lib" | "pyext" | "addon" | "wasm" | "wasi"
-        "out": attrs.string(),
-        "deps": attrs.list(attrs.dep(), default = []),
-        "link_deps": attrs.list(attrs.dep(), default = []),
-        "header_deps": attrs.list(attrs.dep(), default = []),
-        "runtime_deps": attrs.list(attrs.dep(), default = []),
-        "link_closure": attrs.string(default = "direct"),
-        "link_mode": attrs.string(default = ""),
-        "link_closure_overrides": attrs.dict(key = attrs.label(), value = attrs.string(), default = {}),
-        "srcs": attrs.list(attrs.source(), default = []),
-        "nix_inputs": attrs.list(attrs.source(), default = []),
-        "cargo_manifest": attrs.source(),
-        "cargo_lock": attrs.source(),
-        "cargo_output_hashes": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
-        "cargo_fixed_sources": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
-        "crate": attrs.string(),
-        "features": attrs.list(attrs.string(), default = []),
-        "default_features": attrs.bool(default = True),
-        "profile": attrs.string(default = "release"),
-        "target": attrs.string(default = ""),
-        "module": attrs.string(default = ""),
-        "build_py_deps": attrs.list(attrs.string(), default = []),
-        "addon_name": attrs.string(default = ""),
-        "node_api_version": attrs.int(default = 0),
-        "platform": attrs.string(default = ""),
-        "python_abi": attrs.string(default = ""),
-        "binding_config": attrs.string(default = ""),
-        "interop_kind": attrs.string(default = ""),
-        "interop_generator": attrs.string(default = ""),
-        "panic_strategy": attrs.string(default = ""),
-        "exception_policy": attrs.string(default = ""),
-        "allocator": attrs.string(default = ""),
-        "thread_safety": attrs.string(default = ""),
-        "cxx_standard": attrs.string(default = ""),
-        "c_standard": attrs.string(default = ""),
-        "compiler_family": attrs.string(default = ""),
-        "compiler_identity": attrs.string(default = ""),
-        "target_triple": attrs.string(default = ""),
-        "stl": attrs.string(default = ""),
-        "module_surface": attrs.string(default = ""),
-        "source_snapshot": attrs.option(attrs.source(), default = None),
-        "source_snapshot_bundle": attrs.option(attrs.dep(providers = [SourceSnapshotInfo]), default = None),
-        "source_snapshot_manifest": attrs.option(attrs.source(), default = None),
-        "materialization_manifest": attrs.option(attrs.source(), default = None),
-        "artifact_contract": attrs.option(attrs.source(), default = None),
-        "tool_closure": attrs.option(attrs.source(), default = None),
-        "remote_builder_smoke": attrs.option(attrs.source(), default = None),
-        "local_patch_dirs": attrs.list(attrs.string(), default = []),
-        "nixpkgs_profile": attrs.string(default = "default"),
-        "nixpkg_pins": attrs.dict(key = attrs.string(), value = attrs.dict(key = attrs.string(), value = attrs.string()), default = {}),
-        "labels": attrs.list(attrs.string(), default = []),
-        "_flake_file": attrs.source(default = "root//.viberoots/workspace:flake.nix"),
-        "_flake_lock": attrs.source(default = "root//.viberoots/workspace:flake.lock"),
-        "_node_modules_hashes": attrs.source(default = "root//projects/config:node-modules.hashes.json"),
-        "_nixpkgs_registry_extension": attrs.source(default = "root//.viberoots/workspace:nixpkgs-source-registry-extension"),
-        "_source_snapshot_validator": attrs.source(default = "@viberoots//build-tools/tools/dev:validate-source-snapshot.ts"),
-}
-_ATTRS.update(rust_crate_contract_attrs())
-_ATTRS.update(tauri_rule_attrs())
-_ATTRS.update(wasm_contract_rule_attrs())
 rust_nix_build = rule(
     impl = _rust_nix_build_impl,
-    attrs = with_nix_artifact_action_attrs(_ATTRS),
+    attrs = with_nix_artifact_action_attrs(rust_nix_build_attrs()),
 )
 __all__ = ["rust_nix_build"]

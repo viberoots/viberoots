@@ -6,7 +6,13 @@ import { readArtifactPathIdentity } from "./artifact-reproducibility-producer";
 
 export type ProtectedOutputIdentity = Pick<
   ArtifactReproducibilityRunRecord["evidence"],
-  "closureIdentityDigest" | "derivationPath" | "narHash" | "outputPath"
+  | "closureIdentityDigest"
+  | "derivationPath"
+  | "narHash"
+  | "outputPath"
+  | "provenanceClosureIdentityDigest"
+  | "provenanceNarHash"
+  | "provenanceOutputPath"
 >;
 
 export function unsignedEvidenceIngressArgs(storeUri: string, roots: string[]): string[] {
@@ -65,6 +71,9 @@ export function protectedArtifactOutputIdentities(
       derivationPath: evidence.derivationPath,
       narHash: evidence.narHash,
       outputPath: evidence.outputPath,
+      provenanceOutputPath: evidence.provenanceOutputPath,
+      provenanceNarHash: evidence.provenanceNarHash,
+      provenanceClosureIdentityDigest: evidence.provenanceClosureIdentityDigest,
     };
     const prior = byPath.get(identity.outputPath);
     if (prior && JSON.stringify(prior) !== JSON.stringify(identity)) {
@@ -83,10 +92,17 @@ export async function assertHydratedArtifactOutputIdentities(
 ): Promise<void> {
   for (const identity of expected) {
     const actual = await readArtifactPathIdentity(identity.outputPath, runNix);
+    const actualProvenance =
+      identity.provenanceOutputPath === identity.outputPath
+        ? actual
+        : await readArtifactPathIdentity(identity.provenanceOutputPath, runNix);
     if (
       actual.derivationPath !== identity.derivationPath ||
       actual.narHash !== identity.narHash ||
-      actual.closureIdentityDigest !== identity.closureIdentityDigest
+      actual.closureIdentityDigest !== identity.closureIdentityDigest ||
+      actualProvenance.derivationPath !== identity.derivationPath ||
+      actualProvenance.narHash !== identity.provenanceNarHash ||
+      actualProvenance.closureIdentityDigest !== identity.provenanceClosureIdentityDigest
     ) {
       throw new Error(`hydrated artifact output identity mismatch: ${identity.outputPath}`);
     }

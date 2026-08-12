@@ -7,6 +7,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { runCommand } from "../../dev/filtered-flake-command";
+import { pidAlive } from "../../dev/tail-log/process-liveness";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
 
@@ -176,14 +177,7 @@ test(
       );
       const childPid = Number(await fsp.readFile(pidFile, "utf8"));
       owner.kill("SIGKILL");
-      await waitFor(async () => {
-        try {
-          process.kill(childPid, 0);
-          return false;
-        } catch {
-          return true;
-        }
-      }, 5_000);
+      await waitFor(async () => !(await pidAlive(childPid)), 5_000);
       await waitFor(
         async () =>
           (await snapshotEntries(path.join(tmp, "viberoots-command.noindex"))).filter((entry) =>

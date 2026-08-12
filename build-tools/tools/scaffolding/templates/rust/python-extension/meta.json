@@ -2,5 +2,10 @@
   "language": "rust",
   "template": "python-extension",
   "description": "Experimental Rust Python extension",
-  "resolverDestination": "projects/libs/{name}"
+  "resolverDestination": "projects/libs/{name}",
+  "help": {
+    "usage": "scaf new rust python-extension <name> [--path=DEST]",
+    "notes": ["Creates a locked Rust Python extension package with Buck targets."],
+    "examples": ["scaf new rust python-extension demo --yes"]
+  }
 }

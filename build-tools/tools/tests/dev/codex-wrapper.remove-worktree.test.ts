@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import {
+  assertNoCodexLaunch,
   binWrapper,
   escapeRegExp,
   managedCodexEnv,
@@ -39,7 +40,7 @@ test("codex --remove-worktree removes the worktree, branch, and stale metadata",
     assert.match(log, new RegExp(`git worktree remove ${escapeRegExp(worktreeRoot)}`));
     assert.match(log, /git branch -D worktree-remove-me/);
     assert.match(log, /git worktree prune/);
-    assert.doesNotMatch(log, /codex /);
+    assertNoCodexLaunch(log);
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }
@@ -102,7 +103,7 @@ test("codex --remove-worktree ignores appended launch arguments", async () => {
     assert.match(log, new RegExp(`git worktree remove ${escapeRegExp(worktreeRoot)}`));
     assert.match(log, /git branch -D worktree-remove-me/);
     assert.match(log, /git worktree prune/);
-    assert.doesNotMatch(log, /codex /);
+    assertNoCodexLaunch(log);
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }

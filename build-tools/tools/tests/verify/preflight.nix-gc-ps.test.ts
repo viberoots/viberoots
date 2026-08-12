@@ -3,6 +3,20 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { recordNixGcPreflight } from "../../dev/verify/nix-gc-preflight";
 import { activeNixGcProcesses } from "../../dev/verify/preflight";
+import { isNixGcCommand } from "../../lib/nix-gc-lock";
+
+test("isNixGcCommand rejects incomplete process-table wrapper commands", () => {
+  for (const command of [
+    "sudo",
+    "sudo -n",
+    "sudo -u",
+    "/usr/bin/env",
+    "/usr/bin/env NIX_REMOTE=daemon",
+    "/usr/bin/env -u",
+  ]) {
+    assert.equal(isNixGcCommand(command), false, command);
+  }
+});
 
 test("activeNixGcProcesses treats ps denial as no active gc evidence", async () => {
   const processes = await activeNixGcProcesses({
@@ -50,6 +64,22 @@ test("activeNixGcProcesses ignores wrapper commands that mention a gc command", 
     },
     { pid: 204, command: "/usr/bin/sudo -n /nix/store/example/bin/nix-store --gc" },
   ]);
+});
+
+test("activeNixGcProcesses ignores incomplete transient process rows", async () => {
+  const processes = await activeNixGcProcesses({
+    runPs: async () => ({
+      exitCode: 0,
+      stdout: [
+        " 101 sudo -n",
+        " 102 /usr/bin/env NIX_REMOTE=daemon",
+        " 103 /usr/bin/env -u",
+        " 104 /nix/store/example/bin/nix store gc",
+      ].join("\n"),
+    }),
+  });
+
+  assert.deepEqual(processes, [{ pid: 104, command: "/nix/store/example/bin/nix store gc" }]);
 });
 
 test("recordNixGcPreflight records active gc and continues without waiting", async () => {

@@ -35,7 +35,7 @@ test("Rust resolution uses only canonical Nix-store Cargo", async () => {
   );
   assert.match(
     await read("build-tools/tools/nix/devshell.nix"),
-    /buildInputs = \[[\s\S]*pkgs\.viberootsRustToolchain/,
+    /buildInputs = \[[\s\S]*pkgs\.viberootsRustDeveloperTools/,
   );
 });
 
@@ -61,6 +61,16 @@ test("launcher fixture exports the single canonical shared pnpm hash-cache autho
     source,
     /VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT:\s*(?:""|undefined|null)/,
     "launcher must never blank the shared cache authority",
+  );
+  assert.match(
+    source,
+    /import \{ sharedCargoFixedSourceCacheRoot \} from "\.\.\/\.\.\/dev\/install\/cargo-fixed-source-cache";/,
+    "launcher fixture must import the canonical shared Cargo fixed-source cache helper",
+  );
+  assert.match(
+    source,
+    /VBR_SHARED_CARGO_FIXED_SOURCE_CACHE_ROOT:[\s\S]*sharedCargoCacheRoot/,
+    "launcher must export VBR_SHARED_CARGO_FIXED_SOURCE_CACHE_ROOT into temp consumer envs",
   );
 });
 

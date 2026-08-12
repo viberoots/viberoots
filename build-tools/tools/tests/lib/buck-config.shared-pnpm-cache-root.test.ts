@@ -9,9 +9,12 @@ import { ensureBuckConfigForTempRepo } from "./test-helpers/buck-config";
 test("temp repo buck config keeps host paths out of workspace flake state", async () => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "buck-config-shared-pnpm-cache-"));
   const durableRoot = path.join(tmp, "durable-cache-root");
+  const durableCargoRoot = path.join(tmp, "durable-cargo-cache-root");
   const prevSharedRoot = process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT;
+  const prevCargoRoot = process.env.VBR_SHARED_CARGO_FIXED_SOURCE_CACHE_ROOT;
   const prevSharedPrelude = process.env.VBR_SHARED_PRELUDE_PATH;
   process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT = durableRoot;
+  process.env.VBR_SHARED_CARGO_FIXED_SOURCE_CACHE_ROOT = durableCargoRoot;
   process.env.VBR_SHARED_PRELUDE_PATH = path.join(process.cwd(), "viberoots", "prelude");
   try {
     await ensureBuckConfigForTempRepo(tmp, $);
@@ -20,6 +23,11 @@ test("temp repo buck config keeps host paths out of workspace flake state", asyn
       buckConfig,
       /\baction_env = .*VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT\b/,
       "nested Buck actions must receive the durable shared pnpm hash cache root",
+    );
+    assert.match(
+      buckConfig,
+      /\baction_env = .*VBR_SHARED_CARGO_FIXED_SOURCE_CACHE_ROOT\b/,
+      "nested Buck actions must receive the durable shared Cargo fixed-source cache root",
     );
     const workspaceRootEnv = await fsp.readFile(
       path.join(tmp, ".viberoots", "workspace", "buck", "workspace-root.env"),
@@ -30,6 +38,8 @@ test("temp repo buck config keeps host paths out of workspace flake state", asyn
   } finally {
     if (prevSharedRoot === undefined) delete process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT;
     else process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT = prevSharedRoot;
+    if (prevCargoRoot === undefined) delete process.env.VBR_SHARED_CARGO_FIXED_SOURCE_CACHE_ROOT;
+    else process.env.VBR_SHARED_CARGO_FIXED_SOURCE_CACHE_ROOT = prevCargoRoot;
     if (prevSharedPrelude === undefined) delete process.env.VBR_SHARED_PRELUDE_PATH;
     else process.env.VBR_SHARED_PRELUDE_PATH = prevSharedPrelude;
     await fsp.rm(tmp, { recursive: true, force: true });

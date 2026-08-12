@@ -22,25 +22,32 @@ const EVIDENCE_KEYS = [
   "immutableSourceDigest",
   "narHash",
   "outputPath",
+  "provenanceOutputPath",
+  "provenanceNarHash",
+  "provenanceClosureIdentityDigest",
+  "semanticManifest",
   "schema",
   "sourceRevision",
   "system",
   "subjectAuthority",
   "toolClosureDigest",
   "toolClosureRoot",
+  "toolSourceRevision",
   "warmIdentityStable",
 ] as const;
 
 export function assertArtifactReproducibilityEvidence(
   value: ArtifactReproducibilityEvidence,
 ): void {
-  if (value?.schema !== "viberoots.artifact-reproducibility-evidence.v4") {
+  if (value?.schema !== "viberoots.artifact-reproducibility-evidence.v6") {
     throw new Error("artifact reproducibility evidence schema is invalid");
   }
   exactKeys(value, EVIDENCE_KEYS);
   if (value.classification !== "hermetic") throw new Error("artifact evidence is not hermetic");
   if (!REVISION.test(value.sourceRevision))
     throw new Error("source revision is not a git revision");
+  if (!REVISION.test(value.toolSourceRevision))
+    throw new Error("tool source revision is not a git revision");
   for (const key of [
     "immutableSourceDigest",
     "declaredGraphDigest",
@@ -48,6 +55,8 @@ export function assertArtifactReproducibilityEvidence(
     "toolClosureDigest",
     "narHash",
     "closureIdentityDigest",
+    "provenanceNarHash",
+    "provenanceClosureIdentityDigest",
   ] as const) {
     if (!HASH.test(value[key])) throw new Error(`artifact evidence ${key} is invalid`);
   }
@@ -65,7 +74,7 @@ export function assertArtifactReproducibilityEvidence(
   if (bundle.replayMaterializations !== 2) {
     throw new Error("artifact evidence requires two identical evaluation-bundle materializations");
   }
-  for (const key of ["derivationPath", "outputPath"] as const) {
+  for (const key of ["derivationPath", "outputPath", "provenanceOutputPath"] as const) {
     if (!STORE_PATH.test(value[key]))
       throw new Error(`artifact evidence ${key} is not a store path`);
   }
@@ -74,6 +83,31 @@ export function assertArtifactReproducibilityEvidence(
   }
   for (const key of ["system", "checkoutIdentity"] as const) {
     required(key, value[key]);
+  }
+  const semantic = value.semanticManifest;
+  if (semantic.kind === "not-applicable") {
+    exactKeys(semantic, ["kind"]);
+  } else {
+    exactKeys(semantic, ["digest", "kind", "storePath"]);
+    if (!HASH.test(semantic.digest)) {
+      throw new Error("artifact semantic manifest digest is invalid");
+    }
+    if (semantic.kind === "tauri-artifact-manifest") {
+      if (
+        semantic.storePath !== `${value.outputPath}/share/viberoots-tauri/artifact-manifest.json`
+      ) {
+        throw new Error("Tauri semantic manifest authority is invalid");
+      }
+    } else if (semantic.kind === "rust-materialization-manifest") {
+      if (
+        semantic.storePath !==
+        `${value.provenanceOutputPath}/share/viberoots-rust/materialization-manifest.json`
+      ) {
+        throw new Error("Rust semantic manifest authority is invalid");
+      }
+    } else {
+      throw new Error("artifact semantic manifest kind is invalid");
+    }
   }
   const authority = value.builderAuthority;
   if (!authority || typeof authority !== "object" || Array.isArray(authority)) {
@@ -138,6 +172,15 @@ function assertSubjectAuthority(value: ArtifactReproducibilityEvidence): void {
       subject.target !== reproducibilityMatrixCase(subject.matrixId).graphSelection.target
     ) {
       throw new Error("matrix subject does not match its recipe, matrix, or bundle binding");
+    }
+    if (
+      subject.artifactFamily === "rust" &&
+      value.semanticManifest.kind !==
+        (subject.matrixId === "rust-tauri-darwin-pr12"
+          ? "tauri-artifact-manifest"
+          : "rust-materialization-manifest")
+    ) {
+      throw new Error("Rust matrix evidence requires its semantic artifact manifest");
     }
     required("subjectAuthority.target", subject.target);
     assertReproducibilityMatrixBinding({ ...subject, system: value.system });

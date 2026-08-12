@@ -1,4 +1,39 @@
-load("@viberoots//build-tools/rust:defs.bzl", "rust_wasi_binary", "rust_wasm_library")
+load(
+    "@viberoots//build-tools/rust:defs.bzl",
+    "rust_wasi_binary",
+    "rust_wasm_browser_package",
+    "rust_wasm_component",
+    "rust_wasm_library",
+    "rust_wasm_static_library",
+)
 
 rust_wasm_library(name = "{{ name }}", crate = "{{ name }}", srcs = ["src/lib.rs"])
 rust_wasi_binary(name = "{{ name }}-wasi", crate = "{{ name }}", srcs = ["src/main.rs"])
+rust_wasm_static_library(
+    name = "{{ name }}-static",
+    crate = "{{ name }}",
+    srcs = ["src/lib.rs"],
+    wasm_header = "wasm.h",
+)
+rust_wasm_static_library(
+    name = "{{ name }}-wasi-static",
+    crate = "{{ name }}",
+    srcs = ["src/lib.rs"],
+    wasm_abi = "wasi",
+    wasm_header = "wasm.h",
+)
+rust_wasm_browser_package(
+    name = "{{ name }}-browser",
+    crate = "{{ name }}",
+    exported_functions = ["answer"],
+    features = ["browser"],
+    srcs = ["src/lib.rs"],
+)
+rust_wasm_component(
+    name = "{{ name }}-component",
+    crate = "{{ name }}",
+    exported_functions = ["answer"],
+    srcs = ["src/lib.rs"],
+    wit = "wit/answer.wit",
+    wit_world = "answers",
+)

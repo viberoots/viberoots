@@ -58,6 +58,20 @@ async function actualParentEnvironment(policy: "auto" | "strict"): Promise<{
   delete env.VBR_NIX_CACHE_HEALTH_APPLIED;
   delete env.VBR_NIX_CACHE_HEALTH_COMMAND_ACTIVE;
   delete env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG;
+  for (const name of [
+    "VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG",
+    "VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS",
+    "VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS",
+    "VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY",
+    "VBR_NIX_CACHE_ROLE_AUTHORITY",
+    "VBR_NIX_CACHE_ROLE_REQUIRED",
+    "VBR_NIX_CACHE_ROLE_OPTIONAL",
+    "VBR_NIX_CACHE_ROLE_POLICY",
+    "VBR_NIX_CACHE_ROLE_BINDING",
+    "VBR_NIX_CACHE_ROLE_CONFIG_B64",
+  ]) {
+    delete env[name];
+  }
   env.PATH = [path.join(artifactToolsRoot, "bin"), env.PATH || ""]
     .filter(Boolean)
     .join(path.delimiter);

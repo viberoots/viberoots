@@ -15,7 +15,9 @@ export type WasmAcceptanceContext = {
   command: any;
   root: string;
   outputs: string[];
+  provenanceOutputs: string[];
   debugOutput: string;
+  debugProvenanceOutput: string;
   currentInput: string;
   artifactToolsRoot: string;
   allowMissingWasiToolchain: boolean;
@@ -31,7 +33,17 @@ export function selectWasmCacheOutputs(
 }
 
 export async function verifyCacheAndPatch(context: WasmAcceptanceContext): Promise<void> {
-  const { tmp, command: $, root, outputs, debugOutput, currentInput, artifactToolsRoot } = context;
+  const {
+    tmp,
+    command: $,
+    root,
+    outputs,
+    provenanceOutputs,
+    debugOutput,
+    debugProvenanceOutput,
+    currentInput,
+    artifactToolsRoot,
+  } = context;
   const cacheOutputs = selectWasmCacheOutputs(
     outputs,
     debugOutput,
@@ -65,7 +77,7 @@ export async function verifyCacheAndPatch(context: WasmAcceptanceContext): Promi
     stdio: "pipe",
   })`${nix} ${emptyNixPolicy} --store ${`file://${cache}`} store sign --key-file ${secretKey} --recursive ${cacheOutputs}`;
   const manifests = await Promise.all(
-    cacheOutputs.map(async (output) =>
+    [...provenanceOutputs, debugProvenanceOutput].map(async (output) =>
       JSON.parse(
         await fs.readFile(
           path.join(output, "share/viberoots-rust/materialization-manifest.json"),

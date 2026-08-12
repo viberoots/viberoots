@@ -1,7 +1,8 @@
 import { pathToFileURL } from "node:url";
 import { processTableLines } from "./process-inspection";
 
-function isExactTokenOrNixBin(token: string, binName: "nix" | "nix-store"): boolean {
+function isExactTokenOrNixBin(token: string | undefined, binName: "nix" | "nix-store"): boolean {
+  if (!token) return false;
   if (token === binName) return true;
   return token.endsWith(`/bin/${binName}`);
 }

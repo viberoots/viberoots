@@ -7,6 +7,7 @@ import { test } from "node:test";
 import { activateWorkspace } from "../../lib/workspace-activation";
 import { remoteSourceStatus } from "../../lib/workspace-remote-source";
 import { runInScratchTemp } from "../lib/test-helpers";
+import { timeDiagnosticAsync } from "../lib/test-helpers/timing";
 import { killBuckDaemonsForRepo } from "../lib/test-helpers/buck-kill";
 import {
   makeConsumer,
@@ -17,6 +18,7 @@ import {
 } from "./remote-consumer-fixture-helpers";
 import {
   assertCleanConsumerBoundary,
+  artifactCommandEnv,
   commandEnv,
   escapeRegex,
   exists,
@@ -33,30 +35,38 @@ async function activateAndAssertStatus(
 ): Promise<string> {
   const workspaceFlake = path.join(consumer, ".viberoots", "workspace");
   for (let i = 0; i < 2; i++) {
-    await $({
-      cwd: consumer,
-      env: { ...process.env, WORKSPACE_ROOT: consumer, VBR_NIX_CACHE_POLICY: "off" },
-      stdio: "pipe",
-    })`nix run --accept-flake-config path:${workspaceFlake}#viberoots -- init-workspace`;
+    await timeDiagnosticAsync(`remote consumer workspace initialization ${i + 1}`, async () => {
+      await $({
+        cwd: consumer,
+        env: { ...process.env, WORKSPACE_ROOT: consumer, VBR_NIX_CACHE_POLICY: "off" },
+        stdio: "pipe",
+      })`nix run --option eval-cache false --accept-flake-config path:${workspaceFlake}#viberoots -- init-workspace`;
+    });
   }
   const staleEnvSource = path.join(path.dirname(consumer), "stale-env-viberoots");
   await fsp.mkdir(staleEnvSource, { recursive: true });
   await fsp.writeFile(path.join(staleEnvSource, "flake.nix"), "{}\n");
-  const activation = await activateWorkspace({
-    start: consumer,
-    env: { WORKSPACE_ROOT: consumer, VIBEROOTS_ROOT: staleEnvSource },
-  });
+  const activation = await timeDiagnosticAsync("remote consumer workspace activation", async () =>
+    activateWorkspace({
+      start: consumer,
+      env: { WORKSPACE_ROOT: consumer, VIBEROOTS_ROOT: staleEnvSource },
+    }),
+  );
   const status = remoteSourceStatus(consumer);
   assert.ok(status);
   assert.equal(activation.sourcePath, status.sourcePath);
   assert.match(status.sourcePath, /\/nix\/store\//);
   assert.match(status.requestedRef, expectedRequestedRef);
   assert.equal(await fsp.realpath(path.join(consumer, ".viberoots/current")), status.sourcePath);
-  const statusJson = await $({
-    cwd: consumer,
-    env: commandEnv(consumer),
-    stdio: "pipe",
-  })`zx-wrapper ${VIBEROOTS_COMMAND} status --json`;
+  const statusJson = await timeDiagnosticAsync(
+    "remote consumer status command",
+    async () =>
+      $({
+        cwd: consumer,
+        env: commandEnv(consumer),
+        stdio: "pipe",
+      })`zx-wrapper ${VIBEROOTS_COMMAND} status --json`,
+  );
   const commandStatus = JSON.parse(String(statusJson.stdout || "{}"));
   assert.equal(commandStatus.sourceMode, "remote");
   assert.equal(commandStatus.requestedRef, status.requestedRef);
@@ -68,38 +78,58 @@ async function activateAndAssertStatus(
 
 async function runBareCommands(consumer: string, cwd: string, sourcePath: string): Promise<void> {
   const env = commandEnv(consumer);
-  await $({
-    cwd: consumer,
-    env: { ...env, VIBEROOTS_FLAKE_INPUT_ROOT: sourcePath },
-    stdio: "pipe",
-  })`u`;
-  await assertCleanConsumerBoundary(consumer, sourcePath, "after u");
-  await $({ cwd, env, stdio: "pipe" })`i --glue-only --skip-go-tidy`;
-  await assertCleanConsumerBoundary(consumer, sourcePath, "after i");
+  await timeDiagnosticAsync("remote consumer bare u", async () => {
+    await $({
+      cwd: consumer,
+      env: { ...env, VIBEROOTS_FLAKE_INPUT_ROOT: sourcePath },
+      stdio: "pipe",
+    })`u`;
+  });
+  await timeDiagnosticAsync("remote consumer boundary after u", async () =>
+    assertCleanConsumerBoundary(consumer, sourcePath, "after u"),
+  );
+  await timeDiagnosticAsync("remote consumer bare i", async () => {
+    await $({ cwd, env, stdio: "pipe" })`i --glue-only --skip-go-tidy`;
+  });
+  await timeDiagnosticAsync("remote consumer boundary after i", async () =>
+    assertCleanConsumerBoundary(consumer, sourcePath, "after i"),
+  );
   assert.equal(
     await exists(
       path.join(consumer, ".viberoots", "workspace", "toolchains", "toolchain_paths.bzl"),
     ),
     true,
   );
-  await $({
-    cwd,
-    env,
-    stdio: "pipe",
-  })`b build --no-materialize //projects/apps/demo:smoke_script`;
-  await assertCleanConsumerBoundary(consumer, sourcePath, "after b");
-  await $({
-    cwd,
-    env,
-    stdio: "pipe",
-  })`v //projects/apps/demo:smoke_test`;
-  await assertCleanConsumerBoundary(consumer, sourcePath, "after v");
-  const status = await $({
-    cwd,
-    env: { ...env, VBR_TAIL_LOG_STATUS_INTERVAL: "1" },
-    stdio: "pipe",
-    nothrow: true,
-  })`timeout 10s s`;
+  await timeDiagnosticAsync("remote consumer bare b", async () => {
+    await $({
+      cwd,
+      env: artifactCommandEnv(consumer),
+      stdio: "pipe",
+    })`b build --no-materialize //projects/apps/demo:smoke_script`;
+  });
+  await timeDiagnosticAsync("remote consumer boundary after b", async () =>
+    assertCleanConsumerBoundary(consumer, sourcePath, "after b"),
+  );
+  await timeDiagnosticAsync("remote consumer bare v", async () => {
+    await $({
+      cwd,
+      env,
+      stdio: "pipe",
+    })`v --seed-mode=never //projects/apps/demo:smoke_test`;
+  });
+  await timeDiagnosticAsync("remote consumer boundary after v", async () =>
+    assertCleanConsumerBoundary(consumer, sourcePath, "after v"),
+  );
+  const status = await timeDiagnosticAsync(
+    "remote consumer bare s",
+    async () =>
+      $({
+        cwd,
+        env: { ...env, VBR_TAIL_LOG_STATUS_INTERVAL: "1" },
+        stdio: "pipe",
+        nothrow: true,
+      })`timeout 10s s`,
+  );
   const statusOutput = [status.stdout, status.stderr].map((part) => String(part || "")).join("\n");
   assert.match(
     statusOutput,
@@ -107,7 +137,9 @@ async function runBareCommands(consumer: string, cwd: string, sourcePath: string
     `expected s to render status before timeout, exit=${status.exitCode} stdout=${String(status.stdout)} stderr=${String(status.stderr)}`,
   );
   assert.equal(status.exitCode === 0 || status.exitCode === 124, true);
-  await assertCleanConsumerBoundary(consumer, sourcePath, "after s");
+  await timeDiagnosticAsync("remote consumer boundary after s", async () =>
+    assertCleanConsumerBoundary(consumer, sourcePath, "after s"),
+  );
 }
 
 test("committed remote consumer template pins an explicit remote flake lock", async () => {
@@ -168,9 +200,11 @@ test("consumer boundary check rejects representative parent-owned source state",
       const target = path.join(source, rel);
       await fsp.mkdir(path.dirname(target), { recursive: true });
       await fsp.writeFile(target, "misplaced\n");
-      await assert.rejects(
-        assertCleanConsumerBoundary(consumer, source, `negative ${rel}`),
-        new RegExp(escapeRegex(`unexpected source ${rel}`)),
+      await timeDiagnosticAsync(`remote consumer negative boundary ${rel}`, async () =>
+        assert.rejects(
+          assertCleanConsumerBoundary(consumer, source, `negative ${rel}`),
+          new RegExp(escapeRegex(`unexpected source ${rel}`)),
+        ),
       );
       await fsp.rm(path.join(source, rel.split("/")[0]), { recursive: true, force: true });
     }
@@ -209,6 +243,10 @@ test("remote consumer fixture source identity is independent of its temp root", 
     const secondSource = await makeRemoteSource(path.join(tmp, "second-root"), $);
     assert.equal(secondSource, firstSource);
     assert.doesNotMatch(firstSource, new RegExp(escapeRegex(tmp)));
+    if (process.env.VBR_TEST_SEED_STORE_PATH) {
+      await assert.rejects(fsp.access(path.join(tmp, "first-root", "remote-viberoots-src")));
+      await assert.rejects(fsp.access(path.join(tmp, "second-root", "remote-viberoots-src")));
+    }
 
     const first = await makeConsumer(
       path.join(tmp, "first-consumer-root"),
@@ -245,13 +283,22 @@ test("remote consumer fixture source identity is independent of its temp root", 
 
 test("remote consumers activate locked source, run bare commands, and keep ownership boundaries", async () => {
   await runInScratchTemp("viberoots-remote-consumer", async (tmp, $) => {
-    const source = await makeRemoteSource(tmp, $);
-    const first = await makeConsumer(tmp, "consumer-a", source, $);
-    const second = await makeConsumer(tmp, "consumer-b", source, $);
+    const source = await timeDiagnosticAsync("remote consumer shared source", async () =>
+      makeRemoteSource(tmp, $),
+    );
+    const first = await timeDiagnosticAsync("remote consumer fixture a", async () =>
+      makeConsumer(tmp, "consumer-a", source, $),
+    );
+    const second = await timeDiagnosticAsync("remote consumer fixture b", async () =>
+      makeConsumer(tmp, "consumer-b", source, $),
+    );
 
     try {
       for (const consumer of [first, second]) {
-        const sourcePath = await activateAndAssertStatus(consumer);
+        const sourcePath = await timeDiagnosticAsync(
+          "remote consumer activate and status",
+          async () => activateAndAssertStatus(consumer),
+        );
         const visible = (await fsp.readdir(consumer))
           .filter((name) => !name.startsWith("."))
           .sort();
@@ -261,21 +308,35 @@ test("remote consumers activate locked source, run bare commands, and keep owner
           "../buck",
         );
 
-        await runBareCommands(consumer, consumer, sourcePath);
+        await timeDiagnosticAsync("remote consumer bare commands from root", async () =>
+          runBareCommands(consumer, consumer, sourcePath),
+        );
         await assertCleanConsumerBoundary(consumer, sourcePath);
 
-        await runBareCommands(consumer, path.join(consumer, "projects"), sourcePath);
+        await timeDiagnosticAsync("remote consumer bare commands from projects", async () =>
+          runBareCommands(consumer, path.join(consumer, "projects"), sourcePath),
+        );
         await assertCleanConsumerBoundary(consumer, sourcePath);
 
-        await $({ cwd: consumer, stdio: "pipe" })`buck2 targets //projects/...`;
-        const appLabel = await $({
-          cwd: consumer,
-          stdio: "pipe",
-        })`buck2 cquery //projects/apps/demo:smoke_script`;
-        const providerLabel = await $({
-          cwd: consumer,
-          stdio: "pipe",
-        })`buck2 cquery workspace_providers//:auto_map`;
+        await timeDiagnosticAsync("remote consumer buck targets", async () => {
+          await $({ cwd: consumer, stdio: "pipe" })`buck2 targets //projects/...`;
+        });
+        const appLabel = await timeDiagnosticAsync(
+          "remote consumer app cquery",
+          async () =>
+            $({
+              cwd: consumer,
+              stdio: "pipe",
+            })`buck2 cquery //projects/apps/demo:smoke_script`,
+        );
+        const providerLabel = await timeDiagnosticAsync(
+          "remote consumer provider cquery",
+          async () =>
+            $({
+              cwd: consumer,
+              stdio: "pipe",
+            })`buck2 cquery workspace_providers//:auto_map`,
+        );
         assert.match(String(appLabel.stdout), /root\/\/projects\/apps\/demo:smoke_script/);
         assert.match(String(providerLabel.stdout), /workspace_providers\/\/:auto_map/);
       }

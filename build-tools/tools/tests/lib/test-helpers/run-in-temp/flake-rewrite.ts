@@ -182,9 +182,44 @@ export async function seedStoreViberootsRootIfPresent(): Promise<string | null> 
   if (
     (await pathExists(path.join(seedPath, PREPARED_SEED_MARKER))) &&
     (await pathExists(path.join(candidate, "flake.nix"))) &&
+    (await pathExists(
+      path.join(candidate, "build-tools", "tools", "nix", "flake", "outputs.nix"),
+    )) &&
     (await pathExists(path.join(candidate, "build-tools", "tools", "dev", "zx-init.mjs")))
   ) {
     return await fsp.realpath(candidate).catch(() => candidate);
+  }
+  return null;
+}
+
+export async function seedStoreImmutableViberootsInputIfPresent(): Promise<MaterializedPathInput | null> {
+  const seedPath = String(process.env.VBR_TEST_SEED_STORE_PATH || "").trim();
+  if (!seedPath || !(await pathExists(path.join(seedPath, PREPARED_SEED_MARKER)))) return null;
+  for (const relative of [path.join(".viberoots", "workspace", "flake.lock"), "flake.lock"]) {
+    let lock: any;
+    try {
+      lock = JSON.parse(await fsp.readFile(path.join(seedPath, relative), "utf8"));
+    } catch {
+      continue;
+    }
+    const inputName = lock?.nodes?.root?.inputs?.viberoots || "viberoots";
+    const locked = lock?.nodes?.[inputName]?.locked;
+    const candidate = String(locked?.path || "").trim();
+    const narHash = String(locked?.narHash || "").trim();
+    if (!/^\/nix\/store\/[a-z0-9]{32}-source$/.test(candidate)) continue;
+    if (!/^sha256-[A-Za-z0-9+/]{43}=$/.test(narHash)) continue;
+    if (
+      (await pathExists(path.join(candidate, "flake.nix"))) &&
+      (await pathExists(
+        path.join(candidate, "build-tools", "tools", "nix", "flake", "outputs.nix"),
+      )) &&
+      (await pathExists(path.join(candidate, "build-tools", "tools", "dev", "zx-init.mjs")))
+    ) {
+      return {
+        storePath: candidate,
+        locked: { narHash, path: candidate, type: "path" },
+      };
+    }
   }
   return null;
 }

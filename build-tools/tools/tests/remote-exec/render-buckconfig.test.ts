@@ -14,6 +14,11 @@ import {
   renderRemoteTestActivationConfigText,
   writeRemoteTestActivationConfig,
 } from "../../remote-exec/remote-test-activation";
+import { inheritedBuckIsolation } from "../lib/test-helpers";
+
+const sourceRuleIsolation =
+  String(process.env.BUCK_NESTED_ISO || "").trim() ||
+  inheritedBuckIsolation("remote_exec_render_buckconfig");
 
 async function tempDir(name: string): Promise<string> {
   return fs.mkdtemp(path.join(os.tmpdir(), `${name}-`));
@@ -208,13 +213,13 @@ test("generated activation config reaches zx_test executor analysis", async () =
 
   const local = await $({
     stdio: "pipe",
-  })`buck2 audit providers --target-platforms prelude//platforms:default viberoots//:remote_exec_verify_remote_policy`.nothrow();
+  })`buck2 --isolation-dir ${sourceRuleIsolation} audit providers --target-platforms prelude//platforms:default viberoots//:remote_exec_verify_remote_policy`.nothrow();
   assert.equal(local.exitCode, 0, local.stderr);
   assert.match(local.stdout, /default_executor=None/);
 
   const activated = await $({
     stdio: "pipe",
-  })`buck2 audit providers --config-file ${result.configPath} --target-platforms prelude//platforms:default viberoots//:remote_exec_verify_remote_policy`.nothrow();
+  })`buck2 --isolation-dir ${sourceRuleIsolation} audit providers --config-file ${result.configPath} --target-platforms prelude//platforms:default viberoots//:remote_exec_verify_remote_policy`.nothrow();
 
   assert.equal(activated.exitCode, 0, activated.stderr);
   assert.match(activated.stdout, /default_executor=CommandExecutorConfig/);

@@ -16,7 +16,7 @@ export type ArtifactReproducibilitySubjectAuthority =
       kind: "matrix";
       matrixDigest: string;
       matrixId: string;
-      artifactFamily: "go" | "node" | "python" | "cpp" | "wasm" | "mixed";
+      artifactFamily: "go" | "node" | "python" | "cpp" | "rust" | "wasm" | "mixed";
       recipeDigest: string;
       bindingDigest: string;
       target: string;
@@ -31,9 +31,10 @@ export type ArtifactReproducibilitySubjectAuthority =
     };
 
 export type ArtifactReproducibilityEvidence = {
-  schema: "viberoots.artifact-reproducibility-evidence.v4";
+  schema: "viberoots.artifact-reproducibility-evidence.v6";
   classification: "hermetic";
   sourceRevision: string;
+  toolSourceRevision: string;
   immutableSourceDigest: string;
   evaluationBundleAuthority: {
     sourceRoot: string;
@@ -48,8 +49,15 @@ export type ArtifactReproducibilityEvidence = {
   system: string;
   derivationPath: string;
   outputPath: string;
+  provenanceOutputPath: string;
   narHash: string;
+  provenanceNarHash: string;
   closureIdentityDigest: string;
+  provenanceClosureIdentityDigest: string;
+  semanticManifest:
+    | { kind: "not-applicable" }
+    | { kind: "rust-materialization-manifest"; storePath: string; digest: string }
+    | { kind: "tauri-artifact-manifest"; storePath: string; digest: string };
   subjectAuthority: ArtifactReproducibilitySubjectAuthority;
   checkoutIdentity: string;
   builderAuthority: ArtifactBuilderAuthority;

@@ -159,6 +159,7 @@ test("dev-build glue child receives exact capability-authorized config without a
     VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG: "forged",
   });
   assert.equal(child.NIX_CONFIG, reviewed);
+  assert.equal(child.VBR_NIX_CACHE_POLICY, "auto");
   assert.equal(child.VBR_NIX_CACHE_HEALTH_APPLIED, undefined);
   assert.equal(child.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG, undefined);
 
@@ -209,6 +210,7 @@ test("explicit off capability reaches glue, materialization, and action environm
   });
   for (const env of [glue, materialize, action]) {
     assert.equal(env.NIX_CONFIG, undefined);
+    assert.equal(env.VBR_NIX_CACHE_POLICY, "off");
     assert.equal(env.VBR_NIX_CACHE_HEALTH_APPLIED, undefined);
     assert.equal(env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG, undefined);
   }

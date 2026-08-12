@@ -11,6 +11,8 @@ const ALIASES = {
   binding: "VBR_VERIFY_NESTED_CACHE_BINDING",
   config: "VBR_VERIFY_NESTED_CACHE_CONFIG",
 } as const;
+export const NESTED_CACHE_ROLE_AUTHORITY = "verify-nested-v1";
+export const NESTED_CACHE_ROLE_CONFIG = "VBR_NIX_CACHE_ROLE_CONFIG_B64";
 
 type Reviewed = Extract<NixCachePolicyCapabilityOutcome, { kind: "reviewed" }>;
 
@@ -71,6 +73,13 @@ export function consumeNestedCacheRoleTransport(env: NodeJS.ProcessEnv): string[
   if (nixCachePolicyBindingDigest(reviewed) !== binding) {
     throw new Error("nested cache role transport binding is invalid");
   }
+  env.NIX_CONFIG = config;
+  env.VBR_NIX_CACHE_ROLE_REQUIRED = required.join(" ");
+  env.VBR_NIX_CACHE_ROLE_OPTIONAL = optional.join(" ");
+  env.VBR_NIX_CACHE_ROLE_POLICY = policy;
+  env.VBR_NIX_CACHE_ROLE_BINDING = binding;
+  env[NESTED_CACHE_ROLE_CONFIG] = encodedConfig;
+  env.VBR_NIX_CACHE_ROLE_AUTHORITY = NESTED_CACHE_ROLE_AUTHORITY;
   return [
     "--env",
     `NIX_CONFIG=${config}`,
@@ -82,5 +91,9 @@ export function consumeNestedCacheRoleTransport(env: NodeJS.ProcessEnv): string[
     `VBR_NIX_CACHE_ROLE_POLICY=${policy}`,
     "--env",
     `VBR_NIX_CACHE_ROLE_BINDING=${binding}`,
+    "--env",
+    `${NESTED_CACHE_ROLE_CONFIG}=${encodedConfig}`,
+    "--env",
+    `VBR_NIX_CACHE_ROLE_AUTHORITY=${NESTED_CACHE_ROLE_AUTHORITY}`,
   ];
 }

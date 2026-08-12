@@ -69,17 +69,28 @@ test("build-selected runs node patch requirement preflight", async () => {
   }
   const flakeSourceIndex = txt.indexOf("const flakeSource = await chooseFlakeRef");
   const cleanupTryIndex = txt.indexOf("try {", flakeSourceIndex);
+  const identityFlagIndex = txt.indexOf(
+    'const printDerivationIdentity = getFlagBool("print-derivation-identity")',
+    flakeSourceIndex,
+  );
+  const identityStoreGuardIndex = txt.indexOf("!printDerivationIdentity &&", identityFlagIndex);
   const finalStoreProbeIndex = txt.indexOf("await resolveFinalPnpmStore", flakeSourceIndex);
   const cleanupFinallyIndex = txt.indexOf("finally {", finalStoreProbeIndex);
   const snapshotCleanupIndex = txt.indexOf("await flakeSource.cleanup?.()", cleanupFinallyIndex);
   if (
     flakeSourceIndex < 0 ||
     cleanupTryIndex < flakeSourceIndex ||
+    identityFlagIndex < flakeSourceIndex ||
+    identityStoreGuardIndex < identityFlagIndex ||
+    identityStoreGuardIndex > finalStoreProbeIndex ||
     finalStoreProbeIndex < cleanupTryIndex ||
     cleanupFinallyIndex < finalStoreProbeIndex ||
     snapshotCleanupIndex < cleanupFinallyIndex
   ) {
     throw new Error(`${file} must clean the filtered snapshot when the final-store probe rejects`);
+  }
+  if (!txt.includes("if (printDerivationIdentity)")) {
+    throw new Error(`${file} must skip final-store realization for identity-only evaluation`);
   }
   if (txt.includes("import { prepareExactPnpmStore }")) {
     throw new Error(`${file} must not directly prepare exact stores on the selected build path`);
@@ -98,7 +109,7 @@ test("build-selected constructs selected nix build argv with no-link for normal 
     "--accept-flake-config",
     "--no-link",
     "--print-out-paths",
-    "path:/repo#graph-generator-selected",
+    "path:/repo#graph-generator-selected^out",
   ]);
   assert.deepEqual(
     selectedNixBuildArgs({ flakeRef: "path:/repo#graph-generator-selected", showTrace: true }),
@@ -114,8 +125,15 @@ test("build-selected constructs selected nix build argv with no-link for normal 
       "--no-link",
       "--print-out-paths",
       "--show-trace",
-      "path:/repo#graph-generator-selected",
+      "path:/repo#graph-generator-selected^out",
     ],
+  );
+  assert.equal(
+    selectedNixBuildArgs({
+      flakeRef: "path:/repo#graph-generator-selected",
+      output: "provenance",
+    }).at(-1),
+    "path:/repo#graph-generator-selected^provenance",
   );
 });
 

@@ -117,6 +117,10 @@ let
     (lib.hasPrefix "v." base && lib.hasSuffix ".out" base);
   isExcludedPath = rel:
     isVcsMetadataPath rel ||
+    rel == ".viberoots/cargo-home" ||
+    (lib.hasPrefix ".viberoots/cargo-home/" rel) ||
+    rel == ".viberoots/cargo-home.noindex" ||
+    (lib.hasPrefix ".viberoots/cargo-home.noindex/" rel) ||
     rel == "build-tools/tools/dev/toolchain-paths.json" ||
     rel == "toolchains/toolchain_paths.bzl" ||
     rel == ".viberoots/workspace/buck/graph.json" ||
@@ -130,6 +134,8 @@ let
     (lib.hasPrefix ".viberoots/workspace/cache/" rel) ||
     rel == ".viberoots/workspace/cargo-home" ||
     (lib.hasPrefix ".viberoots/workspace/cargo-home/" rel) ||
+    rel == ".viberoots/workspace/cargo-home.noindex" ||
+    (lib.hasPrefix ".viberoots/workspace/cargo-home.noindex/" rel) ||
     rel == ".viberoots/workspace/codex-test-logs" ||
     (lib.hasPrefix ".viberoots/workspace/codex-test-logs/" rel) ||
     rel == ".viberoots/workspace/install-cache" ||

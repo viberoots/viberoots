@@ -4,8 +4,26 @@ import { test } from "node:test";
 import {
   gitAutoMaintenanceDisabledEnvEntries,
   gitAutoMaintenanceDisabledTestEnvArgs,
+  withGitConfigEnvEntries,
   withGitAutoMaintenanceDisabledEnv,
 } from "../../lib/git-auto-maintenance-env";
+
+test("git config env entries append without dropping inherited config", () => {
+  const env = withGitConfigEnvEntries(
+    {
+      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_KEY_0: "protocol.file.allow",
+      GIT_CONFIG_VALUE_0: "always",
+    },
+    [["url.file:///tmp/local/.insteadOf", "https://example.invalid/repo.git"]],
+  );
+
+  assert.equal(env.GIT_CONFIG_COUNT, "2");
+  assert.equal(env.GIT_CONFIG_KEY_0, "protocol.file.allow");
+  assert.equal(env.GIT_CONFIG_VALUE_0, "always");
+  assert.equal(env.GIT_CONFIG_KEY_1, "url.file:///tmp/local/.insteadOf");
+  assert.equal(env.GIT_CONFIG_VALUE_1, "https://example.invalid/repo.git");
+});
 
 test("git auto-maintenance env disables automatic maintenance without dropping existing config", () => {
   const env = withGitAutoMaintenanceDisabledEnv({

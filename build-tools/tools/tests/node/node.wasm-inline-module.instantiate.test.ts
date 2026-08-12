@@ -7,13 +7,37 @@ import { test } from "node:test";
 import {
   publicBuildOutPath,
   reconcileTempDependencyInputs,
+  retargetTempCommandToolSource,
   runInTemp,
   runPublicBuild,
 } from "../lib/test-helpers";
 import { stageTempRepoPaths } from "../lib/test-helpers/git-stage";
+import { ensureToolchainPathsForTempRepo } from "../lib/test-helpers/toolchain-paths";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
+
+async function detachCopiedViberootsToolRoot(tmp: string): Promise<string> {
+  const workspaceFlakePath = path.join(tmp, ".viberoots", "workspace", "flake.nix");
+  const workspaceFlake = await fs.readFile(workspaceFlakePath, "utf8");
+  const match = workspaceFlake.match(/viberoots\.url = "path:([^"]+)"/);
+  const flakeInput = match?.[1]?.trim();
+  assert.ok(flakeInput, `expected ${workspaceFlakePath} to pin viberoots to an immutable path`);
+  await fs.rm(path.join(tmp, "viberoots"), {
+    recursive: true,
+    force: true,
+    maxRetries: 5,
+    retryDelay: 100,
+  });
+  await fs.rm(path.join(tmp, ".viberoots", "current"), { force: true });
+  await fs.symlink(flakeInput, path.join(tmp, ".viberoots", "current"));
+  await fs.rm(path.join(tmp, ".viberoots", "workspace", "prelude"), { force: true });
+  await fs.symlink(
+    path.join(flakeInput, "prelude"),
+    path.join(tmp, ".viberoots", "workspace", "prelude"),
+  );
+  return flakeInput;
+}
 
 async function instantiateFromBytes(bytes: Uint8Array): Promise<WebAssembly.Instance> {
   const module = new WebAssembly.Module(bytes);
@@ -54,12 +78,11 @@ test(
     }
     try {
       await runInTemp("node-wasm-inline-module", async (tmp, _$) => {
+        const flakeInput = await detachCopiedViberootsToolRoot(tmp);
+        retargetTempCommandToolSource(_$, tmp, flakeInput);
+        await _$({ cwd: tmp, stdio: "pipe" })`git rm --cached -r --ignore-unmatch viberoots`;
+        await ensureToolchainPathsForTempRepo(tmp, _$);
         const $ = _$({ cwd: tmp, stdio: "inherit" });
-        const repoRoot = process.cwd();
-        const flakeNix = path.join(repoRoot, "flake.nix");
-        if (await fs.pathExists(flakeNix)) {
-          await fs.copyFile(flakeNix, path.join(tmp, "flake.nix"));
-        }
         const wasmDir = path.join(tmp, "projects", "libs", "demo-wasm");
         await fs.mkdirp(wasmDir);
         await fs.outputFile(

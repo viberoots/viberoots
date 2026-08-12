@@ -10,6 +10,7 @@ async function readRepoFile(rel: string): Promise<string> {
 
 test("p selected runnable builds materialize final pnpm stores before filtered Nix builds", async () => {
   const source = await readRepoFile("build-tools/tools/dev/run-runnable-graph.ts");
+  const cachePolicy = await readRepoFile("build-tools/tools/dev/run-runnable-cache-policy.ts");
   const runner = await readRepoFile("build-tools/tools/dev/run-runnable-nix.ts");
   assert.match(source, /resolveFinalPnpmStore/);
   assert.doesNotMatch(source, /import \{ prepareExactPnpmStore \}/);
@@ -20,14 +21,26 @@ test("p selected runnable builds materialize final pnpm stores before filtered N
     /env: canonicalArtifactReentryEnvironment\(opts\.workspaceRoot, toolsRoot, \{\s+nixCacheHealth: opts\.nixCacheHealth,\s+\}\)/,
   );
   assert.match(source, /artifactToolsRoot,\s+nixCacheHealth: options\.nixCacheHealth,\s+\}/);
+  assert.match(cachePolicy, /maybeCurrentNixCachePolicyCapability/);
+  assert.match(cachePolicy, /outcomeFromNixCachePolicyCapability/);
+  assert.match(source, /const nixCachePolicyCapability = runnableNixCachePolicyCapability\(\)/);
   assert.match(
     source,
-    /internal: \{\s+\.\.\.sourceSelectors,\s+\.\.\.\(options\.nixCacheHealth\?\.config\s+\? \{ NIX_CONFIG: options\.nixCacheHealth\.config \}\s+: \{\}\),\s+\}/,
+    /\.\.\.\(nixCachePolicyCapability \? \{ nixCachePolicyCapability \} : \{\}\)/,
+  );
+  assert.match(source, /const internalReviewedNixConfig =/);
+  assert.match(source, /!nixCachePolicyCapability && reviewedNixConfig/);
+  assert.match(
+    source,
+    /internal: \{\s+\.\.\.sourceSelectors,\s+\.\.\.internalReviewedNixConfig,\s+\}/,
   );
   assert.match(
     runner,
     /internal: \{ WORKSPACE_ROOT: opts\.workspaceRoot, \.\.\.\(opts\.internal \|\| \{\}\) \}/,
   );
+  assert.match(runner, /outcomeFromNixCachePolicyCapability/);
+  assert.match(runner, /runnableNixCachePolicyArgs\(opts\.nixCachePolicyCapability\)/);
+  assert.match(runner, /"extra-substituters"/);
 });
 
 test("p selected webapp builds pass viberoots flake source into the planner", async () => {

@@ -73,15 +73,24 @@ test("canonical Node planning preserves reviewed node_asset_stage mappings", asy
   const nodePlanner = await read("build-tools/tools/nix/planner/node.nix");
   const webappPlanner = await read("build-tools/tools/nix/planner/node-webapp.nix");
   const assetPlanner = await read("build-tools/tools/nix/planner/node-assets.nix");
+  const tauriTargets = await read("projects/apps/tauri-composition-app/TARGETS");
   assert.match(macro, /asset_metadata/);
-  assert.match(assetContract, /node-asset-v1\|/);
+  assert.match(assetContract, /node-asset-v5\|/);
+  assert.match(assetPlanner, /node-asset-v5\|/);
+  assert.match(assetPlanner, /builtins\.length fields != 8/);
+  assert.match(tauriTargets, /"dest": "frontend\.wasm"/);
   assert.match(assetContract, /duplicate asset destination/);
   assert.match(assetContract, /destination must stay inside the staged output/);
+  assert.match(assetContract, /source_path must stay inside its source root/);
+  assert.match(macro, /app_metadata[\s\S]*merged_deps/);
   assert.match(nodePlanner, /dependencyArtifactOf[\s\S]*node-webapp\.nix/);
-  assert.match(assetPlanner, /dependencyArtifactOf source/);
+  assert.match(assetPlanner, /isWasm && isSameCellLabel[\s\S]*dependencyArtifactOf/);
+  assert.match(assetPlanner, /isViberootsSource[\s\S]*rawLabelPath viberootsStoreRoot/);
   assert.match(assetPlanner, /expected exactly one reviewed artifact/);
   assert.match(assetPlanner, /asset destination escaped dist/);
   assert.match(assetPlanner, /asset destination collision/);
+  assert.match(webappPlanner, /stageAppArtifact[\s\S]*STAGE_APP_ARTIFACT/);
+  assert.match(webappPlanner, /cp -R "\$STAGE_APP_ARTIFACT\/dist\/\." dist\//);
   assert.match(webappPlanner, /stage_wasm_contract[\s\S]*\$\{stageAssets\}/);
 });
 
@@ -94,7 +103,7 @@ test("selected Tauri invalidation inspection stays inside canonical artifact ing
   assert.match(selected, /artifactNixPolicyArgs\(\)/);
   assert.match(
     selected,
-    /flakeSource\.flakeRef[\s\S]*package: \[ package\.drvPath package\.outPath \]/,
+    /flakeSource\.flakeRef[\s\S]*package: \[ package\.drvPath package\.\$\{derivationOutput\} \]/,
   );
   assert.doesNotMatch(selected, /print-derivation-identity[\s\S]{0,500}VIBEROOTS_FLAKE_INPUT_ROOT/);
   assert.match(
@@ -108,13 +117,17 @@ test("composed Rust roots retain transitive reviewed native link inputs", async 
   const planner = await read("build-tools/tools/nix/planner/rust.nix");
   const bridge = await read("projects/libs/tauri-composition-providers/bridge/src/lib.rs");
   const desktopCargo = await read("projects/apps/tauri-composition-app/Cargo.toml");
+  const tauriPlanner = await read("build-tools/tools/nix/planner/rust-tauri.nix");
   const tauriTemplate = await read("build-tools/tools/nix/templates/rust-tauri.nix");
   assert.match(planner, /nativeInputsFor \(map \(root: root\.label\) sourceComposition\.roots\)/);
   assert.match(planner, /linkNames = map sanitizeNativeLinkName resolved/);
+  assert.match(planner, /kind = if mode == "shared" then "dylib" else "static"/);
   assert.match(bridge, /intrinsic_abi::composition_native_answer/);
   assert.doesNotMatch(bridge, /__viberoots_abi/);
   assert.match(desktopCargo, /\[\[bin\]\]\nname = "desktop"\npath = "src\/main\.rs"/);
   assert.match(tauriTemplate, /\.app\.withGlobalTauri == false/);
   assert.match(tauriTemplate, /appWindows/);
   assert.match(tauriTemplate, /withGlobalTauri:false/);
+  assert.match(tauriPlanner, /relative == "projects"/);
+  assert.match(tauriPlanner, /lib\.hasPrefix "projects\/" relative/);
 });

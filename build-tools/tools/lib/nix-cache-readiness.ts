@@ -85,13 +85,7 @@ export async function evaluateNixCacheReadinessFromConfig(
     }
   }
   const unreachable = statuses.filter((entry) => entry.state === "unreachable");
-  const requiredUnavailable = unreachable.some((entry) => entry.role === "required");
-  const state =
-    unreachable.length === 0
-      ? "ready"
-      : policy === "strict" || requiredUnavailable
-        ? "failed"
-        : "degraded";
+  const state = unreachable.length === 0 ? "ready" : policy === "strict" ? "failed" : "degraded";
   return readiness(policy, state, requiredIdentities, optionalIdentities, statuses);
 }
 
@@ -205,5 +199,5 @@ function readinessMessage(
   if (state === "failed") {
     return `required cache policy failed for unavailable substituter(s): ${unavailable.join(", ")}`;
   }
-  return `optional local fallback is active; unavailable substituter(s): ${unavailable.join(", ")}`;
+  return `local fallback is active; unavailable substituter(s): ${unavailable.join(", ")}`;
 }

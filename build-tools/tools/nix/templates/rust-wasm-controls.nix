@@ -1,5 +1,10 @@
-{ pkgs, lib, Tools, kind, wasm }:
+{ pkgs, lib, Tools, kind, wasm, behaviorProbe ? false }:
 let
+  behaviorExport =
+    if kind == "wasm_component"
+    then "viberoots-observed-behavior"
+    else "viberoots_observed_behavior";
+  requiredExports = wasm.exported ++ lib.optional behaviorProbe behaviorExport;
   wasmTools = "${Tools.wasmTools}/bin/wasm-tools";
   wasmOpt = "${Tools.wasmOpt}/bin/wasm-opt";
   wasmMetadce = "${Tools.wasmOpt}/bin/wasm-metadce";
@@ -9,7 +14,7 @@ let
     else "";
   requestedCases = lib.concatMapStringsSep "\n" (name:
     "      ${lib.escapeShellArg name}) keep=1 ;;"
-  ) wasm.exported;
+  ) requiredExports;
   reservedCases =
     if kind == "wasm_browser" then
       "      memory|__wbindgen_*) keep=1 ;;"
@@ -33,7 +38,7 @@ in rec {
     ${wasmTools} strip "${path}" -o "${path}.stripped"
     mv "${path}.stripped" "${path}"
   '';
-  enforceExports = path: lib.optionalString (wasm.exported != []) ''
+  enforceExports = path: lib.optionalString (requiredExports != []) ''
     wat="$TMPDIR/viberoots-rust-wasm.$$.wat"
     graph="$TMPDIR/viberoots-rust-wasm.$$.graph.json"
     ${wasmTools} print "${path}" > "$wat"
@@ -42,7 +47,7 @@ in rec {
         echo "Rust WASM export allowlist entry is absent: ${name}" >&2
         exit 2
       }
-    '') wasm.exported}
+    '') requiredExports}
     printf '[' > "$graph"
     separator=
     while IFS= read -r export_name; do
@@ -65,7 +70,7 @@ ${classify}
       fi
     done < <(sed -n 's/.*(export "\([^"]*\)".*/\1/p' "$wat")
   '';
-  enforceWitExports = path: emittedComponent: lib.optionalString (wasm.exported != []) ''
+  enforceWitExports = path: emittedComponent: lib.optionalString (requiredExports != []) ''
     actual="$TMPDIR/viberoots-rust-component-exports.$$"
     wit_json="$actual.json"
     ${wasmTools} component wit --json "${path}" > "$wit_json"
@@ -98,7 +103,7 @@ ${classify}
         end
     ' "$wit_json" > "$actual.unsorted"
     LC_ALL=C sort -u "$actual.unsorted" > "$actual"
-    printf '%s\n' ${lib.concatMapStringsSep " " lib.escapeShellArg wasm.exported} \
+    printf '%s\n' ${lib.concatMapStringsSep " " lib.escapeShellArg requiredExports} \
       | LC_ALL=C sort -u > "$actual.expected"
     if ! cmp -s "$actual.expected" "$actual"; then
       echo "Rust WASM component exports do not exactly match exported_functions for world ${wasm.world}" >&2

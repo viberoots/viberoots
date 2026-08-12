@@ -31,6 +31,7 @@ test("Rust extensions survive remote preparation and a credential-free binary ca
     }
     const cache = path.join(tmp, "binary-cache");
     await fs.mkdir(cache, { recursive: true });
+    const cacheUri = `file://${cache}?compression=none`;
     const artifactToolsRoot = canonicalArtifactToolsRoot(tmp);
     const nix = path.join(artifactToolsRoot, "bin/nix");
     const nixFeatures = artifactNixExperimentalFeatureArgs();
@@ -52,11 +53,11 @@ test("Rust extensions survive remote preparation and a credential-free binary ca
     await $({
       cwd: tmp,
       stdio: "pipe",
-    })`${nix} ${nixFeatures} copy --to ${`file://${cache}`} ${outputs}`;
+    })`${nix} ${nixFeatures} copy --to ${cacheUri} ${outputs}`;
     await $({
       cwd: tmp,
       stdio: "pipe",
-    })`${nix} ${nixFeatures} --store ${`file://${cache}`} store sign --key-file ${secretKey} --recursive ${outputs}`;
+    })`${nix} ${nixFeatures} --store ${cacheUri} store sign --key-file ${secretKey} --recursive ${outputs}`;
     const generated = await Promise.all(
       outputs.map(async (output) =>
         JSON.parse(
@@ -95,7 +96,7 @@ test("Rust extensions survive remote preparation and a credential-free binary ca
       artifactToolsRoot,
       runner: async (command) => {
         const [executable, ...args] = command.map((part) => {
-          if (part === reviewedEndpoint) return `file://${cache}`;
+          if (part === reviewedEndpoint) return cacheUri;
           if (part.includes(REVIEWED_EVIDENCE_PUBLIC_KEY)) {
             return part.replace(REVIEWED_EVIDENCE_PUBLIC_KEY, testPublicKey);
           }

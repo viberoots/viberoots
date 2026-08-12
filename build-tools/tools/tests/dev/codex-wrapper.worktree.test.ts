@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import {
+  assertNoCodexLaunch,
   binWrapper,
   escapeRegExp,
   managedCodexEnv,
@@ -101,7 +102,7 @@ test("codex --list-worktrees prints valid named worktrees without launching", as
 
     assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
     assert.equal(String(res.stdout), `alpha\t${alpha}\n`);
-    await assert.rejects(fsp.stat(fake.log), /ENOENT/);
+    assertNoCodexLaunch(await fsp.readFile(fake.log, "utf8"));
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }
@@ -128,7 +129,7 @@ test("codex --list-worktrees ignores launch arguments", async () => {
 
     assert.equal(res.exitCode, 0);
     assert.equal(String(res.stdout), "");
-    await assert.rejects(fsp.stat(fake.log), /ENOENT/);
+    assertNoCodexLaunch(await fsp.readFile(fake.log, "utf8"));
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }

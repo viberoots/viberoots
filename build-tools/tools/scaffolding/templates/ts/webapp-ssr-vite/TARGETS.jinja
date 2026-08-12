@@ -2,6 +2,7 @@ load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage", "node_webapp",
 
 node_webapp(
     name = "app_raw",
+    labels = ["lang:node", "kind:app", "webapp:ssr", "framework:vite"],
     ts_module_roots = ["src/ts-modules"],
 )
 

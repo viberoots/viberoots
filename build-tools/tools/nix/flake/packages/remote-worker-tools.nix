@@ -1,4 +1,4 @@
-{ pkgs, zx-wrapper, viberootsRoot, viberootsNodeModules ? null }:
+{ pkgs, zx-wrapper, viberootsRoot, viberootsRuntimeRoot, viberootsSourceIdentity, viberootsNodeModules ? null }:
 let
   pnpm11 = import ../../pnpm-11.nix { inherit pkgs; };
   workerPaths = [
@@ -12,6 +12,8 @@ let
     pkgs.gawk
     pkgs.gnutar
     pkgs.gzip
+    pkgs.jq
+    pkgs.llvmPackages.clang
     pkgs.patch
     pkgs.openssl
     pkgs.rsync
@@ -60,22 +62,38 @@ let
     ];
   };
   primitiveInventoryFile = pkgs.writeText "remote-runtime-primitives.json" primitiveInventory;
+  sourceIdentityFile = pkgs.writeText "remote-ci-tools-source-identity.json"
+    (builtins.toJSON ({
+      schema = "viberoots.remote-ci-tools-source-identity.v2";
+    } // viberootsSourceIdentity));
 
   mkClosure =
-    name: paths:
+    { name, paths, sourceRoot, includeSourceIdentity ? false }:
       pkgs.symlinkJoin {
         inherit name paths;
         postBuild = ''
           mkdir -p "$out/share/viberoots"
-          ln -s ${viberootsRoot} "$out/share/viberoots-source"
+          ln -s ${sourceRoot} "$out/share/viberoots-source"
           ${pkgs.lib.optionalString (viberootsNodeModules != null) ''
             ln -s ${viberootsNodeModules}/node_modules "$out/node_modules"
           ''}
           cp ${primitiveInventoryFile} "$out/share/viberoots/remote-runtime-primitives.json"
+          ${pkgs.lib.optionalString includeSourceIdentity ''
+            cp ${sourceIdentityFile} "$out/share/viberoots/source-identity.json"
+          ''}
         '';
       };
 in
 {
-  remote-worker-tools = mkClosure "remote-worker-tools" workerPaths;
-  remote-ci-tools = mkClosure "remote-ci-tools" ciPaths;
+  remote-worker-tools = mkClosure {
+    name = "remote-worker-tools";
+    paths = workerPaths;
+    sourceRoot = viberootsRuntimeRoot;
+  };
+  remote-ci-tools = mkClosure {
+    name = "remote-ci-tools";
+    paths = ciPaths;
+    sourceRoot = viberootsRoot;
+    includeSourceIdentity = true;
+  };
 }

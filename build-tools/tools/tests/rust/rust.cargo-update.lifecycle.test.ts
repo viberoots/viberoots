@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { assertRustTrackedMetadataReady, repairRustDependencies } from "../../dev/install/cargo";
+import { cargoCommandHome } from "../../dev/install/cargo-home";
 import {
   addCargoRoot,
   rustUpdateFixture as fixture,
@@ -61,7 +62,6 @@ test("plain and upgrade Rust updates use exact offline argv in temporary copies"
       ["fetch", "--locked"],
       ["metadata", "--offline", "--format-version", "1"],
       ["metadata", "--locked", "--offline", "--format-version", "1"],
-      ["fetch", "--locked"],
       ["update", "--offline"],
       ["metadata", "--locked", "--offline", "--format-version", "1"],
     ]);
@@ -106,7 +106,7 @@ test("cold Rust update fetches locked sources without ambient Cargo authority or
       .split("\n")
       .map((line) => JSON.parse(line));
     assert.deepEqual(fetch.args, ["fetch", "--locked"]);
-    assert.equal(fetch.cargoHome, path.join(value.root, ".viberoots/workspace/cargo-home"));
+    assert.equal(fetch.cargoHome, cargoCommandHome(value.root));
     assert.equal(fetch.offline, undefined);
     assert.equal(fetch.path, path.dirname(value.cargo));
     assert.equal(fetch.token, undefined);

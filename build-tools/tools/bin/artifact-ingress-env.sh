@@ -48,11 +48,12 @@ artifact_ingress_exec() {
   local workspace_root="$1"
   local script_relative="$2"
   shift 2
-  local tools_root source_root zx_init token reviewed_config_fd proof_payload
+  local tools_root source_root zx_init token reviewed_config_fd proof_payload cache_role_binding cache_role_config_b64
   tools_root="$(artifact_ingress_tools_root "${workspace_root}")"
   source_root="${tools_root}/share/viberoots-source"
   zx_init="${source_root}/build-tools/tools/dev/zx-init.mjs"
   unset VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN
+  artifact_ingress_consume_nested_cache_role_authority
   if [[ "${VBR_NIX_CACHE_HEALTH_APPLIED:-}" == "1" ]]; then
     case "${VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY:-}" in auto|strict) ;; *) return 1 ;; esac
     [[ "${VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS:-}" != *$'\n'* ]] || return 1
@@ -62,7 +63,19 @@ artifact_ingress_exec() {
     exec {reviewed_config_fd}<<<"${proof_payload}"
     VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD="${reviewed_config_fd}"
     VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN="${token}"
+    cache_role_config_b64="$(printf '%s' "${VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG:-}" | base64 | tr -d '\n')"
+    cache_role_binding="$(
+      node -e 'const {createHash}=require("node:crypto"),e=process.env;process.stdout.write(createHash("sha256").update(["reviewed-cache-roles-v1",e.VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY||"auto",e.VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS||"",e.VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS||"",e.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG||""].join("\0")).digest("hex"))' </dev/null
+    )"
+    VBR_NIX_CACHE_ROLE_REQUIRED="${VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS:-}"
+    VBR_NIX_CACHE_ROLE_OPTIONAL="${VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS:-}"
+    VBR_NIX_CACHE_ROLE_POLICY="${VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY:-auto}"
+    VBR_NIX_CACHE_ROLE_BINDING="${cache_role_binding}"
+    VBR_NIX_CACHE_ROLE_CONFIG_B64="${cache_role_config_b64}"
+    VBR_NIX_CACHE_ROLE_AUTHORITY="verify-nested-v1"
     export VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN
+    export VBR_NIX_CACHE_ROLE_REQUIRED VBR_NIX_CACHE_ROLE_OPTIONAL VBR_NIX_CACHE_ROLE_POLICY
+    export VBR_NIX_CACHE_ROLE_BINDING VBR_NIX_CACHE_ROLE_CONFIG_B64 VBR_NIX_CACHE_ROLE_AUTHORITY
   fi
   exec "${tools_root}/bin/zx-wrapper" --import "${zx_init}" \
     "${source_root}/${script_relative}" --artifact-workspace-root="${workspace_root}" "$@"

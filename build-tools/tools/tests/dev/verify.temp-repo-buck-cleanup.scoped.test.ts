@@ -288,6 +288,11 @@ test(
     const owned = spawnMarkerProcess(ownedScript);
     const ownedWasm = spawnMarkerProcess(ownedWasmScript);
     const foreign = spawnMarkerProcess(foreignScript);
+    let replacementOwnedWasm: ReturnType<typeof spawn> | null = null;
+    let spawnReplacement = true;
+    owned.once("close", () => {
+      if (spawnReplacement) replacementOwnedWasm = spawnMarkerProcess(ownedWasmScript);
+    });
     const ownedKey = `${ownedTmp}/projects/apps/demo-vite-ssr/server/dev.mjs`;
     const ownedWasmKey = `${ownedTmp}/viberoots/build-tools/tools/dev/wasm-watch-coordinator-daemon.ts`;
     const foreignKey = `${foreignTmp}/projects/apps/demo-vite-ssr/server/dev.mjs`;
@@ -304,7 +309,13 @@ test(
       await waitForNoProcess(ownedWasmKey, 10_000);
       await waitForProcess(foreignKey, 10_000);
     } finally {
-      await Promise.all([killAndWait(owned), killAndWait(ownedWasm), killAndWait(foreign)]);
+      spawnReplacement = false;
+      await Promise.all([
+        killAndWait(owned),
+        killAndWait(ownedWasm),
+        killAndWait(foreign),
+        ...(replacementOwnedWasm ? [killAndWait(replacementOwnedWasm)] : []),
+      ]);
       if (stateDir) {
         await fsp.rm(stateDir, { recursive: true, force: true }).catch(() => {});
       }

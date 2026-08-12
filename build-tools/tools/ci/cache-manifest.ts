@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
+import path from "node:path";
 export { remoteCiToolsPathEnv } from "../remote-exec/nix-remote-builder-environment";
 import {
   assertCachePublicationEvidence,
@@ -18,9 +19,10 @@ export type CacheManifestInput = {
 };
 
 export type CacheManifest = {
-  schemaVersion: 3;
+  schemaVersion: 4;
   system: string;
   sourceRevision: string;
+  toolSourceRevision: string;
   attrs: { name: string; outputPaths: string[] }[];
   cacheEndpointIdentity: string;
   backend: CacheBackendKind;
@@ -42,9 +44,10 @@ export function buildCacheManifest(input: CacheManifestInput): CacheManifest {
     }),
   );
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     system: input.system,
     sourceRevision: input.reproducibilityAggregate.aggregate.sourceRevision,
+    toolSourceRevision: input.reproducibilityAggregate.aggregate.toolSourceRevision,
     attrs,
     cacheEndpointIdentity: endpointIdentity(input.cacheEndpoint),
     backend: input.backend,

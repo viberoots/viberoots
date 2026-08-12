@@ -165,8 +165,11 @@ build-tools/tools/ci/run-stage.sh --stage wheelhouse-preload --to 's3://...' \
 Without `--to`, it discovers and builds `py-wheelhouse-*` attrs for local preload. With `--to`, it
 requires the signed full reproducibility aggregate, selects its production publication outputs for
 the current system, stages them from the registry-declared evidence store, and publishes only those
-roots, their closures, and the aggregate root. Matrix comparisons are qualification evidence, not
-cache-publication roots.
+roots, their closures, and the aggregate root. Matrix cases run only on their declared system set,
+and aggregation requires two independent builder records for each declared pair. Rust native,
+extension, bridge, and WASM cases retain the three-system requirement. The credential-free Tauri
+case is currently `aarch64-darwin` only and does not imply Linux package or launch support. Matrix
+comparisons are qualification evidence, not cache-publication roots.
 
 `build-tools/tools/ci/publish-nix-cache-manifest.sh` is the generic dormant cache manifest path for
 remote-readiness lanes. It requires the signed full reproducibility aggregate, selects its

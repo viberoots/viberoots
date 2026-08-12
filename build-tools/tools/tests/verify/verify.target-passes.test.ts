@@ -24,7 +24,7 @@ import {
   verifyPassIsolationDir,
 } from "../../dev/verify/verify-pass-scheduling";
 import { prepareVerifyBuckIsolationMetadata } from "../../dev/verify/buck-isolation-metadata";
-import { MACOS_METADATA_NEVER_INDEX_FILE } from "../../lib/macos-metadata";
+import { MACOS_METADATA_NEVER_INDEX_FILE, macosNoindexPathSegment } from "../../lib/macos-metadata";
 
 test("verify target cquery quotes explicit labels with operator characters", () => {
   assert.equal(
@@ -352,7 +352,7 @@ test("concurrent verify passes use dedicated Buck isolations", () => {
       passName: "resource-limited",
       dedicated: true,
     }),
-    "v-123-456-resource-limited",
+    macosNoindexPathSegment("v-123-456-resource-limited"),
   );
   assert.equal(
     verifyPassIsolationDir({
@@ -360,7 +360,7 @@ test("concurrent verify passes use dedicated Buck isolations", () => {
       passName: "isolated://:startup_sensitive",
       dedicated: true,
     }),
-    "v-123-456-isolated-startup-sensitive",
+    macosNoindexPathSegment("v-123-456-isolated-startup-sensitive"),
   );
 });
 
@@ -371,7 +371,7 @@ test("serial isolated verify passes use dedicated Buck isolations", () => {
       passName: "isolated://:startup_sensitive",
       dedicated: true,
     }),
-    "v-123-456-isolated-startup-sensitive",
+    macosNoindexPathSegment("v-123-456-isolated-startup-sensitive"),
   );
 });
 

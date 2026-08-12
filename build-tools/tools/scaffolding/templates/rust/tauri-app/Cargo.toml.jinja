@@ -3,6 +3,9 @@ name = "{{ name }}"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [[bin]]
 name = "{{ name }}"
 path = "src/main.rs"
@@ -12,10 +15,10 @@ required-features = ["desktop"]
 
 [features]
 default = ["desktop"]
-desktop = []
+desktop = ["dep:tauri"]
 
 [build-dependencies]
 tauri-build = { version = "=2.3.1", features = [] }
 
 [dependencies]
-tauri = { version = "=2.7.0", features = [] }
+tauri = { version = "=2.7.0", features = [], optional = true }

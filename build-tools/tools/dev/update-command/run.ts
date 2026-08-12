@@ -3,6 +3,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { detectSubmodule, type GitRunner } from "../../lib/consumer-source-mode";
 import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
+import { timeAsyncDetail } from "../../lib/timing-detail";
 import { repairGeneratedWorkspaceLock } from "../../lib/workspace-lock-repair";
 import { activateWorkspace } from "../../lib/workspace-activation";
 import { discoverImportersWithLock } from "../install/importers";
@@ -113,12 +114,24 @@ export async function runUpdateCommand(opts: {
   operations?: UpdateOperations;
 }): Promise<void> {
   const operations = opts.operations || defaultUpdateOperations;
-  const priorGlobalInputs = await globalNixInputFingerprint(opts.root);
+  const timed = async <T>(label: string, fn: () => Promise<T>): Promise<T> =>
+    await timeAsyncDetail(`update command ${label}`, fn);
+  const priorGlobalInputs = await timed(
+    "global input fingerprint",
+    async () => await globalNixInputFingerprint(opts.root),
+  );
   const priorArtifactToolsRoot = process.env.VBR_ARTIFACT_TOOLS_ROOT;
   const priorPath = process.env.PATH;
   try {
-    await withFileRollback(await updateTransactionFiles(opts.root), async () => {
-      const repairedAuthority = await operations.repairToolchainAuthority(opts.root);
+    const transactionFiles = await timed(
+      "transaction file discovery",
+      async () => await updateTransactionFiles(opts.root),
+    );
+    await withFileRollback(transactionFiles, async () => {
+      const repairedAuthority = await timed(
+        "toolchain authority repair",
+        async () => await operations.repairToolchainAuthority(opts.root),
+      );
       process.env.VBR_ARTIFACT_TOOLS_ROOT = repairedAuthority.artifactToolsRoot;
       process.env.PATH = [
         path.dirname(repairedAuthority.goBin),
@@ -128,12 +141,19 @@ export async function runUpdateCommand(opts: {
         .filter((entry, index, entries) => entries.indexOf(entry) === index)
         .join(path.delimiter);
       operations.validateTransactionTools(process.env);
-      await operations.repairWorkspaceLock(
-        opts.root,
-        opts.verbose,
-        repairedAuthority.viberootsSource,
+      await timed(
+        "workspace lock repair and activation",
+        async () =>
+          await operations.repairWorkspaceLock(
+            opts.root,
+            opts.verbose,
+            repairedAuthority.viberootsSource,
+          ),
       );
-      const importers = await operations.importers(opts.root);
+      const importers = await timed(
+        "importer discovery",
+        async () => await operations.importers(opts.root),
+      );
       let upgradedPnpm = 0;
       for (const importer of importers) {
         if (opts.verbose) console.log(`[update] pnpm: ${importer}`);
@@ -141,25 +161,46 @@ export async function runUpdateCommand(opts: {
         // reconciles that lock into the workspace-local exact-store authority.
         if (importer !== "viberoots") {
           if (opts.upgrade) {
-            await operations.upgradePnpm(opts.root, importer);
+            await timed(
+              `pnpm upgrade ${importer}`,
+              async () => await operations.upgradePnpm(opts.root, importer),
+            );
             upgradedPnpm += 1;
-          } else await operations.repairPnpmLock(opts.root, importer);
+          } else {
+            await timed(
+              `pnpm lock repair ${importer}`,
+              async () => await operations.repairPnpmLock(opts.root, importer),
+            );
+          }
         }
-        await operations.reconcilePnpm(opts.root, importer);
+        await timed(
+          `pnpm reconciliation ${importer}`,
+          async () => await operations.reconcilePnpm(opts.root, importer),
+        );
       }
-      const enabledLanguages = new Set(await operations.enabledLanguages(opts.root));
+      const enabledLanguages = new Set(
+        await timed("language discovery", async () => await operations.enabledLanguages(opts.root)),
+      );
       const languageCounts = new Map<ProjectLanguageId, number>();
       for (const surface of projectLanguageSurfaces) {
         if (!enabledLanguages.has(surface.id)) continue;
         languageCounts.set(
           surface.id,
-          await operations.languageUpdates[surface.id](opts.root, opts.verbose, opts.upgrade),
+          await timed(
+            `${surface.id} dependency repair`,
+            async () =>
+              await operations.languageUpdates[surface.id](opts.root, opts.verbose, opts.upgrade),
+          ),
         );
       }
       const priorSkipPnpmHash = process.env.INSTALL_GLUE_SKIP_PNPM_HASH;
       process.env.INSTALL_GLUE_SKIP_PNPM_HASH = "1";
       try {
-        await operations.repairGeneratedMetadata(opts.root, opts.verbose, priorGlobalInputs);
+        await timed(
+          "generated metadata repair",
+          async () =>
+            await operations.repairGeneratedMetadata(opts.root, opts.verbose, priorGlobalInputs),
+        );
       } finally {
         if (priorSkipPnpmHash === undefined) delete process.env.INSTALL_GLUE_SKIP_PNPM_HASH;
         else process.env.INSTALL_GLUE_SKIP_PNPM_HASH = priorSkipPnpmHash;

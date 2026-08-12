@@ -47,8 +47,12 @@ export function isScopedTempDevProcess(cmd: string): boolean {
 
 type Proc = { pid: number; etime: string; cmd: string };
 
+const CLEANUP_SETTLE_TIMEOUT_MS = 10_000;
+const CLEANUP_POLL_MS = 100;
+
 function collectScopedProcesses(lines: string[], roots: string[]): Proc[] {
   const out: Proc[] = [];
+  const seenPids = new Set<number>();
   const rootSet = new Set(
     roots
       .map((r) => rootVariants(r))
@@ -68,9 +72,16 @@ function collectScopedProcesses(lines: string[], roots: string[]): Proc[] {
       }
     }
     if (!owned) continue;
+    if (seenPids.has(p.pid)) continue;
+    seenPids.add(p.pid);
     out.push({ pid: p.pid, etime: p.etime, cmd: p.cmd });
   }
   return out;
+}
+
+async function scanScopedProcesses(roots: string[]): Promise<{ lines: string[]; procs: Proc[] }> {
+  const lines = [...(await psLines(2000)), ...(await pgrepScopedProcessLines(roots))];
+  return { lines, procs: collectScopedProcesses(lines, roots) };
 }
 
 async function pgrepScopedProcessLines(roots: string[]): Promise<string[]> {
@@ -156,23 +167,38 @@ export async function cleanupTempRepoProcesses(opts: {
   );
   if (roots.length === 0) return { scanned: 0, candidates: 0, killed: 0 };
   const maxKills = Math.max(0, opts.maxKills ?? 500);
-  const lines = [...(await psLines(2000)), ...(await pgrepScopedProcessLines(roots))];
-  const procs = collectScopedProcesses(lines, roots);
-  const capped = procs.slice(0, maxKills);
-  const pids = capped.map((p) => p.pid);
-  await signalPids(pids, "SIGTERM");
-  await new Promise((r) => setTimeout(r, 500));
-  await signalPids(pids, "SIGKILL");
-  let killed = 0;
-  for (const pid of pids) {
-    if (!isPidAlive(pid)) killed++;
+  const deadline = Date.now() + CLEANUP_SETTLE_TIMEOUT_MS;
+  const candidates = new Map<number, Proc>();
+  let scanned = 0;
+  let stableEmptyScans = 0;
+  while (Date.now() < deadline && stableEmptyScans < 2) {
+    const scan = await scanScopedProcesses(roots);
+    scanned += scan.lines.length;
+    const next = scan.procs.filter((proc) => !candidates.has(proc.pid));
+    if (scan.procs.length === 0) {
+      stableEmptyScans++;
+    } else {
+      stableEmptyScans = 0;
+    }
+    const capped = next.slice(0, maxKills - candidates.size);
+    for (const proc of capped) candidates.set(proc.pid, proc);
+    const pids = capped.map((proc) => proc.pid);
+    if (pids.length > 0) {
+      await signalPids(pids, "SIGTERM");
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await signalPids(pids, "SIGKILL");
+    }
+    await new Promise((resolve) => setTimeout(resolve, CLEANUP_POLL_MS));
   }
+  const procs = Array.from(candidates.values());
+  const pids = procs.map((proc) => proc.pid);
+  const killed = pids.filter((pid) => !isPidAlive(pid)).length;
   if (opts.log) {
-    for (const p of capped) {
+    for (const p of procs) {
       await opts.log(
         `[verify] temp-repo process cleanup: pid=${p.pid} etime=${p.etime} cmd=${p.cmd.slice(0, 220)}`,
       );
     }
   }
-  return { scanned: lines.length, candidates: procs.length, killed };
+  return { scanned, candidates: procs.length, killed };
 }

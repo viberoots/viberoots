@@ -17,11 +17,18 @@ const BINDING_A = "a".repeat(64);
 const BINDING_B = "b".repeat(64);
 
 test("same cache-policy binding reuses the same bounded Buck isolation", () => {
-  const first = artifactBuckIsolation("devbuild-shared-example", BINDING_A);
-  const second = artifactBuckIsolation("devbuild-shared-example", BINDING_A);
+  const first = artifactBuckIsolation("devbuild-shared-example", BINDING_A, "linux");
+  const second = artifactBuckIsolation("devbuild-shared-example", BINDING_A, "linux");
   assert.equal(first, second);
   assert.equal(first, `devbuild-shared-example-artifact-cache-${"a".repeat(24)}`);
   assert.ok(first.length < 80);
+});
+
+test("Darwin Buck cache isolation keeps the physical directory under .noindex", () => {
+  assert.equal(
+    artifactBuckIsolation("devbuild-shared-example.noindex", BINDING_A, "darwin"),
+    `devbuild-shared-example-artifact-cache-${"a".repeat(24)}.noindex`,
+  );
 });
 
 test("changed cache-policy binding selects a different Buck isolation", () => {
@@ -127,7 +134,7 @@ test("owned-isolation teardown is bound to the derived cache identity", async ()
 
   assert.equal(isolation.killOnExit, true);
   assert.equal(isolation.registerForCleanup, true);
-  assert.ok(isolation.buckIsolation.endsWith(BINDING_A.slice(0, 24)));
+  assert.match(isolation.buckIsolation, new RegExp(`${BINDING_A.slice(0, 24)}(?:\\.noindex)?$`));
   assert.deepEqual(isolation.isolationFlags, ["--isolation-dir", isolation.buckIsolation]);
   assert.match(source, /\$`buck2 --isolation-dir \$\{buckIsolation\} kill`/u);
   const runSource = await fsp.readFile(

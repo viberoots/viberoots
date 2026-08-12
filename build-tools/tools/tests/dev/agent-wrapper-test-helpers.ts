@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import fs from "node:fs";
 import os from "node:os";
@@ -47,6 +48,13 @@ export async function writeExecutable(file: string, text: string): Promise<void>
 
 export function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function assertNoCodexLaunch(log: string): void {
+  const launchCommands = log
+    .split("\n")
+    .filter((line) => line.startsWith("codex ") && !line.startsWith("codex plugin "));
+  assert.deepEqual(launchCommands, []);
 }
 
 export function safehouseNixReadOnlyPattern(): string {

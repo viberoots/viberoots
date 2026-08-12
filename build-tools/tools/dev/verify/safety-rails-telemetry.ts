@@ -1,6 +1,15 @@
 import * as fsp from "node:fs/promises";
 import os from "node:os";
-import { processCommandLines, processTableLines } from "../../lib/process-inspection";
+import {
+  processCommandLines,
+  processTableLinesDetailed,
+  type ProcessInspectionStatus,
+} from "../../lib/process-inspection";
+import {
+  accumulateDiskIoTelemetryLine,
+  emptyDiskIoTelemetryCounters,
+  type DiskIoTelemetryCounters,
+} from "./safety-rails-disk-telemetry";
 
 export type ProcessCounts = {
   total: number;
@@ -10,7 +19,7 @@ export type ProcessCounts = {
   verifyEnv: number;
 };
 
-export type VerifySafetyRailsTelemetrySummary = {
+export type VerifySafetyRailsTelemetrySummary = DiskIoTelemetryCounters & {
   samples: number;
   maxLoad1: number | null;
   maxLoad5: number | null;
@@ -19,12 +28,19 @@ export type VerifySafetyRailsTelemetrySummary = {
   maxBuckCount: number | null;
   maxNixCount: number | null;
   maxVerifyEnvCount: number | null;
+  highLoadTopProcessAttempts: number;
+  highLoadTopProcessSuccesses: number;
+  highLoadTopProcessUnavailable: number;
+  highLoadTopProcessTimeouts: number;
+  highLoadTopProcessErrors: number;
   highLoadTopProcessSamples: number;
   highLoadTopProcessLines: string[];
 };
 
 export type TopProcessSample = {
   lines: string[];
+  retainedLines?: string[];
+  status?: ProcessInspectionStatus;
 };
 
 type ProcessTableEntry = {
@@ -32,9 +48,10 @@ type ProcessTableEntry = {
   ppid: number;
   stat: string;
   pcpu: number;
-  pmem: number;
   command: string;
 };
+
+export const TOP_PROCESS_PS_ARGS = ["-A", "-o", "pid=,ppid=,stat=,pcpu=,comm="] as const;
 
 export async function sampleProcessCounts(timeoutMs = 1500): Promise<ProcessCounts | null> {
   const lines = await processCommandLines({
@@ -48,20 +65,18 @@ export async function sampleProcessCounts(timeoutMs = 1500): Promise<ProcessCoun
 function parseProcessTableLine(line: string): ProcessTableEntry | null {
   const match = String(line || "")
     .trim()
-    .match(/^(\d+)\s+(\d+)\s+(\S+)\s+([0-9.]+)\s+([0-9.]+)\s+(.+)$/);
+    .match(/^(\d+)\s+(\d+)\s+(\S+)\s+([0-9.]+)\s+(.+)$/);
   if (!match) return null;
   const pid = Number(match[1]);
   const ppid = Number(match[2]);
   const pcpu = Number(match[4]);
-  const pmem = Number(match[5]);
-  if (![pid, ppid, pcpu, pmem].every(Number.isFinite)) return null;
+  if (![pid, ppid, pcpu].every(Number.isFinite)) return null;
   return {
     pid,
     ppid,
     stat: match[3] || "?",
     pcpu,
-    pmem,
-    command: String(match[6] || "").trim(),
+    command: String(match[5] || "").trim(),
   };
 }
 
@@ -74,25 +89,47 @@ export async function sampleTopProcesses(
   timeoutMs = 1500,
   limit = 12,
 ): Promise<TopProcessSample | null> {
-  const lines = await processTableLines({
-    psArgs: ["-A", "-o", "pid=,ppid=,stat=,pcpu=,pmem=,comm="],
+  const result = await processTableLinesDetailed({
+    psArgs: [...TOP_PROCESS_PS_ARGS],
     timeoutMs,
     pgrepPattern: "mds|mdworker|fseventsd|mediaanalysisd|nix|buck2|node|rsync|git|du",
-    pgrepToLine: (pid, cmd) => `${pid} 0 ? 0 0 ${cmd}`,
+    pgrepToLine: (pid, cmd) => `${pid} 0 ? 0 ${cmd}`,
   });
-  const entries = lines.flatMap((line) => {
+  const entries = result.lines.flatMap((line) => {
     const parsed = parseProcessTableLine(line);
     return parsed ? [parsed] : [];
   });
-  if (entries.length === 0) return null;
+  if (entries.length === 0) return { lines: [], status: result.status };
   const top = entries
     .sort((a, b) => b.pcpu - a.pcpu)
     .slice(0, Math.max(1, limit))
     .map(
       (entry) =>
-        `pid=${entry.pid} ppid=${entry.ppid} stat=${entry.stat} pcpu=${entry.pcpu.toFixed(1)} pmem=${entry.pmem.toFixed(1)} cmd=${truncateCommand(entry.command)}`,
+        `pid=${entry.pid} ppid=${entry.ppid} stat=${entry.stat} pcpu=${entry.pcpu.toFixed(1)} cmd=${truncateCommand(entry.command)}`,
     );
-  return top.length > 0 ? { lines: top } : null;
+  return top.length > 0 ? { lines: top, status: "success" } : { lines: [], status: "unavailable" };
+}
+
+export function makeRetainedTopProcessSampler(
+  sample: () => Promise<TopProcessSample | null> = sampleTopProcesses,
+): () => Promise<TopProcessSample> {
+  let retainedLines: string[] = [];
+  return async () => {
+    try {
+      const current = await sample();
+      const status = current?.status ?? (current?.lines.length ? "success" : "unavailable");
+      if (status === "success" && current && current.lines.length > 0) {
+        retainedLines = current.lines.slice(0, 12);
+      }
+      return {
+        lines: current?.lines || [],
+        retainedLines: status === "success" ? [] : retainedLines,
+        status,
+      };
+    } catch {
+      return { lines: [], retainedLines, status: "error" };
+    }
+  };
 }
 
 export function countProcessCommands(lines: string[]): ProcessCounts {
@@ -161,10 +198,26 @@ export async function summarizeVerifySafetyRailsTelemetry(
     maxBuckCount: null,
     maxNixCount: null,
     maxVerifyEnvCount: null,
+    highLoadTopProcessAttempts: 0,
+    highLoadTopProcessSuccesses: 0,
+    highLoadTopProcessUnavailable: 0,
+    highLoadTopProcessTimeouts: 0,
+    highLoadTopProcessErrors: 0,
     highLoadTopProcessSamples: 0,
     highLoadTopProcessLines: [],
+    ...emptyDiskIoTelemetryCounters(),
   };
   for (const line of text.split(/\r?\n/)) {
+    if (accumulateDiskIoTelemetryLine(summary, line)) continue;
+    if (line.startsWith("[verify] high-load top-process sample ")) {
+      summary.highLoadTopProcessAttempts++;
+      const status = /\bstatus=(success|unavailable|timeout|error)\b/.exec(line)?.[1];
+      if (status === "success") summary.highLoadTopProcessSuccesses++;
+      if (status === "unavailable") summary.highLoadTopProcessUnavailable++;
+      if (status === "timeout") summary.highLoadTopProcessTimeouts++;
+      if (status === "error") summary.highLoadTopProcessErrors++;
+      continue;
+    }
     if (line.startsWith("[verify] high-load top-process ")) {
       summary.highLoadTopProcessSamples++;
       if (summary.highLoadTopProcessLines.length < 12) {

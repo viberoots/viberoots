@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { workspaceCargoHome } from "../dev/install/cargo-home";
 import type { CargoPackage } from "./rust-lock";
 import { cargoPackageKey } from "./rust-lock";
 
@@ -92,10 +93,7 @@ export async function resolveRustPackageOrigin(
 ): Promise<string> {
   const cargoHome =
     String(process.env.CARGO_HOME || "").trim() ||
-    path.join(
-      path.resolve(process.env.WORKSPACE_ROOT || process.cwd()),
-      ".viberoots/workspace/cargo-home",
-    );
+    workspaceCargoHome(path.resolve(process.env.WORKSPACE_ROOT || process.cwd()));
   const entry = await reviewedSourceEntry(cargoHome, pkg);
   const authority = entry?.buildInput;
   const testAuthority = Boolean(String(process.env.NIX_RUST_TEST_RESOLVE_JSON || "").trim());

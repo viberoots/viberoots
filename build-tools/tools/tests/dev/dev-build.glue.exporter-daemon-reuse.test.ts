@@ -17,6 +17,16 @@ test("dev-build glue config enables stable exporter daemon reuse", async () => {
   if (!glue.includes("BUCK_NESTED_ISO: stableExporterIsolation(root)")) {
     throw new Error("glue.ts must use stable exporter isolation name");
   }
+  if (!glue.includes("function nextExporterIsolation(root: string): string")) {
+    throw new Error("glue.ts must define generation-scoped exporter isolation");
+  }
+  if (
+    !glue.includes("const exporterIsolation = nextExporterIsolation(root)") ||
+    !glue.includes("BUCK_NESTED_ISO: exporterIsolation") ||
+    !glue.includes("BUCK_ISOLATION_DIR_EXPORTER: exporterIsolation")
+  ) {
+    throw new Error("mutable graph refreshes must not reuse a prior generation's exporter daemon");
+  }
   if (!glue.includes("tools/dev/install-deps.ts") || !glue.includes("--glue-only")) {
     throw new Error("glue.ts must refresh generated glue through install-deps --glue-only");
   }
@@ -38,9 +48,15 @@ test("dev-build glue config enables stable exporter daemon reuse", async () => {
   if (glue.includes("runGomod2nixGenerate") || glue.includes("runGomod2nixScanAll")) {
     throw new Error("glue.ts must not duplicate gomod2nix work after install-deps --glue-only");
   }
-  if (!glue.includes("runGluePipeline({ graphPath })")) {
+  if (
+    !glue.includes("workspaceRoot: root") ||
+    !glue.includes("toolSourceRoot: root") ||
+    !glue.includes("env: runEnv") ||
+    !glue.includes("nodeBin: node") ||
+    !glue.includes("zxInitPath: zxInitPath(root)")
+  ) {
     throw new Error(
-      "glue.ts must sync providers and refresh graph-derived sidecars after exporting graph",
+      "glue.ts must bind post-export glue to the exported workspace and child authority",
     );
   }
 

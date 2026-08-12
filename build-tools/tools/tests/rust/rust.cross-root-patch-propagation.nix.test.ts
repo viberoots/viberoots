@@ -143,7 +143,8 @@ test("public patch-pkg propagates, reverses, and selectively invalidates Rust ro
       cwd: tmp,
       stdio: "pipe",
     })`nix build --impure --no-link --print-out-paths --expr ${importExpression}`;
-    const storePath = path.join(String(imported.stdout).trim(), `${dependency}-${version}`);
+    const vendorRoot = String(imported.stdout).trim();
+    const storePath = path.join(vendorRoot, `${dependency}-${version}`);
     const hashed = await $({
       cwd: tmp,
       stdio: "pipe",

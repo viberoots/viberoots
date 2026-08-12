@@ -41,6 +41,22 @@ test("rust builds reviewed Cargo path dependencies across Buck roots", async () 
       '\n[dependencies]\ncore = { path = "../core", version = "0.1.0" }\n',
       "pub fn value() -> u8 { core::value() + 1 }\n",
     );
+    await fsp.writeFile(
+      path.join(tmp, "projects/libs/mid/Cargo.lock"),
+      [
+        "version = 3",
+        "",
+        "[[package]]",
+        'name = "core"',
+        'version = "0.1.0"',
+        "",
+        "[[package]]",
+        'name = "mid"',
+        'version = "0.1.0"',
+        'dependencies = ["core"]',
+        "",
+      ].join("\n"),
+    );
     await writeCargoRoot(
       path.join(tmp, "projects/libs/derive_demo"),
       "derive_demo",

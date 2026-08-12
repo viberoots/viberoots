@@ -175,11 +175,22 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
     );
   }
   let seedCleanup: (() => Promise<void>) | null = null;
-  if (remoteVerify && deps.shouldPrepareVerifySeedForRequestedTargets(selection.targets)) {
+  const seedPolicyEnv = { ...process.env, VBR_VERIFY_SEED_MODE: args.seedMode || "auto" };
+  const prepareSeed = deps.shouldPrepareVerifySeedForRequestedTargets(
+    selection.targets,
+    seedPolicyEnv,
+  );
+  if (remoteVerify && prepareSeed) {
     const seed = await timedPhase(
       "prepare-verify-seed-remote-ready",
       async () =>
-        await deps.prepareVerifySeed({ root, iso, artifactToolsRoot, mode: "remote-ready" }),
+        await deps.prepareVerifySeed({
+          root,
+          iso,
+          artifactToolsRoot,
+          cacheHealth,
+          mode: "remote-ready",
+        }),
     );
     process.env.VBR_TEST_SEED_STORE_PATH = seed.seedPath;
     process.env.VBR_TEST_SEED_KEY = seed.seedKey;
@@ -188,10 +199,10 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
     } else {
       delete process.env.VBR_TEST_SEED_REMOTE_MANIFEST;
     }
-  } else if (!remoteVerify && deps.shouldPrepareVerifySeedForRequestedTargets(selection.targets)) {
+  } else if (!remoteVerify && prepareSeed) {
     const seed = await timedPhase(
       "prepare-verify-seed",
-      async () => await deps.prepareVerifySeed({ root, iso, artifactToolsRoot }),
+      async () => await deps.prepareVerifySeed({ root, iso, artifactToolsRoot, cacheHealth }),
     );
     process.env.VBR_TEST_SEED_STORE_PATH = seed.seedPath;
     process.env.VBR_TEST_SEED_KEY = seed.seedKey;

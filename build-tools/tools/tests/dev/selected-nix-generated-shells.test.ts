@@ -81,6 +81,7 @@ test("Buck-generated shell wrappers invoke the selected nix binary", async () =>
     const raw = source
       .split("\n")
       .filter((line) => /\bnix (?:build|run|config show)\b/.test(line))
+      .filter((line) => !/\becho\s+\\?["']/.test(line))
       .filter((line) => !line.includes("$NIX_BIN"));
     assert.deepEqual(raw, [], `${label} must not invoke ambient nix:\n${raw.join("\n")}`);
   }

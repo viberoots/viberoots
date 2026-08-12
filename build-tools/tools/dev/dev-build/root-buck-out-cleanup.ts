@@ -1,6 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { buckProcessCommandLines, buckProcessTableLines } from "../../lib/process-inspection";
+import { legacyDarwinSharedIsolationNames } from "./isolation";
 
 function isDevBuildRootBuckOutEntry(name: string): boolean {
   return name.startsWith("devbuild-") || name.startsWith("exporter-");
@@ -88,9 +89,25 @@ async function cleanupDuplicateSharedBuckDaemons(root: string): Promise<string[]
   return [...isolations].sort().map((iso) => `duplicate-shared-daemon:${iso}`);
 }
 
-export async function cleanupDevBuildRootBuckOut(root: string): Promise<string[]> {
+export async function cleanupDevBuildRootBuckOut(
+  root: string,
+  platform: NodeJS.Platform = process.platform,
+): Promise<string[]> {
   const buckOut = path.join(root, "buck-out");
   const removed: string[] = await cleanupDuplicateSharedBuckDaemons(root);
+  for (const legacyIsolation of legacyDarwinSharedIsolationNames(root, platform)) {
+    await $({
+      cwd: root,
+      stdio: "ignore",
+    })`buck2 --isolation-dir ${legacyIsolation} kill`.nothrow();
+    const legacyRoot = path.join(buckOut, legacyIsolation);
+    const existed = await fsp.stat(legacyRoot).then(
+      () => true,
+      () => false,
+    );
+    await fsp.rm(legacyRoot, { recursive: true, force: true }).catch(() => {});
+    if (existed) removed.push(legacyIsolation);
+  }
   const broadCleanup = process.env.VBR_DEVBUILD_BROAD_BUCK_OUT_CLEANUP === "1";
   let entries: string[] = [];
   try {

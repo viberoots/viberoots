@@ -60,7 +60,7 @@ export function assertCachePublicationEvidence(
   manifest: CacheManifest,
   signed: SignedArtifactReproducibilityAggregate | undefined,
 ): void {
-  if (manifest.schemaVersion !== 3) throw new Error("cache publication requires manifest schema 3");
+  if (manifest.schemaVersion !== 4) throw new Error("cache publication requires manifest schema 4");
   if (!signed || signed.storePath !== manifest.reproducibilityAggregateStorePath) {
     throw new Error("cache publication requires its exact signed reproducibility aggregate");
   }
@@ -75,6 +75,9 @@ export function assertCachePublicationEvidence(
   }
   if (signed.aggregate.sourceRevision !== manifest.sourceRevision) {
     throw new Error("cache publication reproducibility evidence has a mismatched source revision");
+  }
+  if (signed.aggregate.toolSourceRevision !== manifest.toolSourceRevision) {
+    throw new Error("cache publication reproducibility evidence has a mismatched tool revision");
   }
 }
 

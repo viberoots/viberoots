@@ -12,6 +12,7 @@ test("artifact command internal environment is a fixed closed transport", () => 
         VBR_UPDATE: "1",
         VBR_WORKSPACE_ROOT: workspaceRoot,
         VBR_VIBEROOTS_URL: `path:${artifactToolsRoot}/share/viberoots-source`,
+        VIBEROOTS_FLAKE_INPUT_ROOT: `${artifactToolsRoot}/share/viberoots-source`,
       },
       workspaceRoot,
       artifactToolsRoot,
@@ -20,6 +21,7 @@ test("artifact command internal environment is a fixed closed transport", () => 
       VBR_UPDATE: "1",
       VBR_WORKSPACE_ROOT: workspaceRoot,
       VBR_VIBEROOTS_URL: `path:${artifactToolsRoot}/share/viberoots-source`,
+      VIBEROOTS_FLAKE_INPUT_ROOT: `${artifactToolsRoot}/share/viberoots-source`,
     },
   );
   assert.throws(
@@ -34,5 +36,14 @@ test("artifact command internal environment is a fixed closed transport", () => 
   assert.throws(
     () => reviewedArtifactCommandInternalEnv({ VBR_UPDATE: "0" }, workspaceRoot, artifactToolsRoot),
     /rejects unreviewed internal environment VBR_UPDATE/,
+  );
+  assert.throws(
+    () =>
+      reviewedArtifactCommandInternalEnv(
+        { VIBEROOTS_FLAKE_INPUT_ROOT: "/host/source" },
+        workspaceRoot,
+        artifactToolsRoot,
+      ),
+    /rejects unreviewed internal environment VIBEROOTS_FLAKE_INPUT_ROOT/,
   );
 });

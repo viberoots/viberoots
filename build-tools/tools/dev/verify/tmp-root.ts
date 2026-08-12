@@ -62,6 +62,10 @@ export async function ensureRepoLocalTmpRoot(
   const platform = opts.platform ?? process.platform;
   const liveRoot = env.LIVE_ROOT || root;
   const systemTmpRoot = opts.systemTmpRoot ?? "/tmp";
+  const preserveSharedTmp =
+    env.VERIFY_ALLOW_CONCURRENT === "1" ||
+    env.VBR_RUN_IN_TEMP_REPO === "1" ||
+    String(env.VBR_VERIFY_OWNER_PID || "").trim() !== "";
   const staleRepoTmpdir = path.join(liveRoot, "buck-out", "tmp", "tmpdir");
   let tmpdir = staleRepoTmpdir;
   const repoLocalTmpdir = platform !== "linux" && platform !== "darwin";
@@ -81,7 +85,7 @@ export async function ensureRepoLocalTmpRoot(
     const suffix = user ? `-${user}` : "";
     tmpdir = path.join(systemTmpRoot, `viberoots-verify${suffix}.noindex`, "tmpdir");
     delete env.TEST_TMP_IN_REPO;
-    if (env.VERIFY_ALLOW_CONCURRENT !== "1") {
+    if (!preserveSharedTmp) {
       await fsp
         .rm(path.join(systemTmpRoot, `viberoots-verify${suffix}`), {
           recursive: true,
@@ -92,7 +96,7 @@ export async function ensureRepoLocalTmpRoot(
   } else {
     env.TEST_TMP_IN_REPO = "1";
   }
-  if (env.VERIFY_ALLOW_CONCURRENT !== "1") {
+  if (!preserveSharedTmp) {
     await Promise.all([
       repoLocalTmpdir || platform === "darwin"
         ? clearTmpdirExceptActiveWorkspace(tmpdir, liveRoot)

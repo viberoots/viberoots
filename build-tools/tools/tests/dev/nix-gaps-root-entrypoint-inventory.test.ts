@@ -159,6 +159,24 @@ test("extensionless public CLIs are classified and fingerprinted without literal
   });
 });
 
+test("ordinary consumer project command sites do not affect the Viberoots tool inventory", async () => {
+  await withRoot("nix-gaps-consumer-project-ignored", async (root) => {
+    await fs.outputFile(
+      path.join(root, "projects/apps/demo/script.ts"),
+      "import { spawn } from 'node:child_process';\nspawn('nix', ['build']);\nawait $`buck2 targets //...`;\n",
+    );
+    const baseline = await inspectProductionCommandSites(root, policy);
+    assert.equal(baseline.count, 0);
+    await fs.outputFile(
+      path.join(root, "build-tools/node/defs.bzl"),
+      'cmd = "nix build --no-link .#artifact"\n',
+    );
+    const withToolCommand = await inspectProductionCommandSites(root, policy);
+    assert.equal(withToolCommand.count, 1);
+    assert.equal(withToolCommand.roleCounts["canonical-artifact"], 1);
+  });
+});
+
 test("artifact ingress environment bytes remain in the closed inventory", async () => {
   await withRoot("nix-gaps-artifact-ingress", async (root) => {
     const ingress = path.join(root, "build-tools/tools/bin/artifact-ingress-env.sh");

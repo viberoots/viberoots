@@ -1,9 +1,16 @@
 import path from "node:path";
+import * as fsp from "node:fs/promises";
 import { canonicalArtifactToolsRoot } from "../../lib/artifact-environment";
 import { runManagedCommand } from "../../lib/managed-command";
 import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
 import type { FixedSourceEntry } from "./cargo-fixed-sources";
+import {
+  readCachedFixedSource,
+  sharedCargoFixedSourceCacheRoot,
+  writeCachedFixedSource,
+} from "./cargo-fixed-source-cache";
 import { languageUpdateTimeoutMs } from "../update-command/languages";
+import { cargoCommandHome } from "./cargo-home";
 
 function tool(root: string, name: string): string {
   return ensureNixStoreToolPathSync(name, {
@@ -26,7 +33,20 @@ async function checkedCommand(
     timeoutMs: languageUpdateTimeoutMs(process.env),
   });
   if (!result.ok || result.interrupted) {
-    throw new Error(`failed immutable Rust source command: ${path.basename(command)} ${args[0]}`);
+    const tail = (value: string): string =>
+      value.trim().split(/\r?\n/u).slice(-12).join("\n").slice(-2_000);
+    const stdout = tail(result.stdout);
+    const stderr = tail(result.stderr);
+    throw new Error(
+      [
+        `failed immutable Rust source command: ${path.basename(command)} ${args.join(" ")}`,
+        `exit=${result.code ?? "signal"} signal=${result.signal ?? "none"} timedOut=${result.timedOut} interrupted=${result.interrupted}`,
+        stderr ? `stderr:\n${stderr}` : "",
+        stdout ? `stdout:\n${stdout}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
   }
   return result.stdout.trim();
 }
@@ -41,7 +61,7 @@ function isolatedCargoEnvironment(root: string, toolsBin: string): NodeJS.Proces
   return {
     ...env,
     PATH: toolsBin,
-    CARGO_HOME: path.join(root, ".viberoots/workspace/cargo-home"),
+    CARGO_HOME: cargoCommandHome(root, env),
     CARGO_NET_OFFLINE: "true",
   };
 }
@@ -81,6 +101,15 @@ export function cargoSourceMaterialization(
     key: string,
     entry: FixedSourceEntry,
   ) => Promise<{ storePath: string; narHash: string }>;
+  deferredMaterialization: {
+    add: (
+      key: string,
+      entry: FixedSourceEntry,
+    ) => Promise<{
+      storePath: string;
+    }>;
+    hash: (storePaths: string[]) => Promise<string[]>;
+  };
   runGit: (command: string, args: string[], cwd: string) => Promise<string>;
 } {
   const nix = tool(root, "nix");
@@ -91,6 +120,30 @@ export function cargoSourceMaterialization(
   const cargoEnv = isolatedCargoEnvironment(root, toolsBin);
   const gitEnv = isolatedGitEnvironment(toolsBin);
   const tarEnv = isolatedTarEnvironment(toolsBin);
+  const cacheRoot = sharedCargoFixedSourceCacheRoot(process.env);
+  const isValidStorePath = async (storePath: string): Promise<boolean> => {
+    return await fsp.access(storePath).then(
+      () => true,
+      () => false,
+    );
+  };
+  const add = async (key: string, entry: FixedSourceEntry): Promise<{ storePath: string }> => {
+    const name = `viberoots-cargo-${Buffer.from(key).toString("hex").slice(0, 24)}`;
+    deps.observeCommand?.({ command: "nix", env: { ...process.env } });
+    const storePath = await checkedCommand(
+      root,
+      nix,
+      ["store", "add-path", "--name", name, entry.originPath],
+      root,
+    );
+    return { storePath };
+  };
+  const hash = async (storePaths: string[]): Promise<string[]> => {
+    if (storePaths.length === 0) return [];
+    deps.observeCommand?.({ command: "nix", env: { ...process.env } });
+    const stdout = await checkedCommand(root, nix, ["hash", "path", "--sri", ...storePaths], root);
+    return stdout.split(/\r?\n/u).filter(Boolean);
+  };
   return {
     runGit: (command, args, cwd) => {
       const kind = command === "git" ? "git" : command === "cargo" ? "cargo" : "tar";
@@ -104,16 +157,16 @@ export function cargoSourceMaterialization(
         env,
       );
     },
+    deferredMaterialization: {
+      lookup: (key, entry) => readCachedFixedSource(cacheRoot, key, entry, isValidStorePath),
+      add,
+      hash,
+      store: (key, entry, value) => writeCachedFixedSource(cacheRoot, key, entry, value),
+    },
     materialize: async (key, entry) => {
-      const name = `viberoots-cargo-${Buffer.from(key).toString("hex").slice(0, 24)}`;
-      deps.observeCommand?.({ command: "nix", env: { ...process.env } });
-      const storePath = await checkedCommand(
-        root,
-        nix,
-        ["store", "add-path", "--name", name, entry.originPath],
-        root,
-      );
-      const narHash = await checkedCommand(root, nix, ["hash", "path", "--sri", storePath], root);
+      const { storePath } = await add(key, entry);
+      const [narHash] = await hash([storePath]);
+      if (!narHash) throw new Error(`failed immutable Rust source hash: ${key}`);
       return { storePath, narHash };
     },
   };

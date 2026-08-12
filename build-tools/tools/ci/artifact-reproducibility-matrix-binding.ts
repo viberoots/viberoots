@@ -1,10 +1,10 @@
-import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
   reproducibilityMatrixCase,
   type ReproducibilityMatrixCase,
 } from "../lib/artifact-reproducibility-matrix";
+import { artifactReproducibilityBindingDigest as digest } from "./artifact-reproducibility-binding-digest";
 
 type GraphNode = { name?: unknown; rule_type?: unknown; labels?: unknown; deps?: unknown };
 type BundleSelection = { attr?: unknown; target?: unknown };
@@ -17,6 +17,11 @@ export type ArtifactReproducibilityMatrixBinding = {
   ruleType: string;
   requiredLabels: readonly string[];
   languageProofs: ReproducibilityMatrixCase["languageProofs"];
+  reachableNodes: readonly {
+    name: string;
+    ruleType: string;
+    kinds: readonly string[];
+  }[];
   nodeArtifact?: ReproducibilityMatrixCase["nodeArtifact"];
   outputRole: string;
   flakeRef: string;
@@ -86,6 +91,15 @@ export function resolveArtifactReproducibilityGraphContract(
       );
     }
   }
+  const reachableNodes = matrixCase.languageProofs.map((proof) => {
+    const proofNode = reachable.find((candidate) => nodeMatchesProof(candidate, proof))!;
+    const labels = (proofNode.labels as string[]).filter((label) => label.startsWith("kind:"));
+    return {
+      name: requiredString(proofNode.name, "reachable graph node name"),
+      ruleType: requiredString(proofNode.rule_type, "reachable graph node rule_type"),
+      kinds: labels.sort(),
+    };
+  });
   if (
     matrixCase.nodeArtifact?.nativeClosureTarget &&
     !matrixCase.languageProofs.some(
@@ -102,6 +116,7 @@ export function resolveArtifactReproducibilityGraphContract(
     ruleType: requiredString(node.rule_type, "selected graph node rule_type"),
     requiredLabels: matrixCase.graphSelection.requiredLabels,
     languageProofs: matrixCase.languageProofs,
+    reachableNodes,
     outputRole: matrixCase.graphSelection.outputRole,
     ...(matrixCase.nodeArtifact ? { nodeArtifact: matrixCase.nodeArtifact } : {}),
   };
@@ -129,6 +144,7 @@ function dependencyClosure(selected: GraphNode, nodes: GraphNode[], matrixId: st
     seen.add(name);
     const node = byName.get(name);
     if (!node) {
+      if (!name.startsWith("//projects/")) continue;
       throw new Error(
         `reproducibility matrix ${matrixId} dependency is absent from graph: ${name}`,
       );
@@ -217,19 +233,4 @@ function assertStoreRoot(value: string): void {
   if (!/^\/nix\/store\/[a-z0-9]{32}-[^/]+$/u.test(value)) {
     throw new Error("reproducibility matrix binding requires an immutable evaluation-bundle root");
   }
-}
-
-function digest(value: unknown): string {
-  return `sha256:${crypto.createHash("sha256").update(canonicalJson(value)).digest("hex")}`;
-}
-
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (value && typeof value === "object") {
-    return `{${Object.entries(value)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`)
-      .join(",")}}`;
-  }
-  return JSON.stringify(value);
 }

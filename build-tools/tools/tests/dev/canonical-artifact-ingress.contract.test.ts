@@ -17,6 +17,25 @@ test("remote consumer commands preserve cache policy ingress", () => {
   const boundary = read("build-tools/tools/tests/viberoots/remote-consumer-boundary.ts");
   const commandEnv = boundary.match(/export function commandEnv[\s\S]*?\n}\n/)?.[0] || "";
   assert.doesNotMatch(commandEnv, /VBR_NIX_CACHE_POLICY:\s*"off"/);
+  assert.match(commandEnv, /proofBoundCachePolicyOutcome\(process\.env\)/);
+  assert.match(commandEnv, /NIX_CONFIG:\s*reviewedCache\.config/);
+  assert.match(commandEnv, /NESTED_CACHE_ROLE_CONFIG/);
+  assert.match(commandEnv, /VBR_NIX_CACHE_ROLE_BINDING/);
+  assert.match(commandEnv, /delete env\.IN_NIX_SHELL/);
+  assert.match(boundary, /export function artifactCommandEnv[\s\S]*delete env\.NIX_CONFIG/);
+});
+
+test("artifact ingress publishes proof-bound cache roles for descendant commands", () => {
+  const ingress = read("build-tools/tools/bin/artifact-ingress-env.sh");
+  const execFn = ingress.match(/artifact_ingress_exec\(\) \{[\s\S]*?\n\}/)?.[0] || "";
+  assert.match(execFn, /artifact_ingress_consume_nested_cache_role_authority/);
+  assert.match(execFn, /VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD/);
+  assert.match(execFn, /reviewed-cache-roles-v1/);
+  assert.match(execFn, /VBR_NIX_CACHE_ROLE_REQUIRED=/);
+  assert.match(execFn, /VBR_NIX_CACHE_ROLE_OPTIONAL=/);
+  assert.match(execFn, /VBR_NIX_CACHE_ROLE_BINDING=/);
+  assert.match(execFn, /VBR_NIX_CACHE_ROLE_CONFIG_B64=/);
+  assert.match(execFn, /VBR_NIX_CACHE_ROLE_AUTHORITY="verify-nested-v1"/);
 });
 
 test("Node genlike builds remain inside the strict Nix sandbox", () => {
@@ -50,6 +69,7 @@ test("selected-build fixtures remove inherited artifact influence before explici
     helper.match(
       /function selectedBuildEnv\([\s\S]*?\n}\n\nexport async function exportGraphInTemp/,
     )?.[0] || "";
+  assert.match(selectedBuildEnv, /delete selectedEnv\.IN_NIX_SHELL/);
   assert.doesNotMatch(selectedBuildEnv, /BUCK_TEST_SRC:/);
   assert.doesNotMatch(selectedBuildEnv, /WORKSPACE_ROOT:/);
   assert.match(helper, /--artifact-workspace-root=\$\{tmp\}/);
@@ -77,9 +97,22 @@ test("selected-build fixtures remove inherited artifact influence before explici
   );
   assert.match(
     entrypoint,
-    /unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG/,
+    /artifact_ingress_trust_devshell_baseline "\$\{selected_workspace_root\}"/,
   );
-  assert.match(entrypoint, /env_apply_nix_cache_health/);
+  assert.match(entrypoint, /artifact_ingress_refresh_nix_cache_health/);
+  assert.match(entrypoint, /artifact_ingress_publish_reviewed_nix_cache_config/);
+  assert.ok(
+    entrypoint.indexOf("artifact_ingress_trust_devshell_baseline") <
+      entrypoint.indexOf("artifact_ingress_refresh_nix_cache_health"),
+  );
+  assert.ok(
+    entrypoint.indexOf("artifact_ingress_refresh_nix_cache_health") <
+      entrypoint.indexOf("artifact_ingress_publish_reviewed_nix_cache_config"),
+  );
+  assert.ok(
+    entrypoint.indexOf("artifact_ingress_publish_reviewed_nix_cache_config") <
+      entrypoint.indexOf("artifact_ingress_restore_or_remove_selectors"),
+  );
   assert.match(
     entrypoint,
     /artifact_ingress_restore_or_remove_selectors\s*unset WORKSPACE_ROOT\s*artifact_ingress_exec/,
@@ -94,7 +127,7 @@ test("artifact action bootstrap rejects ambient root authority", () => {
   const shell = read("build-tools/lang/nix_shell.bzl");
   const filtered = read("build-tools/tools/dev/nix-build-filtered-flake.ts");
   const clear =
-    "unset FLK_ROOT REPO_ROOT VIBEROOTS_FLAKE_INPUT_ROOT VIBEROOTS_ROOT VIBEROOTS_SOURCE_ROOT WORKSPACE_ROOT ZX_INIT";
+    "unset FLK_ROOT REPO_ROOT VBR_ACTION_TOOL_SOURCE_ROOT VIBEROOTS_FLAKE_INPUT_ROOT VIBEROOTS_ROOT VIBEROOTS_SOURCE_ROOT WORKSPACE_ROOT ZX_INIT";
   assert.match(shell, new RegExp(clear));
   assert.ok(shell.indexOf(clear) < shell.indexOf('WS_ENV=\\"\\"'));
   assert.match(
@@ -133,6 +166,21 @@ test("artifact action bootstrap rejects ambient root authority", () => {
     selected,
     /const inheritedEnv = withoutArtifactEnvironmentInfluence\(\s*withoutEvaluationSelectors/,
   );
+});
+
+test("selected artifact inspection restores proof-bound cache authority", () => {
+  const selected = read("build-tools/tools/bin/build-selected");
+  assert.match(
+    selected,
+    /artifact_ingress_trust_devshell_baseline "\$\{selected_workspace_root\}"/,
+  );
+  assert.match(selected, /artifact_ingress_refresh_nix_cache_health/);
+  assert.match(selected, /artifact_ingress_publish_reviewed_nix_cache_config/);
+  assert.ok(
+    selected.indexOf("artifact_ingress_refresh_nix_cache_health") <
+      selected.indexOf("artifact_ingress_restore_or_remove_selectors"),
+  );
+  assert.doesNotMatch(selected, /\nenv_apply_nix_cache_health\n/);
 });
 
 test("direct Node artifact routes declare the Buck target through explicit argv", () => {

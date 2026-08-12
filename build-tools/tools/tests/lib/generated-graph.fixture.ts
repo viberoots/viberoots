@@ -18,6 +18,16 @@ const ANCHOR_TARGETS = [
 ].join("\n");
 const ANCHOR_SOURCE = "generated graph fixture anchor\n";
 
+let graphGeneration = 0;
+
+function nextGeneratedGraphIsolation(workspaceRoot: string): string {
+  const generationRoot = path.join(
+    workspaceRoot,
+    `.zxtest-generated-graph-${process.pid}-${++graphGeneration}`,
+  );
+  return stableBuckIsolation(generationRoot, "zxtest-generated-graph");
+}
+
 async function writeReservedFixtureFile(filePath: string, expected: string): Promise<void> {
   const existing = await fsp.readFile(filePath, "utf8").catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return undefined;
@@ -39,7 +49,7 @@ export async function reconcileSyntheticGeneratedGraph(
   await writeReservedFixtureFile(path.join(anchorRoot, "TARGETS"), ANCHOR_TARGETS);
   await writeReservedFixtureFile(path.join(anchorRoot, "anchor.txt"), ANCHOR_SOURCE);
 
-  const isolation = stableBuckIsolation(workspaceRoot, "zxtest-generated-graph");
+  const isolation = nextGeneratedGraphIsolation(workspaceRoot);
   const env: NodeJS.ProcessEnv = {
     ...baseEnv,
     BUCK_ISOLATION_DIR: isolation,

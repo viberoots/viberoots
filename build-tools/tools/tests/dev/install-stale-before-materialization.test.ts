@@ -32,12 +32,16 @@ test("stale install fails before Nix materialization and u remains available", a
   await fsp.mkdir(path.join(root, ".viberoots", "workspace"), { recursive: true });
   await fsp.mkdir(path.join(root, "build-tools", "tools", "nix"), { recursive: true });
   await fsp.mkdir(path.join(root, "projects"), { recursive: true });
+  const nestedViberoots = path.join(root, "viberoots");
   await fsp.mkdir(path.join(root, "fake-bin"), { recursive: true });
   await fsp.symlink(sourceRoot, path.join(root, ".viberoots", "current"));
   const immutableSource = await prepareFilteredViberootsInput(sourceRoot);
   const consumerRoot = path.dirname(sourceRoot);
   await fsp.writeFile(path.join(root, ".buckroot"), ".\n");
-  await fsp.writeFile(path.join(root, ".gitignore"), ".viberoots/workspace/\n");
+  await fsp.writeFile(
+    path.join(root, ".gitignore"),
+    ".viberoots/workspace/\n.nix-gcroots/\nviberoots/\n",
+  );
   await fsp.copyFile(path.join(consumerRoot, "flake.nix"), path.join(root, "flake.nix"));
   await fsp.copyFile(path.join(consumerRoot, "flake.lock"), path.join(root, "flake.lock"));
   await fsp.writeFile(
@@ -78,6 +82,8 @@ test("stale install fails before Nix materialization and u remains available", a
     "-qm",
     "fixture",
   ]);
+  await fsp.mkdir(nestedViberoots, { recursive: true });
+  await git(nestedViberoots, ["init", "-q"]);
   assert.equal(await git(root, ["status", "--short"]), "");
 
   const { stdout: updateHelp } = await execFileAsync(
@@ -128,7 +134,7 @@ test("stale install fails before Nix materialization and u remains available", a
         path.join(sourceRoot, "build-tools", "tools", "dev", "zx-init.mjs"),
         path.join(sourceRoot, "build-tools", "tools", "dev", "install-deps.ts"),
       ],
-      { cwd: root, env },
+      { cwd: nestedViberoots, env },
     ),
     (error: Error & { stderr?: string }) => {
       const output = `${error.message}\n${error.stderr || ""}`;

@@ -29,6 +29,7 @@ const EXCLUDED_ROOTS = new Set([
   "coverage",
   "node_modules",
   ".direnv",
+  ".codex-logs",
 ]);
 
 async function sourceSnapshot(): Promise<Map<string, string>> {

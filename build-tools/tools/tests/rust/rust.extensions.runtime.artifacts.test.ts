@@ -46,7 +46,12 @@ test("Rust CPython and Node extensions execute and stage native runtime dependen
         "",
       ].join("\n"),
     );
-    await reconcileTempDependencyInputs(tmp, $);
+    const pythonResolveEnv = {
+      NIX_PY_TEST_RESOLVE_JSON: JSON.stringify({
+        packaging: { version: "25.0", originPath: packagingRoot },
+      }),
+    };
+    await reconcileTempDependencyInputs(tmp, $, undefined, pythonResolveEnv);
     const pyOut = await buildSelectedOutPath({
       tmp,
       $,
@@ -77,9 +82,7 @@ test("Rust CPython and Node extensions execute and stage native runtime dependen
         ...process.env,
         WORKSPACE_ROOT: tmp,
         BUCK_TARGET: pyDepTarget,
-        NIX_PY_TEST_RESOLVE_JSON: JSON.stringify({
-          packaging: { version: "25.0", originPath: packagingRoot },
-        }),
+        ...pythonResolveEnv,
       },
     })`${nix} ${nixFeatures} build --impure --accept-flake-config --builders "" --no-link --print-out-paths ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`}`;
     const pyDepOut = String(pyDepBuild.stdout).trim().split(/\n+/).pop()!;

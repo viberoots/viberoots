@@ -16,11 +16,19 @@ def asset_with_selector(asset):
     artifact_glob = asset.get("artifact_glob")
     if artifact_name != None and artifact_name != "" and artifact_glob != None and artifact_glob != "":
         fail("node_asset_stage: asset src %r cannot set both artifact_name and artifact_glob" % src)
+    inferred_wasm = src.endswith(".wasm") or dest.endswith(".wasm") or artifact_name or artifact_glob
+    kind = asset.get("kind") or ("wasm" if inferred_wasm else "file")
+    if kind not in ["file", "wasm"]:
+        fail("node_asset_stage: asset kind must be 'file' or 'wasm'")
+    if kind == "file" and (artifact_name or artifact_glob):
+        fail("node_asset_stage: file assets cannot set artifact_name or artifact_glob")
     return struct(
         src = src,
         dest = dest,
         artifact_name = artifact_name,
         artifact_glob = artifact_glob,
+        kind = kind,
+        provenance = asset.get("provenance"),
     )
 
 def validate_wasm_selector_args(macro_name, artifact_name, artifact_glob):
@@ -34,6 +42,7 @@ def wasm_source_resolver_shell():
         + "if [ -n \"$HINT\" ] && [ -e \"$HINT\" ]; then VBR_WASM_RESOLVED_PATH=\"$HINT\"; return 0; fi; "
         + "if [ -n \"$HINT\" ]; then "
         + "HINT_SRCDIR=\"$SRCDIR/$HINT\"; if [ -e \"$HINT_SRCDIR\" ]; then VBR_WASM_RESOLVED_PATH=\"$HINT_SRCDIR\"; return 0; fi; "
+        + "HINT_BASE=\"${HINT##*/}\"; HINT_BASE_SRCDIR=\"$SRCDIR/$HINT_BASE\"; if [ -e \"$HINT_BASE_SRCDIR\" ]; then VBR_WASM_RESOLVED_PATH=\"$HINT_BASE_SRCDIR\"; return 0; fi; "
         + "HINT_WORKSPACE=\"$WORKSPACE_ROOT/$HINT\"; if [ -e \"$HINT_WORKSPACE\" ]; then VBR_WASM_RESOLVED_PATH=\"$HINT_WORKSPACE\"; return 0; fi; "
         + "HINT_STEM=\"$HINT\"; case \"$HINT_STEM\" in *.wasm) HINT_STEM=\"${HINT_STEM%.wasm}\" ;; esac; "
         + "if [ -n \"$HINT_STEM\" ] && [ -e \"$HINT_STEM\" ]; then VBR_WASM_RESOLVED_PATH=\"$HINT_STEM\"; return 0; fi; "
@@ -93,10 +102,14 @@ def wasm_source_resolver_shell():
         + "if [ \"`grep -c '^kind=' \"$SURFACE\"`\" != 1 ] || [ \"`grep -c '^wasm=' \"$SURFACE\"`\" != 1 ] || [ \"`grep -c '^nix_out=' \"$SURFACE\"`\" != 1 ]; then "
         + "echo \"$MACRO: malformed typed wasm module surface for '$RAW': $SURFACE\" >&2; return 2; fi; "
         + "case \"$SURFACE_ROOT\" in /nix/store/*) ;; *) echo \"$MACRO: typed wasm module surface has an unreviewed artifact root for '$RAW'\" >&2; return 2 ;; esac; "
+        + "case \"$SURFACE_WASM\" in \"$SURFACE_ROOT\"/*) ;; "
+        + "*) echo \"$MACRO: typed wasm module surface escaped its artifact root for '$RAW'\" >&2; return 2 ;; esac; "
+        + "case \"$SURFACE_WASM\" in */../*|*/..) echo \"$MACRO: typed wasm module surface escaped its artifact root for '$RAW'\" >&2; return 2 ;; esac; "
         + "SURFACE_ROOT_REAL=\"`realpath \"$SURFACE_ROOT\" 2>/dev/null || true`\"; "
         + "SURFACE_WASM_REAL=\"`realpath \"$SURFACE_WASM\" 2>/dev/null || true`\"; "
-        + "case \"$SURFACE_WASM_REAL\" in \"$SURFACE_ROOT_REAL\"/*) ;; "
-        + "*) echo \"$MACRO: typed wasm module surface escaped its artifact root for '$RAW'\" >&2; return 2 ;; esac; "
+        + "if [ -z \"$SURFACE_ROOT_REAL\" ] || [ ! -d \"$SURFACE_ROOT_REAL\" ]; then echo \"$MACRO: typed wasm module artifact root is unavailable for '$RAW'\" >&2; return 2; fi; "
+        + "case \"$SURFACE_WASM_REAL\" in /nix/store/*) ;; "
+        + "*) echo \"$MACRO: typed wasm module artifact is unavailable or unreviewed for '$RAW'\" >&2; return 2 ;; esac; "
         + "select_node_wasm_file \"$MACRO\" \"$RAW\" \"$SURFACE_WASM_REAL\" \"$ARTIFACT_NAME\" \"$ARTIFACT_GLOB\"; "
         + "}; "
         + "resolve_node_wasm_artifact() { "

@@ -29,6 +29,9 @@ function record(overrides: Record<string, unknown> = {}): ArtifactReproducibilit
       derivationPath,
       narHash,
       closureIdentityDigest,
+      provenanceOutputPath: outputPath,
+      provenanceNarHash: narHash,
+      provenanceClosureIdentityDigest: closureIdentityDigest,
       ...overrides,
     }),
   } as ArtifactReproducibilityRunRecord;
@@ -77,7 +80,15 @@ test("unsigned evidence roots must have one canonical regular file", async () =>
 
 test("accepted outputs deduplicate exact identities and reject conflicts", () => {
   assert.deepEqual(protectedArtifactOutputIdentities([record(), record()]), [
-    { closureIdentityDigest, derivationPath, narHash, outputPath },
+    {
+      closureIdentityDigest,
+      derivationPath,
+      narHash,
+      outputPath,
+      provenanceClosureIdentityDigest: closureIdentityDigest,
+      provenanceNarHash: narHash,
+      provenanceOutputPath: outputPath,
+    },
   ]);
   assert.throws(
     () =>

@@ -1,6 +1,14 @@
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import process from "node:process";
+import {
+  pgrepTableResult,
+  psTableResult,
+  spawnOutputResult,
+  type ProcessTableResult,
+} from "./process-inspection-runner";
 import { resolveToolPathSync } from "./tool-paths";
+
+export type { ProcessInspectionStatus, ProcessTableResult } from "./process-inspection-runner";
 
 export type ProcessTableOptions = {
   psArgs: string[];
@@ -33,38 +41,7 @@ export function processInspectionPrefersPgrep(env: NodeJS.ProcessEnv = process.e
 }
 
 async function spawnOutput(cmd: string, args: string[], timeoutMs: number): Promise<string> {
-  return await new Promise<string>((resolve) => {
-    let child;
-    try {
-      child = spawn(cmd, args, { stdio: ["ignore", "pipe", "ignore"] });
-    } catch {
-      resolve("");
-      return;
-    }
-    let settled = false;
-    let buf = "";
-    const finish = (text: string) => {
-      if (settled) return;
-      settled = true;
-      resolve(text);
-    };
-    child.stdout.setEncoding("utf8");
-    child.stdout.on("data", (chunk) => {
-      buf += String(chunk || "");
-    });
-    child.on("error", () => finish(""));
-    child.on("close", () => finish(buf));
-    const timer = setTimeout(
-      () => {
-        try {
-          child.kill("SIGKILL");
-        } catch {}
-        finish("");
-      },
-      Math.max(250, timeoutMs),
-    );
-    child.on("close", () => clearTimeout(timer));
-  });
+  return (await spawnOutputResult(cmd, args, timeoutMs)).output;
 }
 
 async function psLines(args: string[], timeoutMs: number): Promise<string[]> {
@@ -185,15 +162,29 @@ export function processCommandLinesSync(opts?: { pgrepPattern?: string }): strin
 }
 
 export async function processTableLines(opts: ProcessTableOptions): Promise<string[]> {
+  return (await processTableLinesDetailed(opts)).lines;
+}
+
+export async function processTableLinesDetailed(
+  opts: ProcessTableOptions,
+): Promise<ProcessTableResult> {
   const timeoutMs = opts.timeoutMs ?? 2000;
   const toLine = opts.pgrepToLine || ((pid: number, cmd: string) => `${pid} ${cmd}`);
   if (opts.pgrepPattern && processInspectionPrefersPgrep()) {
-    return await pgrepTableLines(opts.pgrepPattern, timeoutMs, toLine);
+    return await pgrepTableResult(opts.pgrepPattern, timeoutMs, toLine);
   }
-  const lines = await psLines(opts.psArgs, timeoutMs);
-  if (lines.length > 0) return lines;
-  if (!opts.pgrepPattern) return [];
-  return await pgrepTableLines(opts.pgrepPattern, timeoutMs, toLine);
+  const primary = await psTableResult(opts.psArgs, timeoutMs);
+  if (primary.lines.length > 0) return primary;
+  if (!opts.pgrepPattern) return primary;
+  const fallback = await pgrepTableResult(opts.pgrepPattern, timeoutMs, toLine);
+  if (fallback.lines.length > 0) return fallback;
+  if (primary.status === "timeout" || fallback.status === "timeout") {
+    return { lines: [], status: "timeout" };
+  }
+  if (primary.status === "error" || fallback.status === "error") {
+    return { lines: [], status: "error" };
+  }
+  return { lines: [], status: "unavailable" };
 }
 
 export async function processCommandLines(opts?: {

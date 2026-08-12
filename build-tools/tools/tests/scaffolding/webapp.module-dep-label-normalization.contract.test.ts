@@ -38,11 +38,14 @@ test("module_deps infers __surface labels and preserves explicit overrides", asy
     await writeTargets(
       path.join(tmp, "projects", "apps", "web"),
       [
+        'load("@prelude//:rules.bzl", "export_file")',
         'load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage")',
+        "",
+        'export_file(name = "index", src = "index.html")',
         "",
         "node_asset_stage(",
         '  name = "app",',
-        '  app = "index.html",',
+        '  app = ":index",',
         '  module_deps = ["//projects/libs/math-wasm", "//projects/libs/math-wasm:custom"],',
         '  module_surface_deps = ["//projects/libs/vendor:runtime_surface_v2"],',
         '  labels = ["lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],',
@@ -80,11 +83,14 @@ test("module_deps missing inferred surface fails with inferred label in diagnost
     await writeTargets(
       path.join(tmp, "projects", "apps", "web"),
       [
+        'load("@prelude//:rules.bzl", "export_file")',
         'load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage")',
+        "",
+        'export_file(name = "index", src = "index.html")',
         "",
         "node_asset_stage(",
         '  name = "app",',
-        '  app = "index.html",',
+        '  app = ":index",',
         '  module_deps = ["//projects/libs/missing-wasm"],',
         '  labels = ["lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],',
         ")",

@@ -97,7 +97,7 @@ test("runInTemp seed overlay honors prepared seed marker version", async () => {
   );
   const seedLayoutSource = await readRepoFile("build-tools/tools/dev/verify/seed-stage-layout.ts");
 
-  assert.match(seedMarkerSource, /PREPARED_SEED_MARKER = "\.seed-store-prepared-v8"/);
+  assert.match(seedMarkerSource, /PREPARED_SEED_MARKER = "\.seed-store-prepared-v9"/);
   for (const source of [
     viberootsOverlaySource,
     worktreeOverlaySource,
@@ -106,10 +106,12 @@ test("runInTemp seed overlay honors prepared seed marker version", async () => {
   ]) {
     assert.match(source, /import \{ PREPARED_SEED_MARKER \}/);
     assert.match(source, /path\.join\([^\n]*PREPARED_SEED_MARKER\)/);
+    assert.doesNotMatch(source, /\.seed-store-prepared-v8/);
     assert.doesNotMatch(source, /\.seed-store-prepared-v6/);
     assert.doesNotMatch(source, /\.seed-store-prepared-v5/);
   }
-  assert.match(seedLayoutSource, /\.seed-store-prepared-v8/);
+  assert.match(seedLayoutSource, /\.seed-store-prepared-v9/);
+  assert.doesNotMatch(seedLayoutSource, /\.seed-store-prepared-v8/);
   assert.doesNotMatch(seedLayoutSource, /\.seed-store-prepared-v[56]/);
   assert.match(viberootsOverlaySource, /if \(prepared\) return \[\]/);
   assert.match(
@@ -133,8 +135,9 @@ test("runInTemp seed copies do not repair permissions with broad chmod", async (
   assert.match(seedCopySource, /makeDirectoryPublishable\(stagingDir\)/);
   assert.match(seedCopySource, /process\.platform !== "darwin"/);
   assert.match(seedCopySource, /makeTreeWritable\(stagingDir\)/);
-  assert.match(seedCopySource, /\.seed-store-prepared-v8/);
-  assert.match(seedCopySource, /repair_permissions = sys\.argv\[3\] == "1"/);
+  assert.match(seedCopySource, /PREPARED_SEED_MARKER/);
+  assert.match(seedCopySource, /clonefile\(src\.encode\(\), dst\.encode\(\), 0\)/);
+  assert.doesNotMatch(seedCopySource, /repair_permissions/);
 });
 
 test("temp-repo staging routes parent and nested paths to their owning Git indexes", async () => {
@@ -174,9 +177,16 @@ test("prepared runInTemp seeds validate nested Git identity without re-indexing 
   assert.match(gitBootstrapSource, /if \(!opts\.stageAll && opts\.touchedRelPaths\.length === 0\)/);
   assert.match(gitBootstrapSource, /if \(opts\.stageAll\) await git`git add -A`/);
   assert.match(gitBootstrapSource, /prepared seed gitlink mismatch/);
+  const seedPrepareSource = await readRepoFile(
+    "build-tools/tools/dev/verify/seed-stage-prepare.ts",
+  );
+  assert.match(seedPrepareSource, /git repack -a -d -q --threads=1/);
+  assert.match(seedPrepareSource, /git fsck --full --no-dangling/);
+  assert.match(seedPrepareSource, /git count-objects -v/);
+  assert.match(seedPrepareSource, /objects", "info", "alternates"/);
 });
 
-test("runInTemp uses one user-global pnpm hash authority in seeded and scratch repos", async () => {
+test("runInTemp uses one user-global dependency cache authority in seeded and scratch repos", async () => {
   for (const relativePath of [
     "build-tools/tools/tests/lib/test-helpers/run-in-temp/seeded-setup.ts",
     "build-tools/tools/tests/lib/test-helpers/run-in-temp/runtime-env.ts",
@@ -184,7 +194,9 @@ test("runInTemp uses one user-global pnpm hash authority in seeded and scratch r
   ]) {
     const source = await readRepoFile(relativePath);
     assert.match(source, /sharedPnpmStoreHashCacheRoot\(\s*process\.env,\s*realHome,?\s*\)/);
+    assert.match(source, /sharedCargoFixedSourceCacheRoot\(\s*process\.env,\s*realHome,?\s*\)/);
     assert.doesNotMatch(source, /VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT[^\n]*process\.cwd\(\)/);
+    assert.doesNotMatch(source, /VBR_SHARED_CARGO_FIXED_SOURCE_CACHE_ROOT[^\n]*process\.cwd\(\)/);
   }
 });
 
@@ -197,7 +209,7 @@ test("update-command launcher materializes the complete filtered working-tree so
   assert.doesNotMatch(source, /checkout-index/);
 });
 
-test("update-command launcher inherits the single canonical shared pnpm hash authority", async () => {
+test("update-command launcher inherits canonical shared dependency cache authorities", async () => {
   const source = await readRepoFile(
     "build-tools/tools/tests/dev/update-command-launcher.fixture.ts",
   );
@@ -206,7 +218,17 @@ test("update-command launcher inherits the single canonical shared pnpm hash aut
     source,
     /import\s*\{\s*sharedPnpmStoreHashCacheRoot\s*\}\s*from\s*"\.\.\/\.\.\/dev\/update-pnpm-hash\/verified-marker"/,
   );
+  assert.match(
+    source,
+    /import\s*\{\s*sharedCargoFixedSourceCacheRoot\s*\}\s*from\s*"\.\.\/\.\.\/dev\/install\/cargo-fixed-source-cache"/,
+  );
   assert.match(source, /sharedPnpmStoreHashCacheRoot\(\s*process\.env\s*,\s*os\.homedir\(\)\s*\)/);
+  assert.match(
+    source,
+    /sharedCargoFixedSourceCacheRoot\(\s*process\.env\s*,\s*os\.homedir\(\)\s*\)/,
+  );
   assert.match(source, /VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT:\s*[\s\S]*sharedHashCacheRoot/);
+  assert.match(source, /VBR_SHARED_CARGO_FIXED_SOURCE_CACHE_ROOT:\s*[\s\S]*sharedCargoCacheRoot/);
   assert.doesNotMatch(source, /VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT[^\n]*process\.cwd\(\)/);
+  assert.doesNotMatch(source, /VBR_SHARED_CARGO_FIXED_SOURCE_CACHE_ROOT[^\n]*process\.cwd\(\)/);
 });

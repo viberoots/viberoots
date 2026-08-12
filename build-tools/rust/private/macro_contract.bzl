@@ -148,6 +148,7 @@ RUST_PUBLIC_ARGS = [
     "capabilities",
     "build_py_deps",
     "binding_config",
+    "behavior_probe",
     "cargo_fixed_sources",
     "cargo_lock",
     "cargo_manifest",

@@ -103,6 +103,7 @@ pkgs.runCommand "test-seed" { nativeBuildInputs = [ pkgs.git ]; } ''
 	  ${copySubDirScript}
   mkdir -p "$out/viberoots"
   cp -a ${viberootsRoot}/. "$out/viberoots/"
+  chmod -R u+w "$out"
   rm -rf \
     "$out/.DS_Store" \
     "$out/.codex-logs" \
@@ -113,11 +114,14 @@ pkgs.runCommand "test-seed" { nativeBuildInputs = [ pkgs.git ]; } ''
     "$out/.viberoots/buck" \
     "$out/.viberoots/cache" \
     "$out/.viberoots/codex-logs" \
+    "$out/.viberoots/cargo-home" \
+    "$out/.viberoots/cargo-home.noindex" \
     "$out/.viberoots/workspace/.viberoots" \
     "$out/.viberoots/workspace/backups" \
     "$out/.viberoots/workspace/buck" \
     "$out/.viberoots/workspace/cache" \
     "$out/.viberoots/workspace/cargo-home" \
+    "$out/.viberoots/workspace/cargo-home.noindex" \
     "$out/.viberoots/workspace/codex-test-logs" \
     "$out/.viberoots/workspace/install-cache" \
     "$out/.viberoots/workspace/nix-xdg-cache" \
@@ -134,6 +138,7 @@ pkgs.runCommand "test-seed" { nativeBuildInputs = [ pkgs.git ]; } ''
     "$out/viberoots/.codex-"*.log \
     "$out/viberoots/.DS_Store" \
     "$out/viberoots/.direnv" \
+    "$out/viberoots/.git" \
     "$out/viberoots/.full-test-output.log" \
     "$out/viberoots/.nix-gcroots" \
     "$out/viberoots/.patch-sessions.json" \
@@ -149,12 +154,12 @@ pkgs.runCommand "test-seed" { nativeBuildInputs = [ pkgs.git ]; } ''
     "$out/viberoots/install-cache" \
     "$out/viberoots/nix-xdg-cache" \
     "$out/viberoots/node_modules" \
+    "$out/viberoots/prelude" \
     "$out/viberoots/pr-logs" \
     "$out/viberoots/result" \
     "$out/viberoots/test-logs" \
     "$out/viberoots/toolchains/toolchain_paths.bzl" \
     "$out/viberoots/xdg-cache"
-  chmod -R u+w "$out"
   export GIT_AUTHOR_NAME=seed
   export GIT_AUTHOR_EMAIL=seed@example.com
   export GIT_COMMITTER_NAME=seed

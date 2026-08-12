@@ -9,6 +9,7 @@ import { ensureNixStoreToolPathSync, envWithResolvedNixBin } from "../lib/tool-p
 import {
   defaultFilteredFlakeSnapshotRsyncSources,
   filteredFlakeRsyncExcludeArgs,
+  relPathsForImmutableViberootsInput,
 } from "./nix-build-filtered-flake-lib";
 import { filteredSnapshotSelection } from "./filtered-flake-snapshot-selection";
 import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../lib/macos-metadata";
@@ -187,7 +188,10 @@ async function main(declaredArtifactToolsRoot: string): Promise<void> {
     const snapshotStart = Date.now();
     const rsyncBin = ensureNixStoreToolPathSync("rsync", policyEnv);
     const presentRelPaths: string[] = [];
-    for (const rel of snapshotSelection.relPaths) {
+    for (const rel of relPathsForImmutableViberootsInput(
+      snapshotSelection.relPaths,
+      immutableViberootsInputRoot,
+    )) {
       try {
         await fsp.lstat(path.join(root, rel));
         presentRelPaths.push(rel);

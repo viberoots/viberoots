@@ -134,6 +134,27 @@ export type ProcessTreeRow = {
   command: string;
 };
 
+export async function processTreeRows(): Promise<ProcessTreeRow[]> {
+  const result = spawnSync(resolveToolPathSync("ps"), ["-axo", "pid=,ppid=,pgid=,command="], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`process inspection failed (${result.status}): ${String(result.stderr || "")}`);
+  }
+  return String(result.stdout || "")
+    .split(/\r?\n/u)
+    .map((line) => line.trim().match(/^(\d+)\s+(\d+)\s+(\d+)\s+(.*)$/u))
+    .filter((match): match is RegExpMatchArray => match !== null)
+    .map((match) => ({
+      pid: Number(match[1]),
+      ppid: Number(match[2]),
+      pgid: Number(match[3]),
+      command: match[4] || "",
+    }));
+}
+
 export function exactDescendantCommandPids(
   rows: ProcessTreeRow[],
   rootPid: number,

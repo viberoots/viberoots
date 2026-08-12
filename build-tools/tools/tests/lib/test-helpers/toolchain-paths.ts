@@ -3,7 +3,14 @@ import path from "node:path";
 import { ensureToolchainPathsFiles } from "../../../dev/toolchain-paths";
 import { canonicalArtifactToolsRoot } from "../../../lib/artifact-tool-authority";
 import { setTimeout as sleep } from "node:timers/promises";
-import { repoRoot, pathExists } from "../../../lib/repo";
+import { pathExists } from "../../../lib/repo";
+import {
+  ensureToolchainSourcesForTempRepo,
+  resolveSourceRoot,
+  resolveToolSourceRoot,
+} from "./toolchain-source-files";
+
+export { ensureToolchainSourcesForTempRepo } from "./toolchain-source-files";
 
 let cachedSource: Promise<{ bzl: string; json: string } | null> | null = null;
 const STALE_LOCK_MS = 5 * 60 * 1000;
@@ -12,40 +19,6 @@ type LockOwner = {
   pid?: number;
   createdAt?: string;
 };
-
-function resolveSourceRoot(): string {
-  const envRoot = String(process.env.REPO_ROOT || process.env.LIVE_ROOT || "").trim();
-  return envRoot || repoRoot();
-}
-
-async function resolveToolSourceRoot(root: string): Promise<string> {
-  const isNixStorePath = (candidate: string): boolean =>
-    candidate === "/nix/store" || candidate.startsWith("/nix/store/");
-  const hasToolchainSources = async (candidate: string): Promise<boolean> => {
-    const resolved = path.resolve(candidate || "");
-    if (!resolved) return false;
-    return (
-      (await pathExists(
-        path.join(resolved, "build-tools", "tools", "dev", "gen-toolchain-paths.ts"),
-      )) && (await pathExists(path.join(resolved, "toolchains", "toolchain_paths.bzl")))
-    );
-  };
-  const submoduleRoot = path.join(root, "viberoots");
-  if (await hasToolchainSources(submoduleRoot)) return submoduleRoot;
-  if (await hasToolchainSources(root)) return root;
-  const envCandidates = [process.env.VIBEROOTS_SOURCE_ROOT || "", process.env.VIBEROOTS_ROOT || ""];
-  for (const candidate of envCandidates) {
-    const resolved = path.resolve(candidate || "");
-    if (!resolved || isNixStorePath(resolved)) continue;
-    if (await hasToolchainSources(resolved)) return resolved;
-  }
-  for (const candidate of envCandidates) {
-    const resolved = path.resolve(candidate || "");
-    if (!resolved) continue;
-    if (await hasToolchainSources(resolved)) return resolved;
-  }
-  return root;
-}
 
 async function hasValidGeneratedToolchainPaths(
   bzlPath: string,
@@ -188,37 +161,14 @@ async function copyFile(src: string, dst: string): Promise<void> {
   await fsp.copyFile(src, dst);
 }
 
-async function copyToolchainTree(src: string, dst: string): Promise<void> {
-  let entries: import("node:fs").Dirent[] = [];
-  try {
-    entries = await fsp.readdir(src, { withFileTypes: true });
-  } catch {
-    return;
-  }
-  await fsp.mkdir(dst, { recursive: true });
-  for (const entry of entries) {
-    const srcPath = path.join(src, entry.name);
-    const dstPath = path.join(dst, entry.name);
-    if (entry.isDirectory()) {
-      await copyToolchainTree(srcPath, dstPath);
-    } else if (entry.isFile()) {
-      await copyFile(srcPath, dstPath);
-    }
-  }
-}
-
 export async function ensureToolchainPathsForTempRepo(tmp: string, $: any): Promise<void> {
   const src = await ensureSourceFiles($);
-  const root = resolveSourceRoot();
-  const toolSourceRoot = await resolveToolSourceRoot(root);
-  const toolchainSrcDir = path.join(toolSourceRoot, "toolchains");
+  await ensureToolchainSourcesForTempRepo(tmp);
   const legacyToolchainsDir = path.join(tmp, "toolchains");
   const workspaceToolchainsDir = path.join(tmp, ".viberoots", "workspace", "toolchains");
   const legacyBzlDst = path.join(legacyToolchainsDir, "toolchain_paths.bzl");
   const workspaceBzlDst = path.join(workspaceToolchainsDir, "toolchain_paths.bzl");
   const jsonDst = path.join(tmp, ".viberoots", "workspace", "toolchain-paths.json");
-  await copyToolchainTree(toolchainSrcDir, legacyToolchainsDir);
-  await copyToolchainTree(toolchainSrcDir, workspaceToolchainsDir);
   await copyFile(src.bzl, legacyBzlDst);
   await copyFile(src.bzl, workspaceBzlDst);
   await copyFile(src.json, jsonDst);

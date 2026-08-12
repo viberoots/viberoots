@@ -3,12 +3,15 @@ import path from "node:path";
 import type { MaterializedPathInput } from "../../dev/filtered-flake-viberoots-input";
 import { ensureToolchainPathsFiles } from "../../dev/toolchain-paths";
 import { readGlobalNixInputTargets } from "../../lib/global-nix-input-targets";
+import { retargetTempCommandToolSource } from "../lib/test-helpers/run-in-temp/dependency-reconcile";
 
 export async function pinTempViberootsInput(
   tmp: string,
   input: MaterializedPathInput,
   refreshArtifactTools = false,
+  command?: object,
 ): Promise<void> {
+  if (command) retargetTempCommandToolSource(command, tmp, input.storePath);
   await fs.rm(path.join(tmp, "viberoots"), { force: true, recursive: true });
   const current = path.join(tmp, ".viberoots", "current");
   await fs.rm(current, { force: true, recursive: true });

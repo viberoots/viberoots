@@ -130,8 +130,8 @@ test("Rust remote-ready test executes its real snapshot-backed Cargo harness", a
   if (process.env.NIX_CONFIG) {
     assert.equal(
       nestedCacheTestArgs.length,
-      10,
-      "nested Buck test requires proof-bound config plus four cache roles",
+      14,
+      "nested Buck test requires proof-bound config, four cache roles, encoded config, and authority",
     );
   }
   const result =

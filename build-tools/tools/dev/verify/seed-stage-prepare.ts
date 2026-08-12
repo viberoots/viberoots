@@ -28,7 +28,47 @@ async function gitStageRelPaths(stageDir: string, relPaths: string[]): Promise<v
   if (missing.length > 0) await git`git rm -q --ignore-unmatch -- ${missing}`;
 }
 
-async function commitNestedViberoots(stageDir: string): Promise<void> {
+function parseCountObjects(output: string): { count: number; packs: number } {
+  const values = new Map(
+    output
+      .split(/\r?\n/)
+      .map((line) => line.split(":", 2).map((part) => part.trim()))
+      .filter((parts) => parts.length === 2),
+  );
+  return {
+    count: Number(values.get("count") ?? Number.NaN),
+    packs: Number(values.get("packs") ?? Number.NaN),
+  };
+}
+
+export async function validatePreparedNestedGit(stageDir: string): Promise<string> {
+  const nested = path.join(stageDir, "viberoots");
+  const git = $({ cwd: nested, stdio: "pipe" });
+  const head = String((await git`git rev-parse HEAD`).stdout || "").trim();
+  if (!/^[0-9a-f]{40}$/.test(head)) {
+    throw new Error(`verify seed nested viberoots HEAD is invalid: ${head}`);
+  }
+  const parent = $({ cwd: stageDir, stdio: "pipe" });
+  const gitlink = String((await parent`git ls-files -s -- viberoots`).stdout || "").trim();
+  const expected = `160000 ${head} 0\tviberoots`;
+  if (gitlink !== expected) {
+    throw new Error(`verify seed nested gitlink mismatch: ${gitlink}; expected ${expected}`);
+  }
+  await git`git fsck --full --no-dangling`;
+  const objects = parseCountObjects(String((await git`git count-objects -v`).stdout || ""));
+  if (objects.count !== 0 || !Number.isInteger(objects.packs) || objects.packs < 1) {
+    throw new Error(
+      `verify seed nested Git objects are not packed: count=${objects.count} packs=${objects.packs}`,
+    );
+  }
+  const alternates = await fsp
+    .lstat(path.join(nested, ".git", "objects", "info", "alternates"))
+    .catch(() => null);
+  if (alternates) throw new Error("verify seed nested Git repo must not use object alternates");
+  return head;
+}
+
+export async function commitNestedViberoots(stageDir: string): Promise<void> {
   const nested = path.join(stageDir, "viberoots");
   const git = $({
     cwd: nested,
@@ -61,9 +101,11 @@ async function commitNestedViberoots(stageDir: string): Promise<void> {
   if (!/^[0-9a-f]{40}$/.test(head)) {
     throw new Error(`verify seed nested viberoots HEAD is invalid: ${head}`);
   }
+  await git`git repack -a -d -q --threads=1`;
   const parent = $({ cwd: stageDir, stdio: "pipe" });
   await parent`git rm -r --cached -q --ignore-unmatch -- viberoots`;
   await parent`git update-index --add --cacheinfo ${`160000,${head},viberoots`}`;
+  await validatePreparedNestedGit(stageDir);
 }
 
 async function trackedNpmrcDirs(stageDir: string): Promise<string[]> {
@@ -121,5 +163,6 @@ export async function prepareStageSeed(stageDir: string, workspaceRoot: string):
       .nothrow()
       .quiet();
   }
+  await validatePreparedNestedGit(stageDir);
   await fsp.writeFile(path.join(stageDir, PREPARED_MARKER), "ok\n", "utf8");
 }

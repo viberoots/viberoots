@@ -126,18 +126,28 @@ test("real Cargo build.rs and proc-macro cleanup descendants and allow retry", a
       ...process.env,
       PATH: `${hostileBin}${path.delimiter}${path.join(toolchainRoot, "bin")}`,
       RUSTC: path.join(toolchainRoot, "bin", "rustc"),
+      CARGO_TARGET_DIR: path.join(tmp, "target.noindex"),
     };
+    const warm = await runManagedCommand({
+      command: cargo,
+      args: ["build", "--offline", "-p", "build-host"],
+      cwd: tmp,
+      env: { ...toolEnv, HOST_MODE: "success", HOST_PID_FILE: path.join(tmp, "warm.pid") },
+      timeoutMs: 120_000,
+    });
+    assert.equal(warm.ok, true, warm.stderr);
     const timeoutPid = path.join(tmp, "timeout.pid");
     const timed = await runManagedCommand({
       command: cargo,
       args: ["build", "--offline", "-p", "build-host"],
       cwd: tmp,
       env: { ...toolEnv, HOST_MODE: "block", HOST_PID_FILE: timeoutPid },
-      timeoutMs: 2_000,
+      timeoutMs: 10_000,
       killGraceMs: 50,
       activity: activity(),
     });
-    assert.equal(timed.timedOut, true);
+    assert.equal(timed.timedOut, true, timed.stderr);
+    await waitForFile(timeoutPid);
     await waitForPidGone(Number(await fsp.readFile(timeoutPid, "utf8")));
 
     const interruptPid = path.join(tmp, "interrupt.pid");

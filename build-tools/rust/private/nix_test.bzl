@@ -167,6 +167,7 @@ _ATTRS = {
     "cargo_lock": attrs.source(),
     "cargo_output_hashes": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
     "cargo_fixed_sources": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
+    "behavior_probe": attrs.bool(default = False),
     "crate": attrs.string(),
     "features": attrs.list(attrs.string(), default = []),
     "default_features": attrs.bool(default = True),

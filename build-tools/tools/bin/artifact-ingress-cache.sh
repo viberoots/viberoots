@@ -1,5 +1,22 @@
 #!/usr/bin/env bash
 
+artifact_ingress_consume_nested_cache_role_authority() {
+  if [[ "${VBR_NIX_CACHE_ROLE_AUTHORITY:-}" != "verify-nested-v1" ]]; then
+    return 0
+  fi
+  unset VBR_NIX_CACHE_ROLE_REQUIRED VBR_NIX_CACHE_ROLE_OPTIONAL
+  unset VBR_NIX_CACHE_ROLE_POLICY VBR_NIX_CACHE_ROLE_BINDING VBR_NIX_CACHE_ROLE_CONFIG_B64 VBR_NIX_CACHE_ROLE_AUTHORITY
+}
+
+artifact_ingress_nix_config_matches_nested_role() {
+  local captured="${1:-}" decoded
+  [[ "${VBR_NIX_CACHE_ROLE_AUTHORITY:-}" == "verify-nested-v1" ]] || return 1
+  if ! decoded="$(node -e 'const e=String(process.env.VBR_NIX_CACHE_ROLE_CONFIG_B64||""),b=Buffer.from(e,"base64");if(b.toString("base64")!==e)process.exit(1);process.stdout.write(b)' </dev/null)"; then
+    return 1
+  fi
+  [[ "${captured}" == "${decoded}" ]]
+}
+
 artifact_ingress_publish_reviewed_nix_cache_config() {
   unset VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG
   if [[ "${VBR_NIX_CACHE_HEALTH_APPLIED:-}" != "1" ]]; then
@@ -19,15 +36,26 @@ artifact_ingress_publish_reviewed_nix_cache_config() {
 }
 
 artifact_ingress_refresh_nix_cache_health() {
+  local proof_bound_role="0"
   [[ "${VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED:-}" == "1" ]] || return 0
-  if [[ -n "${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG:-}" ]]; then
+  if [[ "${VBR_NIX_CACHE_ROLE_AUTHORITY:-}" == "verify-nested-v1" ]]; then
+    if ! NIX_CONFIG="$(node -e 'const e=String(process.env.VBR_NIX_CACHE_ROLE_CONFIG_B64||""),b=Buffer.from(e,"base64");if(b.toString("base64")!==e)process.exit(1);process.stdout.write(b)' </dev/null)"; then
+      echo "error: proof-bound Nix cache role config is invalid" 1>&2
+      return 1
+    fi
+    export NIX_CONFIG
+    env_apply_nix_cache_health || return 1
+    proof_bound_role="1"
+  elif [[ "${VBR_NIX_CACHE_HEALTH_APPLIED:-}" == "1" && -n "${VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG:-}" ]]; then
+    export NIX_CONFIG="${VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG}"
+  elif [[ -n "${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG:-}" ]]; then
     export NIX_CONFIG="${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG}"
   elif [[ "${VBR_DEVSHELL_ARTIFACT_WAS_SET_NIX_CONFIG:-}" == "1" ]]; then
     export NIX_CONFIG="${VBR_DEVSHELL_ARTIFACT_VALUE_NIX_CONFIG:-}"
   else
     unset NIX_CONFIG
   fi
-  if [[ -z "${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG:-}" ]] && declare -F env_strip_nix_cache_overrides >/dev/null 2>&1; then
+  if [[ "${VBR_NIX_CACHE_ROLE_AUTHORITY:-}" != "verify-nested-v1" && -z "${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG:-}" ]] && declare -F env_strip_nix_cache_overrides >/dev/null 2>&1; then
     local retained
     retained="$(env_strip_nix_cache_overrides)"
     if [[ -n "${retained}" ]]; then
@@ -54,6 +82,11 @@ artifact_ingress_refresh_nix_cache_health() {
     else
       export NIX_CONFIG="netrc-file = ${VBR_ARTIFACT_INGRESS_EFFECTIVE_NETRC_FILE}"
     fi
+  fi
+  if [[ "${proof_bound_role}" == "1" ]]; then
+    VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG="${NIX_CONFIG:-}"
+    export VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG
+    return 0
   fi
   unset VBR_NIX_CACHE_HEALTH_APPLIED
   env_apply_nix_cache_health

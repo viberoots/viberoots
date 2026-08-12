@@ -2,5 +2,10 @@
   "language": "rust",
   "template": "wasm",
   "description": "Experimental Rust bare-WASM and WASI modules",
-  "resolverDestination": "projects/libs/{name}"
+  "resolverDestination": "projects/libs/{name}",
+  "help": {
+    "usage": "scaf new rust wasm <name> [--path=DEST]",
+    "notes": ["Creates locked Rust bare-WASM and WASI targets with typed interface artifacts."],
+    "examples": ["scaf new rust wasm demo --yes"]
+  }
 }

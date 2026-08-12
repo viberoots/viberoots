@@ -124,6 +124,20 @@ test("standalone coverage build marks report directories before writing coverage
   assert.match(coverageMarkDirsSource, /mkdirWithMacosMetadataExclusion/);
 });
 
+test("dev build marks its exact Buck isolation before materializing outputs", async () => {
+  const testDir = path.dirname(fileURLToPath(import.meta.url));
+  const buckSource = await fsp.readFile(
+    path.resolve(testDir, "../../dev/dev-build/buck.ts"),
+    "utf8",
+  );
+  assert.match(buckSource, /path\.join\(opts\.root, "buck-out", isolation\)/);
+  assert.match(buckSource, /mkdirWithMacosMetadataExclusion\(isolationRoot\)/);
+  assert.ok(
+    buckSource.indexOf("mkdirWithMacosMetadataExclusion(isolationRoot)") <
+      buckSource.indexOf("const proc = await withSharedBuckIsolationStartupLock"),
+  );
+});
+
 test("agent safehouse and git CoW shell wrappers mark generated temp directories", async () => {
   const testDir = path.dirname(fileURLToPath(import.meta.url));
   const root = path.resolve(testDir, "../../../..");

@@ -53,6 +53,10 @@ test("nix_node_cli_bin(bundle=True) cmd prefixes nix bootstrap env and timeout w
       out.includes('export NIX_PNPM_INSTALL_TIMEOUT="$TOUT"'),
       "expected timeout wrapper to export NIX_PNPM_INSTALL_TIMEOUT",
     );
+    assert.ok(
+      out.includes('export VBR_ARTIFACT_COMMAND_TIMEOUT_SECS="$TOUT"'),
+      "expected timeout wrapper to propagate the production envelope to managed artifact commands",
+    );
     const idxTimeout = out.indexOf("TIMEOUT");
     const idxNix = out.indexOf("nix-build-filtered-flake.ts");
     assert.ok(

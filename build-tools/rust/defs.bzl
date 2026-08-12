@@ -7,6 +7,7 @@ load("@viberoots//build-tools/rust/private:composition_snapshot.bzl", "rust_comp
 load("@viberoots//build-tools/rust/private:extension_contract.bzl", "prepare_python_build_wiring", "validate_addon_name", "validate_extension_kind_args", "validate_node_api_version")
 load("@viberoots//build-tools/rust/private:interop_contract.bzl", "prepare_interop_kwargs")
 load("@viberoots//build-tools/rust/private:macro_contract.bzl", "RUST_PUBLIC_ARGS", "artifact_out", "crate_type_for", "fixed_artifact_contract", "has_nixpkg_inputs", "public_crate_for", "rust_macro_name", "single_cargo_file", "valid_features", "validate_crate_names", "validate_local_patch_dirs", "validate_public_crate", "with_required_target")
+load("@viberoots//build-tools/rust/private:runtime_contract.bzl", "validate_rust_runtime_args")
 load("@viberoots//build-tools/rust/private:tauri_contract.bzl", "prepare_tauri_contract")
 load("@viberoots//build-tools/rust/private:wasm_contract.bzl", "is_wasm_kind", "prepare_wasm_contract", "rust_wasm_module_surface")
 def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, interop = False):
@@ -69,6 +70,7 @@ def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, inte
     runtime_deps = kw.pop("runtime_deps", []) or []
     addon_name = kw.pop("addon_name", "")
     node_api_version = kw.pop("node_api_version", 0)
+    behavior_probe = kw.pop("behavior_probe", False)
     platform, python_abi = kw.pop("platform", ""), kw.pop("python_abi", "")
     interop_keys = ["binding_config", "interop_kind", "interop_generator", "panic_strategy", "exception_policy", "allocator", "thread_safety", "cxx_standard", "c_standard", "compiler_family", "compiler_identity", "target_triple", "stl", "module_surface"]
     supplied_interop = [key for key in interop_keys if kw.get(key, "") != ""]
@@ -93,12 +95,9 @@ def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, inte
         fail("rust target profile must be release or dev")
     if not isinstance(target, str):
         fail("rust target target must be a string")
-    if not isinstance(build_py_deps, list) or not all([isinstance(dep, str) and dep != "" for dep in build_py_deps]):
-        fail("rust target build_py_deps must be a list of non-empty Python package names")
+    validate_rust_runtime_args(build_py_deps, runtime_deps, behavior_probe)
     if kind == "pyext":
         kw = prepare_python_build_wiring(kw, python_lockfile_label, build_py_deps)
-    if not isinstance(runtime_deps, list):
-        fail("rust target runtime_deps must be a list of labels")
     runtime_deps = normalize_labels(native.package_name(), runtime_deps)
     expected_target = wasm_attrs.get("wasm_target", "")
     if target != expected_target:
@@ -149,6 +148,7 @@ def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, inte
         "default_features": default_features,
         "profile": profile,
         "target": target,
+        "behavior_probe": behavior_probe,
         "local_patch_dirs": wiring.local_patch_dirs,
         "nixpkgs_profile": prepared.get("nixpkgs_profile", "default"),
         "nixpkg_pins": prepared.get("nixpkg_pins", {}),

@@ -4,6 +4,7 @@ import { ensureNixStoreToolPathSync } from "../lib/tool-paths";
 import { isCanonicalSha256SRI } from "../lib/nix-sri";
 import { runCommand } from "./filtered-flake-command";
 import { syncExactViberootsInputs } from "./filtered-flake-lock-inputs";
+import { immutableStorePathNarHash } from "./filtered-flake-immutable-source";
 
 export { syncExactViberootsInputs } from "./filtered-flake-lock-inputs";
 
@@ -102,6 +103,14 @@ export async function materializeFilteredViberootsSource(
   const nixEnv = env;
   const nixBin = ensureNixStoreToolPathSync("nix", nixEnv);
   const canonical = await fsp.realpath(inputPath).catch(() => inputPath);
+  const immutable = await immutableSource(canonical);
+  if (immutable) {
+    const narHash = await immutableStorePathNarHash(nixBin, immutable, nixEnv);
+    return {
+      storePath: immutable,
+      locked: { narHash, path: immutable, type: "path" },
+    };
+  }
   const prefetched = await runCommand({
     command: nixBin,
     args: [

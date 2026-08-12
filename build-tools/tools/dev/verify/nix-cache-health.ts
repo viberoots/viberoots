@@ -7,11 +7,12 @@ import {
 } from "../../lib/nix-cache-readiness";
 import {
   configScalar,
+  defaultReadCacheRoleProvenance,
   defaultReadEffectiveConfig,
   isProbeableUrl,
   policyFromEnv,
+  proofBoundCachePolicyOutcome,
   reviewedConfigWithNetrc,
-  stripOverrideKeys,
   trustedCachePolicyOutcome,
   unique,
 } from "./nix-cache-health-config";
@@ -23,24 +24,11 @@ import {
   clearReviewedCacheEnvironment,
   recordReviewedCacheResult,
 } from "./nix-cache-health-review";
+import { offCacheHealthResult } from "./nix-cache-health-types";
+import type { CacheHealthResult, NixCacheHealthDeps } from "./nix-cache-health-types";
+import { finalizeReachableNixCacheResult } from "./nix-cache-health-result";
 export type { NixCachePolicy } from "./nix-cache-health-config";
-
-export type NixCacheHealthDeps = {
-  readEffectiveConfig?: () => Promise<string>;
-  probeUrl?: (url: string, timeoutMs: number) => Promise<boolean>;
-  resolveCurlBin?: (env: NodeJS.ProcessEnv) => string;
-  log?: (line: string) => void;
-};
-
-export type CacheHealthResult = {
-  authority: "reviewed" | "off";
-  changed: boolean;
-  kept: string[];
-  removed: string[];
-  nixConfig: string;
-  requiredSubstituters: string[];
-  optionalSubstituters: string[];
-};
+export type { CacheHealthResult, NixCacheHealthDeps } from "./nix-cache-health-types";
 
 export async function applyNixCacheHealthPolicy(
   _root: string,
@@ -104,6 +92,27 @@ export async function applyNixCacheHealthPolicy(
       optionalSubstituters: [...trusted.optionalSubstituters],
     };
   }
+  const proofBound = proofBoundCachePolicyOutcome(process.env);
+  if (proofBound) {
+    if (policy !== proofBound.policy) {
+      throw new Error("proof-bound Nix cache role policy does not match the active policy");
+    }
+    assertSafeNixCacheConfig(proofBound.config);
+    return recordReviewedCacheResult(
+      {
+        authority: "reviewed",
+        changed: false,
+        kept: unique([...proofBound.requiredSubstituters, ...proofBound.optionalSubstituters]),
+        removed: [],
+        nixConfig: proofBound.config,
+        requiredSubstituters: [...proofBound.requiredSubstituters],
+        optionalSubstituters: [...proofBound.optionalSubstituters],
+      },
+      [...proofBound.requiredSubstituters],
+      [...proofBound.optionalSubstituters],
+      proofBound.policy,
+    );
+  }
   clearReviewedCacheEnvironment();
   const reviewed = (result: CacheHealthResult, required: string[], optional: string[]) =>
     recordReviewedCacheResult(result, required, optional, policy);
@@ -111,15 +120,7 @@ export async function applyNixCacheHealthPolicy(
     if (process.env.VBR_CANONICAL_ARTIFACT_ENTRYPOINT === "1") {
       activateNixCachePolicyCapabilityAfterCanonicalEntry(process.env, { kind: "off" });
     }
-    return {
-      authority: "off",
-      changed: false,
-      kept: [],
-      removed: [],
-      nixConfig: String(process.env.NIX_CONFIG || ""),
-      requiredSubstituters: [],
-      optionalSubstituters: [],
-    };
+    return offCacheHealthResult(String(process.env.NIX_CONFIG || ""));
   }
 
   const log = deps.log || ((line: string) => process.stderr.write(`${line}\n`));
@@ -127,8 +128,27 @@ export async function applyNixCacheHealthPolicy(
   const priorConfig = String(process.env.NIX_CONFIG || "");
   assertSafeNixCacheConfig(priorConfig);
   const parsed = parseNixCacheConfigValues(effectiveConfig);
-  const effectiveRequired = unique(parsed.get("substituters") || []);
-  const effectiveOptional = unique(parsed.get("extra-substituters") || []);
+  let effectiveRequired = unique(parsed.get("substituters") || []);
+  let effectiveOptional = unique(parsed.get("extra-substituters") || []);
+  if (effectiveRequired.length > 0 && effectiveOptional.length === 0) {
+    const provenance =
+      deps.readCacheRoleProvenance === undefined
+        ? defaultReadCacheRoleProvenance()
+        : deps.readCacheRoleProvenance();
+    const provenRequired = unique(provenance?.required || []);
+    const provenOptional = unique(provenance?.optional || []).filter(
+      (substituter) => !provenRequired.includes(substituter),
+    );
+    const effectiveFlattened = unique([...effectiveRequired, ...effectiveOptional]).sort();
+    const provenFlattened = unique([...provenRequired, ...provenOptional]).sort();
+    if (
+      effectiveFlattened.length === provenFlattened.length &&
+      effectiveFlattened.every((value, index) => value === provenFlattened[index])
+    ) {
+      effectiveRequired = provenRequired;
+      effectiveOptional = provenOptional;
+    }
+  }
   const priorParsed = parseNixCacheConfigValues(priorConfig);
   const priorRequired = unique(priorParsed.get("substituters") || []);
   const priorOptional = unique(priorParsed.get("extra-substituters") || []);
@@ -185,66 +205,18 @@ export async function applyNixCacheHealthPolicy(
     if (reachable) {
       available.push(substituter);
     } else {
-      if (policy === "auto" && !optionalOnly) {
-        throw new Error(
-          `required Nix substituter unavailable: ${nixCacheSubstituterIdentity(substituter)}`,
-        );
-      }
       removed.push(substituter);
     }
   }
 
-  if (removed.length === 0) {
-    if (reviewedConfig) process.env.NIX_CONFIG = reviewedConfig;
-    else delete process.env.NIX_CONFIG;
-    return reviewed(
-      {
-        authority: "reviewed",
-        changed: reviewedConfig !== priorConfig,
-        kept: configured,
-        removed,
-        nixConfig: reviewedConfig,
-        requiredSubstituters: [],
-        optionalSubstituters: [],
-      },
-      required,
-      optional,
-    );
-  }
-  const removedIdentities = removed.map(nixCacheSubstituterIdentity);
-  if (policy === "strict") {
-    throw new Error(`configured Nix substituter(s) unavailable: ${removedIdentities.join(" ")}`);
-  }
-  const requiredKept = required.filter((substituter) => available.includes(substituter));
-  const optionalKept = optional.filter((substituter) => available.includes(substituter));
-  const retainedEnv = stripOverrideKeys(reviewedConfig);
-  const overrideLines = [
-    `substituters = ${requiredKept.join(" ")}`,
-    `extra-substituters = ${optionalKept.join(" ")}`,
-    "connect-timeout = 3",
-    "stalled-download-timeout = 10",
-    "fallback = true",
-  ];
-  process.env.NIX_CONFIG = [retainedEnv, ...overrideLines].filter(Boolean).join("\n");
-  log(
-    `[verify] nix cache health: disabled unreachable substituter(s): ${removedIdentities.join(" ")}`,
-  );
-  log(
-    `[verify] nix cache health: using optional substituter(s): ${
-      optionalKept.map(nixCacheSubstituterIdentity).join(" ") || "<none>"
-    }`,
-  );
-  return reviewed(
-    {
-      authority: "reviewed",
-      changed: true,
-      kept: unique([...requiredKept, ...optionalKept]),
-      removed,
-      nixConfig: process.env.NIX_CONFIG,
-      requiredSubstituters: [],
-      optionalSubstituters: [],
-    },
-    requiredKept,
-    optionalKept,
-  );
+  return finalizeReachableNixCacheResult({
+    policy,
+    priorConfig,
+    reviewedConfig,
+    required,
+    optional,
+    available,
+    removed,
+    log,
+  });
 }

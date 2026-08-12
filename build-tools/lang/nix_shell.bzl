@@ -22,7 +22,7 @@ def nix_canonical_dev_override_shell():
 
 def nix_artifact_policy_args():
     return (
-        "--option sandbox true --option sandbox-fallback false --option sandbox-paths '' --option builders '' "
+        "--option sandbox true --option sandbox-fallback false --option sandbox-paths \"$VBR_ARTIFACT_SANDBOX_PATHS\" --option extra-sandbox-paths '' --option builders '' "
         + "--option trusted-public-keys '%s' " % " ".join(NIX_ARTIFACT_TRUSTED_PUBLIC_KEYS)
     )
 
@@ -36,6 +36,9 @@ def nix_artifact_tool_authority_shell():
         + "VBR_TOOL_PATH=\"%s/bin/$VBR_TOOL\"; " % NIX_ARTIFACT_TOOLS_ROOT
         + "test -x \"$VBR_TOOL_PATH\" || { echo \"artifact action requires declared tool: $VBR_TOOL -> $VBR_TOOL_PATH\" >&2; exit 127; }; "
         + "done; "
+        + "VBR_ACTION_TOOL_SOURCE_ROOT=\"$VBR_ARTIFACT_TOOLS_ROOT/share/viberoots-source\"; "
+        + "test -f \"$VBR_ACTION_TOOL_SOURCE_ROOT/build-tools/tools/dev/zx-init.mjs\" || { echo 'artifact action tool closure is missing viberoots build tools' >&2; exit 127; }; "
+        + "export VBR_ACTION_TOOL_SOURCE_ROOT; "
     )
 
 def nix_artifact_environment_shell():
@@ -112,7 +115,8 @@ def nix_bootstrap_env_core():
         "set -euo pipefail; "
         + nix_artifact_tool_authority_shell()
         + nix_canonical_dev_override_shell()
-        + "unset FLK_ROOT REPO_ROOT VIBEROOTS_FLAKE_INPUT_ROOT VIBEROOTS_ROOT VIBEROOTS_SOURCE_ROOT WORKSPACE_ROOT ZX_INIT; "
+        + "VBR_ARTIFACT_SANDBOX_PATHS=''; case \"${OSTYPE:-}\" in darwin*) VBR_ARTIFACT_SANDBOX_PATHS=/bin/bash ;; esac; export VBR_ARTIFACT_SANDBOX_PATHS; "
+        + "unset FLK_ROOT REPO_ROOT VBR_ACTION_TOOL_SOURCE_ROOT VIBEROOTS_FLAKE_INPUT_ROOT VIBEROOTS_ROOT VIBEROOTS_SOURCE_ROOT WORKSPACE_ROOT ZX_INIT; "
         + "if [ -z \"${XDG_CONFIG_HOME:-}\" ]; then "
         + "  CONF_HOME=\"${BUCK2_REAL_HOME:-${HOME:-}}\"; "
         + "  if [ -n \"$CONF_HOME\" ]; then export XDG_CONFIG_HOME=\"$CONF_HOME/.config\"; fi; "
@@ -182,7 +186,7 @@ def nix_bootstrap_env_core():
         + "FLK_PHYS=\"\"; read -r FLK_PHYS < \"$FLK_PHYS_FILE\" 2>/dev/null || true; "
         + "if [ -n \"$FLK_PHYS\" ]; then FLK_ROOT=\"$FLK_PHYS\"; fi; "
         + "VBR_ROOT=\"$VBR_ARTIFACT_TOOLS_ROOT/share/viberoots-source\"; test -f \"$VBR_ROOT/build-tools/tools/dev/zx-init.mjs\" || { echo 'artifact action tool closure is missing viberoots build tools' >&2; exit 127; }; "
-        + "VBR_PHYS_FILE=\"$TMP/vbr-source-root.phys\"; (cd \"$VBR_ROOT\" 2>/dev/null && pwd -P > \"$VBR_PHYS_FILE\") || true; VBR_PHYS=\"\"; read -r VBR_PHYS < \"$VBR_PHYS_FILE\" 2>/dev/null || true; if [ -n \"$VBR_PHYS\" ]; then VBR_ROOT=\"$VBR_PHYS\"; fi; export VIBEROOTS_ROOT=\"$VBR_ROOT\"; "
+        + "VBR_PHYS_FILE=\"$TMP/vbr-source-root.phys\"; (cd \"$VBR_ROOT\" 2>/dev/null && pwd -P > \"$VBR_PHYS_FILE\") || true; VBR_PHYS=\"\"; read -r VBR_PHYS < \"$VBR_PHYS_FILE\" 2>/dev/null || true; if [ -n \"$VBR_PHYS\" ]; then VBR_ROOT=\"$VBR_PHYS\"; fi; export VBR_ACTION_TOOL_SOURCE_ROOT=\"$VBR_ROOT\" VIBEROOTS_ROOT=\"$VBR_ROOT\"; "
         + "cd \"$WORKSPACE_ROOT\"; "
         + "test -f \"$FLK_ROOT/flake.nix\" || { echo \"nix bootstrap: missing flake.nix (WORKSPACE_ROOT=$WORKSPACE_ROOT FLK_ROOT=$FLK_ROOT checked hidden=$WORKSPACE_ROOT/.viberoots/workspace/flake.nix)\" >&2; exit 2; }; "
     )
@@ -234,6 +238,7 @@ def nix_timeout_wrapper_var(var_name = "TIMEOUT", default_sec = 600):
         + "done; "
         + "if [ -n \"$RAW_PNPM_INSTALL_TOUT\" ] && [ \"$RAW_PNPM_INSTALL_TOUT\" -gt \"$TOUT\" ] 2>/dev/null; then TOUT=\"$RAW_PNPM_INSTALL_TOUT\"; fi; "
         + "export NIX_PNPM_INSTALL_TIMEOUT=\"$TOUT\"; "
+        + "export VBR_ARTIFACT_COMMAND_TIMEOUT_SECS=\"$TOUT\"; "
         + "if command -v timeout >/dev/null 2>&1; then "
         + ("%s=\"timeout -k 2s ${TOUT}s\"; " % var_name)
         + "else "

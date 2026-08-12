@@ -40,6 +40,7 @@ const CANONICAL_ARTIFACT_ENV_KEYS = new Set([
   "LC_ALL",
   "NIX_REMOTE",
   "NIX_SSL_CERT_FILE",
+  "NODE_COMPILE_CACHE",
   "PATH",
   "SSL_CERT_FILE",
   "SOURCE_DATE_EPOCH",
@@ -51,6 +52,14 @@ const CANONICAL_ARTIFACT_ENV_KEYS = new Set([
   "XDG_CONFIG_HOME",
   "XDG_DATA_HOME",
 ]);
+
+export function artifactNodeCompileCachePath(
+  stateRoot: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const name = platform === "darwin" ? "node-compile-cache.noindex" : "node-compile-cache";
+  return path.join(stateRoot, "tmp", name);
+}
 
 export function buildArtifactEnvironment(opts: {
   baseEnv: NodeJS.ProcessEnv;
@@ -124,6 +133,8 @@ export function buildArtifactEnvironment(opts: {
   for (const rel of ["home", "tmp", "xdg-cache", "xdg-config", "xdg-data"]) {
     fs.mkdirSync(path.join(opts.stateRoot, rel), { recursive: true });
   }
+  const nodeCompileCache = artifactNodeCompileCachePath(opts.stateRoot);
+  fs.mkdirSync(nodeCompileCache, { recursive: true });
   const bootstrapNix = "/nix/var/nix/profiles/default/bin/nix";
   const nixBin = (() => {
     try {
@@ -147,6 +158,7 @@ export function buildArtifactEnvironment(opts: {
     VBR_ARTIFACT_TOOLS_ROOT: artifactToolsRoot,
     VBR_NIX_BIN: nixBin,
     NIX_REMOTE: "daemon",
+    NODE_COMPILE_CACHE: nodeCompileCache,
     NIX_SSL_CERT_FILE: artifactCertificateFile,
     SSL_CERT_FILE: artifactCertificateFile,
   };
@@ -163,12 +175,14 @@ export function buildArtifactEnvironment(opts: {
     const policy = outcomeFromNixCachePolicyCapability(opts.nixCachePolicyCapability);
     if (policy.kind === "reviewed") {
       out.NIX_CONFIG = policy.config;
+      out.VBR_NIX_CACHE_POLICY = policy.policy;
       out.VBR_NIX_CACHE_ROLE_REQUIRED = policy.requiredSubstituters.join(" ");
       out.VBR_NIX_CACHE_ROLE_OPTIONAL = policy.optionalSubstituters.join(" ");
       out.VBR_NIX_CACHE_ROLE_POLICY = policy.policy;
       out.VBR_NIX_CACHE_ROLE_BINDING = nixCachePolicyBindingDigest(policy);
     } else {
       delete out.NIX_CONFIG;
+      out.VBR_NIX_CACHE_POLICY = "off";
       delete out.VBR_NIX_CACHE_ROLE_REQUIRED;
       delete out.VBR_NIX_CACHE_ROLE_OPTIONAL;
       delete out.VBR_NIX_CACHE_ROLE_POLICY;

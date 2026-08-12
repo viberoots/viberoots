@@ -60,6 +60,17 @@ export async function timeAsync<T>(label: string, fn: () => Promise<T>): Promise
   }
 }
 
+export async function timeDiagnosticAsync<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  const t0 = performance.now();
+  try {
+    return await fn();
+  } finally {
+    try {
+      console.error(`[timing] ${label}: ${(performance.now() - t0).toFixed(1)}ms`);
+    } catch {}
+  }
+}
+
 export function getTimingCountForLabel(label: string): number {
   return timingAgg.get(label)?.count ?? 0;
 }

@@ -5,6 +5,12 @@ import {
   canonicalArtifactToolsRoot,
   withoutArtifactEnvironmentInfluence,
 } from "../../../lib/artifact-environment";
+import {
+  activateNixCachePolicyCapabilityAfterCanonicalEntry,
+  maybeCurrentNixCachePolicyCapability,
+  type NixCachePolicyCapability,
+} from "../../../lib/nix-cache-policy-capability";
+import { proofBoundCachePolicyOutcome } from "../../../dev/verify/nix-cache-health-config";
 import { DEFAULT_GRAPH_PATH } from "../../../lib/workspace-state-paths";
 import { makeFilteredFlakeRef } from "../../../dev/filtered-flake";
 import { timeAsync } from "./timing";
@@ -39,10 +45,23 @@ function selectedBuildEnv(args: {
   env?: Record<string, string>;
 }): Record<string, string> {
   const { env } = args;
-  return {
+  const selectedEnv = {
     ...withoutArtifactEnvironmentInfluence(process.env),
     ...(env || {}),
   };
+  delete selectedEnv.IN_NIX_SHELL;
+  return selectedEnv;
+}
+
+function selectedBuildNixCachePolicyCapability(): NixCachePolicyCapability | undefined {
+  const active = maybeCurrentNixCachePolicyCapability();
+  if (active) return active;
+  const reviewed = proofBoundCachePolicyOutcome(process.env);
+  if (!reviewed) return undefined;
+  return activateNixCachePolicyCapabilityAfterCanonicalEntry(
+    { ...process.env, VBR_CANONICAL_ARTIFACT_ENTRYPOINT: "1" },
+    reviewed,
+  );
 }
 
 export async function exportGraphInTemp(args: {
@@ -136,6 +155,7 @@ export async function runFilteredFlakeAttr(args: {
     tmp,
     String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
   );
+  const nixCachePolicyCapability = selectedBuildNixCachePolicyCapability();
   const artifactEnv = buildArtifactEnvironment({
     baseEnv: withoutArtifactEnvironmentInfluence(process.env),
     mode: "local",
@@ -149,6 +169,7 @@ export async function runFilteredFlakeAttr(args: {
         ? { NIX_PNPM_ALLOW_GENERATE: env.NIX_PNPM_ALLOW_GENERATE }
         : {}),
     },
+    ...(nixCachePolicyCapability ? { nixCachePolicyCapability } : {}),
   });
   const bundle = await makeFilteredFlakeRef({
     workspaceRoot: tmp,

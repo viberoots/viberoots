@@ -7,6 +7,12 @@ export_file(
 )
 
 export_file(
+    name = "heavy-fanout-resource.py",
+    src = "heavy-fanout-resource.py",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
     name = "source-selection.ts",
     src = "source-selection.ts",
     visibility = ["PUBLIC"],

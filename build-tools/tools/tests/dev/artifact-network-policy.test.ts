@@ -8,6 +8,7 @@ import {
   artifactNixPolicyArgs,
   REVIEWED_OPTIONAL_SUBSTITUTERS,
   REVIEWED_REQUIRED_SUBSTITUTERS,
+  reviewedArtifactSandboxPaths,
 } from "../../lib/artifact-nix-policy";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 import { assertArtifactNetworkPolicyInventory } from "./artifact-network-policy.contract";
@@ -42,11 +43,16 @@ test("policy command fixes sandbox, builders, and keys without rebuilding cache 
   }
   assert.equal(args[args.indexOf("sandbox") + 1], "true");
   assert.equal(args[args.indexOf("sandbox-fallback") + 1], "false");
-  assert.equal(args[args.indexOf("sandbox-paths") + 1], "");
+  assert.equal(args[args.indexOf("sandbox-paths") + 1], reviewedArtifactSandboxPaths().join(" "));
   assert.equal(args[args.indexOf("extra-sandbox-paths") + 1], "");
   assert.equal(args.includes("substituters"), false);
   assert.equal(args.includes("extra-substituters"), false);
   assert.equal(args.includes("fallback"), false);
+});
+
+test("artifact sandbox paths admit only the Darwin shell launcher dependency", () => {
+  assert.deepEqual(reviewedArtifactSandboxPaths("darwin"), ["/bin/bash"]);
+  assert.deepEqual(reviewedArtifactSandboxPaths("linux"), []);
 });
 
 test("independent Nix commands pin exact reviewed or empty cache authority", () => {
@@ -93,6 +99,13 @@ test("scoped selected-build action environments inherit canonical reviewed confi
   assert.match(boundary, /policy\.kind === "reviewed"/);
 });
 
+test("filtered-flake test helper binds reviewed cache authority", () => {
+  const source = read("build-tools/tools/tests/lib/test-helpers/selected-build.ts");
+  assert.match(source, /proofBoundCachePolicyOutcome\(process\.env\)/);
+  assert.match(source, /selectedBuildNixCachePolicyCapability\(\)/);
+  assert.match(source, /\{ nixCachePolicyCapability \}/);
+});
+
 test("CI graph builds and cache admission cannot fail open or claim impure evaluation", () => {
   const stage = read("build-tools/tools/ci/run-stage.ts");
   assert.match(stage, /chooseRunnableFlakeRef/);
@@ -112,6 +125,7 @@ test("only cache-health renderers construct substituter configuration", () => {
       "build-tools/tools/bin/devshell-cache-health.sh",
       "build-tools/tools/dev/verify/nix-cache-health.ts",
       "build-tools/tools/dev/verify/nix-cache-health-config.ts",
+      "build-tools/tools/dev/verify/nix-cache-health-result.ts",
       "build-tools/tools/lib/consumer-direnv.ts",
     ].map(viberootsSourcePath),
   );

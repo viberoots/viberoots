@@ -12,6 +12,8 @@ def nix_action_workspace_setup_from_args(
         + ("FLAKE_FILE=\"%s\"; " % flake_file_arg)
         + "[ -n \"$WORKSPACE_ENV\" ] && [ -f \"$WORKSPACE_ENV\" ] && . \"$WORKSPACE_ENV\" || true; "
         + nix_artifact_tool_authority_shell()
+        + "test -n \"${VBR_ACTION_TOOL_SOURCE_ROOT:-}\" && test -f \"$VBR_ACTION_TOOL_SOURCE_ROOT/build-tools/tools/dev/zx-init.mjs\" || { echo 'action tool source authority was lost during workspace setup' >&2; exit 127; }; "
+        + "export VIBEROOTS_ROOT=\"$VBR_ACTION_TOOL_SOURCE_ROOT\"; "
         + "if [ -n \"$GRAPH\" ] && [ -z \"${WORKSPACE_ROOT:-}\" ]; then "
         + "  WR=\"${GRAPH%/.viberoots/workspace/buck/graph.json}\"; "
         + "  if [ \"$WR\" = \"$GRAPH\" ]; then WR=\"${GRAPH%/build-tools/tools/buck/graph.json}\"; fi; "
@@ -53,6 +55,7 @@ def nix_action_build_selected_out_path_cmd(
         attr = "graph-generator-selected",
         escape_cmd_subst = False,
         graph_json_arg = "",
+        derivation_output = "out",
         extra_args = ""):
     subst_open = "`" if escape_cmd_subst else "$("
     subst_close = "`" if escape_cmd_subst else ")"
@@ -69,6 +72,8 @@ def nix_action_build_selected_out_path_cmd(
         + ("case \"$VBR_BUILD_SELECTED_LOG\" in /*) VBR_BUILD_SELECTED_LOG_DIR=\"%sdirname \"$VBR_BUILD_SELECTED_LOG\"%s\" ;; *) VBR_BUILD_SELECTED_LOG_DIR=\"%sdirname \"${WORKSPACE_ROOT:-$PWD}/$VBR_BUILD_SELECTED_LOG\"%s\" ;; esac; " % (subst_open, subst_close, subst_open, subst_close))
         + "mkdir -p \"$VBR_BUILD_SELECTED_LOG_DIR\"; "
         + "[ -e \"$VBR_BUILD_SELECTED_LOG_DIR/.metadata_never_index\" ] || : > \"$VBR_BUILD_SELECTED_LOG_DIR/.metadata_never_index\" 2>/dev/null || true; "
+        + "test -n \"${VBR_ACTION_TOOL_SOURCE_ROOT:-}\" && test -f \"$VBR_ACTION_TOOL_SOURCE_ROOT/build-tools/tools/dev/zx-init.mjs\" || { echo 'action tool source authority was lost before selected build' >&2; exit 127; }; "
+        + "export VIBEROOTS_ROOT=\"$VBR_ACTION_TOOL_SOURCE_ROOT\"; "
         + "VBR_NODE_ZX_INIT=\"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
         + "set +e; "
         + ("%s=%s" % (raw_var, subst_open))
@@ -77,6 +82,7 @@ def nix_action_build_selected_out_path_cmd(
         + "node --experimental-top-level-await --disable-warning=ExperimentalWarning "
         + "--experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "
         + ("\"$VIBEROOTS_ROOT/build-tools/tools/dev/build-selected.ts\" --target \"%s\" --attr %s --buck-action-inputs \"$VBR_BUCK_INPUTS\" " % (target_label, attr))
+        + ("--derivation-output %s " % derivation_output)
         + nix_declared_action_transport_args()
         + " $VBR_DEV_OVERRIDE_ARG "
         + (" %s " % extra_args)

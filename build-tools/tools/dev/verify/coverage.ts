@@ -16,7 +16,7 @@ async function pathExists(p: string): Promise<boolean> {
   }
 }
 
-async function mergeRustLcov(root: string): Promise<void> {
+async function mergeRustLcov(root: string): Promise<boolean> {
   const rustRoot = path.join(root, "coverage", "rust");
   const inputs: string[] = [];
   const visit = async (current: string): Promise<void> => {
@@ -27,7 +27,7 @@ async function mergeRustLcov(root: string): Promise<void> {
     }
   };
   await visit(rustRoot);
-  if (inputs.length === 0) return;
+  if (inputs.length === 0) return false;
   const merged = await Promise.all(
     inputs.sort().map(async (input) => {
       const content = await fsp.readFile(input, "utf8");
@@ -35,6 +35,7 @@ async function mergeRustLcov(root: string): Promise<void> {
     }),
   );
   await fsp.appendFile(path.join(root, "coverage", "lcov.info"), merged.join(""));
+  return true;
 }
 
 export async function resolveCoverageC8(root: string): Promise<string | null> {
@@ -109,16 +110,6 @@ export async function runMergedCoverageReport(opts: {
   root: string;
   rawDir: string;
 }): Promise<void> {
-  const c8Js = await resolveCoverageC8(opts.root);
-  if (!c8Js) {
-    process.stderr.write(
-      `error: coverage enabled but c8 is missing from ${path.join(opts.root, "node_modules")} and the managed tool closure\n`,
-    );
-    process.stderr.write("hint: run 'i' and ensure the viberoots tool closure is complete.\n");
-    process.exit(2);
-    return;
-  }
-
   const nodeBin = process.env.NODE_BIN || process.execPath;
   const artifactToolsRoot = String(process.env.VBR_ARTIFACT_TOOLS_ROOT || "");
   const managedBinDir = artifactToolsRoot.startsWith("/nix/store/")
@@ -130,20 +121,34 @@ export async function runMergedCoverageReport(opts: {
     cwd: opts.root,
   })`${nodeBin} ${buildToolPath(opts.root, "tools/dev/coverage-raw-normalize.mjs")}`.nothrow();
 
-  await $({
-    stdio: "inherit",
-    cwd: opts.root,
-    env: {
-      ...process.env,
-      NODE_V8_COVERAGE: opts.rawDir,
-      PATH: `${managedBinDir}:${process.env.PATH || ""}`,
-    },
-  })`${nodeBin} ${c8Js} report --clean=false --temp-directory ${opts.rawDir} --reports-dir ${path.join(
-    opts.root,
-    "coverage",
-  )} --reporter=json-summary --reporter=lcov --reporter=html --merge-async --extension .ts --allowExternal --src ${opts.root} --include **/*.ts --exclude node_modules/** --exclude buck-out/** --exclude .clinic/** --exclude **/*.d.ts`;
+  const hasNodeCoverage = (await fsp.readdir(opts.rawDir).catch(() => [])).some((name) =>
+    name.endsWith(".json"),
+  );
+  const hasRustCoverage = await mergeRustLcov(opts.root);
+  if (hasNodeCoverage) {
+    const c8Js = await resolveCoverageC8(opts.root);
+    if (!c8Js && !hasRustCoverage) {
+      throw new Error(
+        `coverage contains Node data but c8 is missing from ${path.join(opts.root, "node_modules")} and the managed tool closure`,
+      );
+    }
+    if (c8Js) {
+      await $({
+        stdio: "inherit",
+        cwd: opts.root,
+        env: {
+          ...process.env,
+          NODE_V8_COVERAGE: opts.rawDir,
+          PATH: `${managedBinDir}:${process.env.PATH || ""}`,
+        },
+      })`${nodeBin} ${c8Js} report --clean=false --temp-directory ${opts.rawDir} --reports-dir ${path.join(
+        opts.root,
+        "coverage",
+      )} --reporter=json-summary --reporter=lcov --reporter=html --merge-async --extension .ts --allowExternal --src ${opts.root} --include **/*.ts --exclude node_modules/** --exclude buck-out/** --exclude .clinic/** --exclude **/*.d.ts`;
+      await mergeRustLcov(opts.root);
+    }
+  }
 
-  await mergeRustLcov(opts.root);
   await $({
     stdio: "ignore",
     cwd: opts.root,

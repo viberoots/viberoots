@@ -9,6 +9,7 @@ import {
   type ArtifactEnvironmentMode,
 } from "../lib/artifact-environment";
 import { artifactNixIndependentPolicyArgs } from "../lib/artifact-nix-policy";
+import type { NixCachePolicyCapability } from "../lib/nix-cache-policy-capability";
 import { ensureNixStoreToolPathSync, envWithResolvedNixBin } from "../lib/tool-paths";
 import { redactPublisherOutput } from "./publisher-credentials";
 
@@ -26,7 +27,10 @@ export type ArtifactCommandInternalEnv = Partial<
     | "VBR_CONSUMER"
     | "VBR_RUN_INSTALL"
     | "VBR_DIRENV_ALLOW"
-    | "VBR_VIBEROOTS_URL",
+    | "VBR_BOOTSTRAP_SCAFFOLD_ONLY"
+    | "VBR_VIBEROOTS_URL"
+    | "VIBEROOTS_FLAKE_INPUT_ROOT"
+    | "VIBEROOTS_SOURCE_ROOT",
     string
   >
 >;
@@ -52,6 +56,7 @@ export async function runArtifactTool(opts: {
   artifactToolsRoot: string;
   declaredToolPath?: string;
   internalEnv?: ArtifactCommandInternalEnv;
+  nixCachePolicyCapability?: NixCachePolicyCapability;
 }): Promise<ArtifactCommandResult> {
   const inherited = envWithResolvedNixBin(opts.baseEnv || process.env);
   const internal = reviewedArtifactCommandInternalEnv(
@@ -66,6 +71,9 @@ export async function runArtifactTool(opts: {
     workspaceRoot: opts.workspaceRoot,
     artifactToolsRoot: opts.artifactToolsRoot,
     internal,
+    ...(opts.nixCachePolicyCapability
+      ? { nixCachePolicyCapability: opts.nixCachePolicyCapability }
+      : {}),
   });
   const command = opts.declaredToolPath
     ? declaredStoreExecutable(opts.declaredToolPath)
@@ -98,12 +106,23 @@ export function reviewedArtifactCommandInternalEnv(
     VBR_CONSUMER: "flake",
     VBR_RUN_INSTALL: "0",
     VBR_DIRENV_ALLOW: "0",
+    VBR_BOOTSTRAP_SCAFFOLD_ONLY: "1",
     VBR_VIBEROOTS_URL: `path:${path.join(artifactToolsRoot, "share/viberoots-source")}`,
+    VIBEROOTS_FLAKE_INPUT_ROOT: path.join(artifactToolsRoot, "share/viberoots-source"),
+    VIBEROOTS_SOURCE_ROOT: path.join(artifactToolsRoot, "share/viberoots-source"),
   };
   for (const [name, supplied] of Object.entries(value)) {
-    if (fixed[name] !== supplied) {
-      throw new Error(`artifact command rejects unreviewed internal environment ${name}`);
+    if (fixed[name] === supplied) continue;
+    if (
+      name === "VBR_VIBEROOTS_URL" &&
+      supplied?.startsWith("path:") &&
+      fixed[name]?.startsWith("path:")
+    ) {
+      const suppliedPath = fs.realpathSync(supplied.slice("path:".length));
+      const fixedPath = fs.realpathSync(fixed[name]!.slice("path:".length));
+      if (suppliedPath === fixedPath) continue;
     }
+    throw new Error(`artifact command rejects unreviewed internal environment ${name}`);
   }
   return value;
 }

@@ -12,6 +12,9 @@ import {
 } from "../../lib/artifact-environment";
 import { runBoundedArtifactCommand } from "../../lib/artifact-command-runner";
 import { artifactNixPolicyArgs } from "../../lib/artifact-nix-policy";
+import { proofBoundCachePolicyOutcome } from "../../dev/verify/nix-cache-health-config";
+import { consumeNestedCacheRoleTransport } from "../../dev/verify/nested-cache-role-transport";
+import { activateNixCachePolicyCapabilityAfterCanonicalEntry } from "../../lib/nix-cache-policy-capability";
 import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
 
 async function command(command: string, args: string[], env: NodeJS.ProcessEnv) {
@@ -80,11 +83,19 @@ test("effective artifact policy blocks host files and network and enforces fixed
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "artifact-sandbox-"));
   let server: http.Server | undefined;
   try {
+    consumeNestedCacheRoleTransport(process.env);
+    const reviewedCache = proofBoundCachePolicyOutcome(process.env);
+    assert.ok(reviewedCache, "sandbox integration requires reviewed cache authority");
+    const nixCachePolicyCapability = activateNixCachePolicyCapabilityAfterCanonicalEntry(
+      { ...process.env, VBR_CANONICAL_ARTIFACT_ENTRYPOINT: "1" },
+      reviewedCache,
+    );
     const env = buildArtifactEnvironment({
       baseEnv: withoutArtifactEnvironmentInfluence(process.env),
       mode: "ci",
       stateRoot: path.join(tmp, "environment"),
       workspaceRoot: path.resolve(process.cwd()),
+      nixCachePolicyCapability,
     });
     const nix = ensureNixStoreToolPathSync("nix", env);
     const system = await nixSystem(nix, env);

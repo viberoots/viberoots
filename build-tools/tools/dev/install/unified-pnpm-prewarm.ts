@@ -1,4 +1,5 @@
 import path from "node:path";
+import * as fsp from "node:fs/promises";
 import { runNodeWithZx } from "../../lib/node-run";
 import { buildToolPath, zxInitPath } from "../dev-build/paths";
 import { sharedUnifiedStorePath } from "./importers";
@@ -15,10 +16,14 @@ export async function prewarmUnifiedPnpmStore(opts: {
   try {
     const liveRepoRoot = String(process.env.REPO_ROOT || "").trim();
     const preferShared = !!liveRepoRoot && path.resolve(liveRepoRoot) !== opts.repoRoot;
-    if (preferShared && (await sharedUnifiedStorePath(liveRepoRoot))) {
+    const declaredShared = String(process.env.VBR_SHARED_UNIFIED_PNPM_STORE_PATH || "").trim();
+    const sharedPath =
+      declaredShared || (preferShared ? await sharedUnifiedStorePath(liveRepoRoot) : "");
+    if (sharedPath) {
+      await fsp.access(sharedPath);
       if (opts.verbose) {
         console.log(
-          `[install-deps] skipping temp-workspace unified prewarm; using shared store marker from ${liveRepoRoot}`,
+          `[install-deps] skipping temp-workspace unified prewarm; using shared store ${sharedPath}`,
         );
       }
       return;

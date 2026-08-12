@@ -969,7 +969,7 @@ Public args:
 - `name` string. Target name.
   - Example: `node_asset_stage(name = "web_assets")`
   - Used for / scenarios: Defines the target label used by other targets and tooling. Use it to create a stable API name for the artifact in this package.
-- `app` label or path string. Webapp output to copy.
+- `app` same-cell target label. Webapp output to copy.
   - Example: `app = ":webapp"`
   - Used for / scenarios: Points staging to the primary webapp output to copy. Use it as the base artifact before adding runtime assets or rewrites.
 - `assets` list of dicts. Each item requires `src` and `dest`, and may set one selector.
@@ -980,6 +980,9 @@ Public args:
       - Example: `{"src": "//libs:py_wasm", "artifact_name": "pyext.wasm", "dest": "wasm/py.wasm"}`
     - `artifact_glob` string. Glob selector for controlled unstable names when `src` resolves to a directory.
       - Example: `{"src": "//libs:wasm_out", "artifact_glob": "module-*.wasm", "dest": "wasm/module.wasm"}`
+    - `source_path` string. Exact repository-relative source for a raw `export_file` label.
+    - `output_path` string. Exact artifact-relative output for a generated raw-file target.
+    - `kind` string (`file` or `wasm`). Required when an extensionless asset is ambiguous.
   - Do not set both `artifact_name` and `artifact_glob` on the same asset.
 - Directory resolution defaults when no selector is set:
   - Prefer `top.wasm` when present.
@@ -1573,6 +1576,22 @@ part of the action's declared inputs: Rust build and test actions validate the s
 materialize its declared state into action-owned writable storage, and execute the selected build or
 real Cargo test harness from that state. Local-only targets may omit the set; partial sets do not
 establish remote readiness.
+
+All artifact-producing Rust macros also accept `behavior_probe`, a bool that defaults to `False`.
+This is a narrow reproducibility-qualification API, not a general post-build hook. When enabled,
+the Nix artifact builder executes the installed output with the kind-specific reviewed observer,
+extracts the reserved `viberoots_observed_behavior` result, requires the protected value `42` or
+`43`, and writes only `$out/share/viberoots-rust/observed-behavior`. Native binaries and tests run
+their installed executables; libraries and extensions expose the reserved symbol through their
+reviewed ABI; WASM invokes that export with the pinned runtime. Tauri observes the packaged
+frontend WASM only after its path and digest match the package manifest.
+
+`behavior_probe = True` therefore changes artifact construction and output identity. It accepts no
+command, path, environment, or expected-value override and fails closed when the artifact lacks the
+reserved observation contract. Use it only for protected reproducibility and patch-lifecycle
+fixtures whose sources intentionally implement that contract; ordinary application and library
+targets must leave it disabled. `rust_python_wasm_extension` remains unsupported and produces no
+artifact to observe.
 
 ### `rust_library(name, **kwargs)`
 

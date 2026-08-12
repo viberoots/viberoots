@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { externalNodeToolEnv } from "../../lib/external-node-env";
+import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
 import { resolveWorkspaceRootSync } from "../../lib/repo";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { NATIVE_PNPM_COMMAND_TIMEOUT_MS } from "./pnpm-fixed-store-native-run";
@@ -129,19 +130,36 @@ export async function stageFixtureLock(root: string): Promise<void> {
   });
 }
 
+function nativeFixtureNixConfig(): string {
+  const inherited = String(
+    process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG || process.env.NIX_CONFIG || "",
+  ).trim();
+  const base =
+    inherited ||
+    [
+      "substituters = https://cache.nixos.org/",
+      "extra-substituters =",
+      "connect-timeout = 3",
+      "stalled-download-timeout = 10",
+      "fallback = true",
+    ].join("\n");
+  if (/^\s*experimental-features\s*=/m.test(base)) return base;
+  return `experimental-features = nix-command flakes\n${base}`;
+}
+
 export function nixEnv(
   home: string,
   authority: "reconcile" | "materialize" = "reconcile",
 ): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {
+  const env: NodeJS.ProcessEnv = withSanitizedInheritedNixConfig({
     ...externalNodeToolEnv(),
     HOME: home,
     XDG_CACHE_HOME: path.join(home, "xdg-cache"),
-    NIX_CONFIG: "experimental-features = nix-command flakes",
+    NIX_CONFIG: nativeFixtureNixConfig(),
     ...(authority === "reconcile" ? { NIX_PNPM_RECONCILE: "1" } : { NIX_PNPM_MATERIALIZE: "1" }),
     NIX_PNPM_FETCH_TIMEOUT: String(NATIVE_PNPM_COMMAND_TIMEOUT_MS / 1000),
     NIX_PNPM_INSTALL_TIMEOUT: String(NATIVE_PNPM_COMMAND_TIMEOUT_MS / 1000),
-  };
+  });
   delete env.VBR_NIX_CACHE_HEALTH_APPLIED;
   delete env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG;
   return env;

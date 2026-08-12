@@ -7,7 +7,7 @@ import { rustPatchFilename } from "../../patch/rust-sync-required";
 import { runInTemp } from "../lib/test-helpers";
 import { runRealGitVendorBoundary } from "./rust.real-git-vendor-boundary.helpers";
 import { runRealPrivateRegistryBoundary } from "./rust.real-private-registry-boundary.helpers";
-
+import { readRemoteNixStoreFile } from "../../ci/artifact-reproducibility-semantic-manifest";
 type Dependency = {
   id: string;
   name: string;
@@ -18,7 +18,6 @@ type Dependency = {
   patched: number;
   vendorName: string;
 };
-
 const dependencies: Dependency[] = [
   {
     id: "crates_dep",
@@ -69,18 +68,16 @@ const dependencies: Dependency[] = [
     vendorName: "replaced_dep-4.0.0-source-replaced",
   },
 ];
-
 function lockEntry(dependency: Dependency): string {
   const checksum = dependency.checksum ? `\nchecksum="${dependency.checksum}"` : "";
   return `[[package]]\nname="${dependency.name}"\nversion="${dependency.version}"\nsource="${dependency.source}"${checksum}\n`;
 }
-
 test("Rust Nix patching executes for registry, Git, private, and source-replaced identities", async () => {
   await runInTemp("rust-patch-compiled", async (tmp, $) => {
     const owner = path.join(tmp, "fixture");
     const sources = path.join(owner, "sources");
     const unrelated = path.join(owner, "unrelated");
-    const patchDir = path.join(owner, "patches");
+    const patchDir = path.join(owner, "patches", "rust");
     await Promise.all(
       [sources, unrelated, patchDir].map((directory) => fsp.mkdir(directory, { recursive: true })),
     );
@@ -92,22 +89,27 @@ test("Rust Nix patching executes for registry, Git, private, and source-replaced
         path.join(sourceRoot, "lib.rs"),
         `pub fn value() -> u8 { ${dependency.initial} }\n`,
       );
-      await fsp.writeFile(
-        path.join(
-          patchDir,
-          rustPatchFilename(dependency.name, dependency.version, dependency.source),
-        ),
-        [
-          "diff --git a/lib.rs b/lib.rs",
-          "--- a/lib.rs",
-          "+++ b/lib.rs",
-          "@@ -1 +1 @@",
-          `-pub fn value() -> u8 { ${dependency.initial} }`,
-          `+pub fn value() -> u8 { ${dependency.patched} }`,
-          "",
-        ].join("\n"),
-      );
     }
+    const writePatches = async () =>
+      await Promise.all(
+        dependencies.map((dependency) =>
+          fsp.writeFile(
+            path.join(
+              patchDir,
+              rustPatchFilename(dependency.name, dependency.version, dependency.source),
+            ),
+            [
+              "diff --git a/lib.rs b/lib.rs",
+              "--- a/lib.rs",
+              "+++ b/lib.rs",
+              "@@ -1 +1 @@",
+              `-pub fn value() -> u8 { ${dependency.initial} }`,
+              `+pub fn value() -> u8 { ${dependency.patched} }`,
+              "",
+            ].join("\n"),
+          ),
+        ),
+      );
     const lock = path.join(owner, "Cargo.lock");
     await fsp.writeFile(lock, `version=3\n${dependencies.map(lockEntry).join("")}`);
 
@@ -115,7 +117,7 @@ test("Rust Nix patching executes for registry, Git, private, and source-replaced
       .map((dependency) => {
         return [
           `mkdir -p vendor/${dependency.vendorName}`,
-          `cp ${path.join(sources, dependency.id)}/lib.rs vendor/${dependency.vendorName}/`,
+          `cp \${builtins.path { path = builtins.toPath ${JSON.stringify(path.join(sources, dependency.id))}; name = ${JSON.stringify(`rust-patch-${dependency.id}`)}; }}/lib.rs vendor/${dependency.vendorName}/`,
           `printf '%s\\n' ${JSON.stringify(
             JSON.stringify({
               files: {},
@@ -136,7 +138,7 @@ test("Rust Nix patching executes for registry, Git, private, and source-replaced
         (dependency) =>
           `${JSON.stringify(
             `${dependency.name.toLowerCase()}@${dependency.version}#${dependency.source}`,
-          )} = builtins.toPath ${JSON.stringify(path.join(sources, dependency.id))};`,
+          )} = builtins.path { path = builtins.toPath ${JSON.stringify(path.join(sources, dependency.id))}; name = ${JSON.stringify(`rust-patch-authority-${dependency.id}`)}; };`,
       )
       .join("\n");
     const expression = (authorities = vendorAuthorities, extraVendor = "") => `
@@ -144,8 +146,8 @@ test("Rust Nix patching executes for registry, Git, private, and source-replaced
         pkgs = import <nixpkgs> {};
         plan = import ./viberoots/build-tools/tools/nix/templates/rust-patches.nix {
           inherit pkgs;
-          cargoLock = builtins.toPath ${JSON.stringify(lock)};
-          patchInputs = [ (builtins.toPath ${JSON.stringify(patchDir)}) ];
+          cargoLock = builtins.path { path = builtins.toPath ${JSON.stringify(lock)}; name = "rust-patch-Cargo.lock"; };
+          patchInputs = [ (builtins.path { path = builtins.toPath ${JSON.stringify(patchDir)}; name = "rust-package-patches"; }) ];
           vendorAuthorities = { ${authorities} };
         };
       in pkgs.runCommand "rust-patch-compiled-behavior" {
@@ -159,7 +161,7 @@ test("Rust Nix patching executes for registry, Git, private, and source-replaced
           'fn main() { println!("{:?}", (${values})); }' > main.rs
         rustc main.rs -o value
         mkdir -p unrelated
-        cp ${unrelated}/lib.rs unrelated/lib.rs
+        cp \${builtins.path { path = builtins.toPath ${JSON.stringify(unrelated)}; name = "rust-patch-unrelated"; }}/lib.rs unrelated/lib.rs
         printf '%s\n' \
           'mod dep { include!("unrelated/lib.rs"); }' \
           'fn main() { println!("{}", dep::value()); }' > unrelated.rs
@@ -172,14 +174,30 @@ test("Rust Nix patching executes for registry, Git, private, and source-replaced
         nix build -L --impure --no-link --print-out-paths --expr \
           ${expression(authorities, extraVendor)}
       `;
-      return await fsp.readFile(String(result.stdout).trim(), "utf8");
+      const outPath = String(result.stdout).trim();
+      const drvPath = String(
+        (await $({ cwd: tmp, stdio: "pipe" })`nix path-info --derivation ${outPath}`).stdout,
+      ).trim();
+      const behavior = (
+        await readRemoteNixStoreFile(
+          async (args) => await $({ cwd: tmp, stdio: "pipe" })`${["nix", ...args]}`,
+          outPath,
+        )
+      ).toString("utf8");
+      return { behavior, drvPath, outPath };
     };
     const failedBuild = async (authorities?: string, extraVendor?: string) =>
       await $({ cwd: tmp, stdio: "pipe", reject: false, nothrow: true })`
         nix build -L --impure --no-link --print-out-paths --expr \
           ${expression(authorities, extraVendor)}
       `;
-    assert.equal((await build()).trim(), "(2, 12, 14, 22, 32)\n7");
+    const baseline = await build();
+    assert.equal(baseline.behavior.trim(), "(1, 11, 13, 21, 31)\n7");
+    await writePatches();
+    const patched = await build();
+    assert.equal(patched.behavior.trim(), "(2, 12, 14, 22, 32)\n7");
+    assert.notEqual(patched.drvPath, baseline.drvPath);
+    assert.notEqual(patched.outPath, baseline.outPath);
     assert.equal(
       await fsp.readFile(path.join(unrelated, "lib.rs"), "utf8"),
       "pub fn value() -> u8 { 7 }\n",
@@ -203,7 +221,8 @@ test("Rust Nix patching executes for registry, Git, private, and source-replaced
         rustPatchFilename(dependencies[2]!.name, dependencies[2]!.version, dependencies[2]!.source),
       ),
     );
-    assert.equal((await build()).trim(), "(2, 12, 13, 22, 32)\n7");
+    assert.equal((await build()).behavior.trim(), "(2, 12, 13, 22, 32)\n7");
+    await writePatches();
     await Promise.all(
       dependencies.map((dependency) =>
         fsp.rm(
@@ -215,14 +234,14 @@ test("Rust Nix patching executes for registry, Git, private, and source-replaced
         ),
       ),
     );
-    assert.equal((await build()).trim(), "(1, 11, 13, 21, 31)\n7");
+    const restored = await build();
+    assert.deepEqual(restored, baseline);
+    console.log(JSON.stringify({ baseline, patched, restored }));
   });
 });
-
 test("Rust patches a real buildRustPackage Git vendor boundary without matching metadata", async () => {
   await runInTemp("rust-real-git-vendor", async (tmp) => await runRealGitVendorBoundary(tmp));
 });
-
 test("Rust patches a pre-materialized private registry boundary offline", async () => {
   await runInTemp(
     "rust-real-private-registry",

@@ -22,6 +22,8 @@
     attr = H.sanitizeName name;
     path = "__VIBEROOTS_RUST_OUT__";
     expectedOutputIdentity = "__VIBEROOTS_RUST_IDENTITY__";
+    provenancePath = "__VIBEROOTS_RUST_PROVENANCE__";
+    expectedProvenanceIdentity = "__VIBEROOTS_RUST_PROVENANCE_IDENTITY__";
   }] ++ builtins.genList (index:
     let runtime = builtins.elemAt interopContract.runtimePackages index;
     in {

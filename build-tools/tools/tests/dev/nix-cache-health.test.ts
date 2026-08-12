@@ -9,6 +9,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { applyNixCacheHealthPolicy } from "../../dev/verify/nix-cache-health";
+import { renderReviewedNixCacheConfig } from "../../dev/verify/nix-cache-health-config";
 import { evaluateNixCacheReadinessFromConfig } from "../../lib/nix-cache-readiness";
 import {
   currentNixCachePolicyCapability,
@@ -97,6 +98,12 @@ async function withEnv<T>(env: NodeJS.ProcessEnv, fn: () => Promise<T>): Promise
     "VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS",
     "VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS",
     "VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY",
+    "VBR_NIX_CACHE_ROLE_REQUIRED",
+    "VBR_NIX_CACHE_ROLE_OPTIONAL",
+    "VBR_NIX_CACHE_ROLE_POLICY",
+    "VBR_NIX_CACHE_ROLE_BINDING",
+    "VBR_NIX_CACHE_ROLE_CONFIG_B64",
+    "VBR_NIX_CACHE_ROLE_AUTHORITY",
   ]) {
     delete process.env[key];
   }
@@ -150,6 +157,29 @@ test("nix cache health removes unreachable optional extra-substituters dynamical
   );
 });
 
+test("nix cache health restores optional roles from flattened effective substituters", async () => {
+  await withEnv({ VBR_NIX_CACHE_POLICY: "auto", VBR_NIX_CACHE_HEALTH_APPLIED: "" }, async () => {
+    const result = await applyNixCacheHealthPolicy("/tmp/repo", {
+      readEffectiveConfig: async () =>
+        "substituters = https://cache.nixos.org/ https://cache.home.example/main",
+      readCacheRoleProvenance: () => ({
+        required: ["https://cache.nixos.org/"],
+        optional: ["https://cache.home.example/main"],
+      }),
+      probeUrl: async () => true,
+    });
+    assert.deepEqual(result.requiredSubstituters, ["https://cache.nixos.org/"]);
+    assert.deepEqual(result.optionalSubstituters, ["https://cache.home.example/main"]);
+    const childConfig = renderReviewedNixCacheConfig(
+      result.nixConfig,
+      result.requiredSubstituters,
+      result.optionalSubstituters,
+    );
+    assert.match(childConfig, /substituters = https:\/\/cache\.nixos\.org\//);
+    assert.match(childConfig, /extra-substituters = https:\/\/cache\.home\.example\/main/);
+  });
+});
+
 test("forged cache-health markers cannot bypass TypeScript re-review", async () => {
   let reads = 0;
   await withEnv(
@@ -175,32 +205,117 @@ test("forged cache-health markers cannot bypass TypeScript re-review", async () 
   );
 });
 
-test("nix cache health auto mode fails closed for unreachable required substituters", async () => {
-  await withEnv({ VBR_NIX_CACHE_POLICY: "auto", VBR_NIX_CACHE_HEALTH_APPLIED: "" }, async () => {
-    await assert.rejects(
-      applyNixCacheHealthPolicy("/tmp/repo", {
-        readEffectiveConfig: async () => "substituters = https://cache.nixos.org/",
-        probeUrl: async () => false,
-      }),
-      /required Nix substituter unavailable: https:\/\/cache\.nixos\.org\//,
+test("proof-bound cache roles reuse the reviewed config without another network probe", async () => {
+  const config = [
+    "substituters = https://cache.nixos.org/",
+    "extra-substituters = https://optional.example/cache",
+    "fallback = true",
+  ].join("\n");
+  const reviewed = {
+    kind: "reviewed" as const,
+    config,
+    policy: "auto" as const,
+    requiredSubstituters: ["https://cache.nixos.org/"],
+    optionalSubstituters: ["https://optional.example/cache"],
+  };
+  await withEnv(
+    {
+      NIX_CONFIG: config,
+      VBR_NIX_CACHE_POLICY: "auto",
+      VBR_NIX_CACHE_ROLE_REQUIRED: reviewed.requiredSubstituters.join(" "),
+      VBR_NIX_CACHE_ROLE_OPTIONAL: reviewed.optionalSubstituters.join(" "),
+      VBR_NIX_CACHE_ROLE_POLICY: reviewed.policy,
+      VBR_NIX_CACHE_ROLE_BINDING: nixCachePolicyBindingDigest(reviewed),
+      VBR_NIX_CACHE_ROLE_CONFIG_B64: Buffer.from(config, "utf8").toString("base64"),
+      VBR_NIX_CACHE_ROLE_AUTHORITY: "verify-nested-v1",
+    },
+    async () => {
+      const result = await applyNixCacheHealthPolicy("/tmp/repo", {
+        readEffectiveConfig: async () => {
+          throw new Error("proof-bound config must not be re-read");
+        },
+        probeUrl: async () => {
+          throw new Error("proof-bound substituters must not be re-probed");
+        },
+      });
+      assert.equal(result.changed, false);
+      assert.deepEqual(result.requiredSubstituters, reviewed.requiredSubstituters);
+      assert.deepEqual(result.optionalSubstituters, reviewed.optionalSubstituters);
+    },
+  );
+});
+
+test("proof-bound cache roles fail closed when config or binding changes", async () => {
+  const config = "substituters = https://cache.nixos.org/";
+  const reviewed = {
+    kind: "reviewed" as const,
+    config,
+    policy: "auto" as const,
+    requiredSubstituters: ["https://cache.nixos.org/"],
+    optionalSubstituters: [] as string[],
+  };
+  for (const env of [
+    {
+      VBR_NIX_CACHE_ROLE_CONFIG_B64: Buffer.from(
+        "substituters = https://different.example/cache",
+        "utf8",
+      ).toString("base64"),
+      VBR_NIX_CACHE_ROLE_BINDING: nixCachePolicyBindingDigest(reviewed),
+    },
+    {
+      VBR_NIX_CACHE_ROLE_CONFIG_B64: Buffer.from(config, "utf8").toString("base64"),
+      VBR_NIX_CACHE_ROLE_BINDING: "0".repeat(64),
+    },
+  ]) {
+    await withEnv(
+      {
+        VBR_NIX_CACHE_POLICY: "auto",
+        VBR_NIX_CACHE_ROLE_REQUIRED: reviewed.requiredSubstituters.join(" "),
+        VBR_NIX_CACHE_ROLE_OPTIONAL: "",
+        VBR_NIX_CACHE_ROLE_POLICY: reviewed.policy,
+        VBR_NIX_CACHE_ROLE_AUTHORITY: "verify-nested-v1",
+        ...env,
+      },
+      async () => {
+        await assert.rejects(
+          applyNixCacheHealthPolicy("/tmp/repo"),
+          /proof-bound Nix cache (?:roles do not match active config|role binding is invalid)/,
+        );
+      },
     );
-    assert.equal(process.env.VBR_NIX_CACHE_HEALTH_APPLIED, undefined);
+  }
+});
+
+test("nix cache health auto mode degrades unreachable required substituters", async () => {
+  await withEnv({ VBR_NIX_CACHE_POLICY: "auto", VBR_NIX_CACHE_HEALTH_APPLIED: "" }, async () => {
+    const logs: string[] = [];
+    const result = await applyNixCacheHealthPolicy("/tmp/repo", {
+      log: (line) => logs.push(line),
+      readEffectiveConfig: async () => "substituters = https://cache.nixos.org/",
+      probeUrl: async () => false,
+    });
+    assert.equal(result.changed, true);
+    assert.deepEqual(result.removed, ["https://cache.nixos.org/"]);
+    assert.deepEqual(result.requiredSubstituters, []);
+    assert.match(String(process.env.NIX_CONFIG), /substituters =\s*(?:\n|$)/);
+    assert.equal(process.env.VBR_NIX_CACHE_HEALTH_APPLIED, "1");
+    assert.match(logs.join("\n"), /disabled unreachable substituter.*cache\.nixos\.org/);
   });
 });
 
-test("nix cache health treats a dual-role substituter as required", async () => {
+test("nix cache health degrades an unreachable dual-role substituter once", async () => {
   await withEnv({ VBR_NIX_CACHE_POLICY: "auto", VBR_NIX_CACHE_HEALTH_APPLIED: "" }, async () => {
-    await assert.rejects(
-      applyNixCacheHealthPolicy("/tmp/repo", {
-        readEffectiveConfig: async () =>
-          [
-            "substituters = https://dual.example/cache",
-            "extra-substituters = https://dual.example/cache",
-          ].join("\n"),
-        probeUrl: async () => false,
-      }),
-      /required Nix substituter unavailable: https:\/\/dual\.example\/cache/,
-    );
+    const result = await applyNixCacheHealthPolicy("/tmp/repo", {
+      readEffectiveConfig: async () =>
+        [
+          "substituters = https://dual.example/cache",
+          "extra-substituters = https://dual.example/cache",
+        ].join("\n"),
+      probeUrl: async () => false,
+    });
+    assert.deepEqual(result.removed, ["https://dual.example/cache"]);
+    assert.deepEqual(result.requiredSubstituters, []);
+    assert.deepEqual(result.optionalSubstituters, []);
   });
 });
 
@@ -412,7 +527,7 @@ test("generated cache probes enforce netrc argv and curl exit policy behaviorall
     await fsp.writeFile(
       nixPath,
       `#!/usr/bin/env bash
-if [[ "\${3:-}" == "--json" ]]; then
+if [[ " $* " == *" --json "* ]]; then
   printf '{"substituters":{"defaultValue":["%s"],"value":["%s"]}}\\n' "\${TEST_SUBSTITUTER:-https://cache.example}" "\${TEST_SUBSTITUTER:-https://cache.example}"
   exit 0
 fi
@@ -485,7 +600,7 @@ printf "%s = %s\\n" "\${TEST_CACHE_SETTING:-substituters}" "\${TEST_SUBSTITUTER:
             TMPDIR: tmp,
             VIBEROOTS_SOURCE_ROOT: VIBEROOTS_ROOT,
             VBR_NIX_CACHE_POLICY: "auto",
-            NIX_CONFIG: forgedMarkers ? `substituters = ${substituter}` : "",
+            NIX_CONFIG: `${setting} = ${substituter}`,
             VBR_NIX_CACHE_HEALTH_APPLIED: forgedMarkers ? "1" : "",
             VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG: forgedMarkers
               ? `substituters = ${substituter}`
@@ -551,8 +666,8 @@ printf "%s = %s\\n" "\${TEST_CACHE_SETTING:-substituters}" "\${TEST_SUBSTITUTER:
       }
       assert.equal(
         (await runRenderer(renderer, readable, 6)).status,
-        1,
-        `${renderer.name}: required transport failure must fail closed`,
+        0,
+        `${renderer.name}: required transport failure must degrade in auto mode`,
       );
       assert.equal(
         (
@@ -892,10 +1007,7 @@ test("auto cache health degrades an optional HTTP 401 (curl 22) while required a
   assert.match(degraded.logs.join("\n"), /disabled unreachable substituter/);
   assert.doesNotMatch(degraded.logs.join("\n"), /fixture-secret-must-redact/);
 
-  for (const [setting, policy] of [
-    ["substituters", "auto"],
-    ["extra-substituters", "strict"],
-  ] as const) {
+  for (const [setting, policy] of [["extra-substituters", "strict"]] as const) {
     const closed = await run(setting, policy);
     assert.equal(closed.result, null);
     assert.match(
@@ -1243,7 +1355,7 @@ test("generated stage0 refreshes stale authority and hands exact config to TypeS
       `#!/usr/bin/env bash
 printf 'called\\n' >> ${JSON.stringify(callLog)}
 [[ "\${TEST_NIX_CONFIG_STATUS:-0}" == 0 ]] || exit "$TEST_NIX_CONFIG_STATUS"
-if [[ "\${3:-}" == "--json" ]]; then
+if [[ " $* " == *" --json "* ]]; then
   if [[ -n "\${TEST_EFFECTIVE_NIX_CONFIG_JSON:-}" ]]; then printf '%s\\n' "$TEST_EFFECTIVE_NIX_CONFIG_JSON"; else printf '{}\\n'; fi
 elif [[ "\${TEST_EFFECTIVE_FROM_NIX_CONFIG:-}" == "1" ]]; then
   printf '%s\\n' "\${NIX_CONFIG:-}"
@@ -1361,7 +1473,7 @@ exit 0
       applied: "1",
       reviewed: full,
       nixConfig: full,
-      sourceConfig: "builders =",
+      sourceConfig: full,
       required: "",
       optional: "",
       reviewedPolicy: "auto",
@@ -1452,11 +1564,13 @@ exit 0
       return Number(stdout);
     };
     assert.equal(await runBoundAction(["https://required.example/cache"], [lateOptional]), 0);
-    assert.equal(await runBoundAction([lateOptional], []), 1);
-    assert.equal(await runBoundAction([lateOptional], [lateOptional]), 1);
+    // A valid binding is the reviewed parent health-check result. Actions validate that
+    // authority and reuse it instead of multiplying network probes across the graph.
+    assert.equal(await runBoundAction([lateOptional], []), 0);
+    assert.equal(await runBoundAction([lateOptional], [lateOptional]), 0);
 
     const mismatchedJsonRoles = await runStage0({
-      effective: "substituters = file:///system-cache",
+      effective: "substituters = file:///system-cache file:///other-cache",
       effectiveJson: "{}",
       roleSourceRoot: VIBEROOTS_ROOT,
     });
@@ -1564,11 +1678,13 @@ exit 0
     assert.equal(credentialRejected.sourceConfig, "");
     assert.doesNotMatch(credentialRejected.nixConfig, /fixture-secret|token=/);
 
+    const removedConfig = [
+      "substituters = file:///system-cache",
+      "extra-substituters = https://removed.example/cache file:///kept-optional",
+    ].join("\n");
     const removed = await runStage0({
-      effective: [
-        "substituters = file:///system-cache",
-        "extra-substituters = https://removed.example/cache file:///kept-optional",
-      ].join("\n"),
+      effective: removedConfig,
+      nixConfig: removedConfig,
     });
     assert.equal(removed.required, "file:///system-cache");
     assert.equal(removed.optional, "file:///kept-optional");
@@ -1645,7 +1761,7 @@ exit 0
     assert.equal(strictToAuto.status, 0);
     assert.equal(strictToAuto.required, "file:///strict-cache");
     assert.equal(strictToAuto.reviewedPolicy, "auto");
-    assert.equal(strictToAuto.calls, 2);
+    assert.equal(strictToAuto.calls, 1);
 
     const empty = await runStage0({ effective: "" });
     assert.equal(empty.status, 0);
@@ -1725,8 +1841,8 @@ test("nix cache readiness reports reachable, absent, degraded, and strict states
     "auto",
     async () => false,
   );
-  assert.equal(requiredUnavailable.state, "failed");
-  assert.match(requiredUnavailable.message, /required cache policy failed/);
+  assert.equal(requiredUnavailable.state, "degraded");
+  assert.match(requiredUnavailable.message, /local fallback is active/);
 
   const strict = await evaluateNixCacheReadinessFromConfig(
     "extra-substituters = https://strict.dynamic.example/cache",
@@ -1772,7 +1888,6 @@ test("nix cache readiness reports reachable, absent, degraded, and strict states
   );
 
   for (const [config, policy] of [
-    ["substituters = https://required-http.example/cache", "auto"],
     ["extra-substituters = https://optional-http.example/cache", "strict"],
   ] as const) {
     await assert.rejects(

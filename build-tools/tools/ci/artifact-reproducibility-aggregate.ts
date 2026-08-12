@@ -3,14 +3,13 @@ import {
   artifactIdentityFields,
   artifactToolClosureDigest,
   assertArtifactReproducibilityEvidence,
-  type ArtifactBuilderAuthority,
   type ArtifactReproducibilityEvidence,
   type ArtifactReproducibilitySubjectAuthority,
 } from "../lib/artifact-reproducibility-evidence";
 import {
-  ARTIFACT_REPRODUCIBILITY_MATRIX,
   ARTIFACT_REPRODUCIBILITY_MATRIX_DIGEST,
   RELEASE_BUILDER_SYSTEMS,
+  reproducibilityMatrixSystemPairs,
 } from "../lib/artifact-reproducibility-matrix";
 import {
   assertIndependentReviewedRemoteBuilders,
@@ -18,53 +17,36 @@ import {
 } from "../remote-exec/remote-builder-authority";
 import { assertRegisteredArtifactBuilderAuthority } from "./artifact-reproducibility-aggregate-validation";
 import {
-  proveGraduatedLanguageCoverage,
   assertObservationStorePath,
   assertRunRecordAuthority,
   summarizeArtifactObservations,
-  type ArtifactObservationSummary,
-  type LanguageGraduationProof,
   type StoredArtifactObservation,
 } from "./artifact-reproducibility-aggregate-gates";
-
+import { proveLanguageQualification } from "./artifact-reproducibility-language-qualification";
+import {
+  assertProtectedRustPatchEvidenceSet,
+  type ProtectedRustPatchEvidence,
+} from "./protected-rust-patch-evidence";
+import {
+  assertRemoteCiToolsSourceIdentity,
+  type RemoteCiToolsSourceIdentity,
+} from "./remote-ci-tools-source-identity";
 export {
   assertArtifactReproducibilityAggregate,
   parseArtifactReproducibilityAggregate,
 } from "./artifact-reproducibility-aggregate-validation";
-
-export type ArtifactReproducibilityIdentity = ReturnType<typeof artifactIdentityFields>;
-export type PublicationSubject = Extract<
-  ArtifactReproducibilitySubjectAuthority,
-  { kind: "publication" }
->;
-type Comparison = {
-  subjectId: string;
-  system: string;
-  artifactIdentity: ArtifactReproducibilityIdentity;
-  artifactIdentityDigest: string;
-  builderAuthorities: [ArtifactBuilderAuthority, ArtifactBuilderAuthority];
-  checkoutIdentities: [string, string];
-};
-
-export type ArtifactReproducibilityRunRecord = {
-  schema: "viberoots.artifact-reproducibility-run-record.v3";
-  registryStorePath: string;
-  observationStorePath: string;
-  evidence: ArtifactReproducibilityEvidence;
-};
-
-export type ArtifactReproducibilityAggregate = {
-  schema: "viberoots.artifact-reproducibility-aggregate.v3";
-  sourceRevision: string;
-  matrixDigest: string;
-  publicationSubjectSetDigest: string;
-  registryStorePath: string;
-  matrixComparisons: Comparison[];
-  publicationComparisons: Comparison[];
-  observationSummary: ArtifactObservationSummary;
-  languageGraduation: LanguageGraduationProof[];
-};
-
+export type {
+  ArtifactReproducibilityAggregate,
+  ArtifactReproducibilityIdentity,
+  ArtifactReproducibilityRunRecord,
+  PublicationSubject,
+} from "./artifact-reproducibility-aggregate-types";
+import type {
+  ArtifactReproducibilityAggregate,
+  ArtifactReproducibilityComparison as Comparison,
+  ArtifactReproducibilityRunRecord,
+  PublicationSubject,
+} from "./artifact-reproducibility-aggregate-types";
 export function createArtifactReproducibilityRunRecord(opts: {
   registryStorePath: string;
   observationStorePath: string;
@@ -83,7 +65,6 @@ export function createArtifactReproducibilityRunRecord(opts: {
     evidence: opts.evidence,
   };
 }
-
 export function aggregateArtifactReproducibilityEvidence(opts: {
   registry: unknown;
   registryStorePath: string;
@@ -93,6 +74,8 @@ export function aggregateArtifactReproducibilityEvidence(opts: {
   languageManifest: unknown;
   expectedSourceRevision: string;
   expectedToolClosureRoot: string;
+  expectedToolClosureSourceIdentity: RemoteCiToolsSourceIdentity;
+  protectedRustPatchEvidence: readonly ProtectedRustPatchEvidence[];
 }): ArtifactReproducibilityAggregate {
   const registry = parseReviewedRemoteBuilders(opts.registry);
   assertRegistryStorePath(opts.registryStorePath);
@@ -102,11 +85,15 @@ export function aggregateArtifactReproducibilityEvidence(opts: {
     throw new Error("reproducibility aggregate requires the protected source revision");
   }
   const expectedToolClosureDigest = artifactToolClosureDigest(opts.expectedToolClosureRoot);
+  assertRemoteCiToolsSourceIdentity(
+    opts.expectedToolClosureSourceIdentity,
+    opts.expectedToolClosureSourceIdentity.toolSourceRevision,
+  );
   const expectedPublicationSubjects = new Map(
     publicationSubjects.map((subject) => [subject.subjectId, JSON.stringify(subject)]),
   );
   const expectedGroups =
-    ARTIFACT_REPRODUCIBILITY_MATRIX.length * RELEASE_BUILDER_SYSTEMS.length +
+    reproducibilityMatrixSystemPairs().length +
     publicationSubjects.length * RELEASE_BUILDER_SYSTEMS.length;
   if (opts.records.length !== expectedGroups * 2) {
     throw new Error(`reproducibility aggregate requires exactly ${expectedGroups * 2} records`);
@@ -118,7 +105,8 @@ export function aggregateArtifactReproducibilityEvidence(opts: {
     const evidence = record.evidence;
     if (
       evidence.toolClosureRoot !== opts.expectedToolClosureRoot ||
-      evidence.toolClosureDigest !== expectedToolClosureDigest
+      evidence.toolClosureDigest !== expectedToolClosureDigest ||
+      evidence.toolSourceRevision !== opts.expectedToolClosureSourceIdentity.toolSourceRevision
     ) {
       throw new Error("reproducibility evidence does not use the reviewed tool closure");
     }
@@ -153,10 +141,8 @@ export function aggregateArtifactReproducibilityEvidence(opts: {
   if (publicationRevisions.size !== 1) {
     throw new Error("publication comparisons require one production source revision");
   }
-  const matrixComparisons = ARTIFACT_REPRODUCIBILITY_MATRIX.flatMap((matrixCase) =>
-    RELEASE_BUILDER_SYSTEMS.map((system) =>
-      comparePair(groups, builders, `matrix:${matrixCase.id}\0${system}`, matrixCase.id, system),
-    ),
+  const matrixComparisons = reproducibilityMatrixSystemPairs().map(({ matrixId, system }) =>
+    comparePair(groups, builders, `matrix:${matrixId}\0${system}`, matrixId, system),
   );
   const publicationComparisons = publicationSubjects.flatMap((subject) =>
     RELEASE_BUILDER_SYSTEMS.map((system) =>
@@ -171,23 +157,33 @@ export function aggregateArtifactReproducibilityEvidence(opts: {
   );
   if (groups.size) throw new Error("reproducibility aggregate contains extra subject groups");
   const observationSummary = summarizeArtifactObservations(opts.records, opts.observations);
-  const languageGraduation = proveGraduatedLanguageCoverage(
+  const languageQualification = proveLanguageQualification(
     opts.languageManifest,
     matrixComparisons,
   );
+  const protectedRustPatchEvidence = [...opts.protectedRustPatchEvidence];
+  assertProtectedRustPatchEvidenceSet({
+    evidence: protectedRustPatchEvidence,
+    registry,
+    registryStorePath: opts.registryStorePath,
+    sourceRevision: opts.expectedSourceRevision,
+    toolClosureSourceIdentity: opts.expectedToolClosureSourceIdentity,
+  });
   return {
-    schema: "viberoots.artifact-reproducibility-aggregate.v3",
+    schema: "viberoots.artifact-reproducibility-aggregate.v6",
     sourceRevision: [...publicationRevisions][0]!,
+    toolSourceRevision: opts.expectedToolClosureSourceIdentity.toolSourceRevision,
     matrixDigest: ARTIFACT_REPRODUCIBILITY_MATRIX_DIGEST,
     publicationSubjectSetDigest: publicationSubjects[0]!.subjectSetDigest,
     registryStorePath: opts.registryStorePath,
     matrixComparisons,
     publicationComparisons,
     observationSummary,
-    languageGraduation,
+    languageQualification,
+    protectedRustPatchEvidence,
+    toolClosureSourceIdentity: opts.expectedToolClosureSourceIdentity,
   };
 }
-
 function comparePair(
   groups: Map<string, ArtifactReproducibilityRunRecord[]>,
   builders: Map<string, ReturnType<typeof parseReviewedRemoteBuilders>["builders"][number]>,
@@ -219,7 +215,6 @@ function comparePair(
     checkoutIdentities: [left.checkoutIdentity, right.checkoutIdentity],
   };
 }
-
 function canonicalPublicationSubjects(
   subjects: readonly PublicationSubject[],
 ): PublicationSubject[] {
@@ -234,11 +229,9 @@ function canonicalPublicationSubjects(
   }
   return ordered;
 }
-
 function subjectGroupKey(subject: ArtifactReproducibilitySubjectAuthority, system: string): string {
   return `${subject.kind}:${subject.kind === "matrix" ? subject.matrixId : subject.subjectId}\0${system}`;
 }
-
 function assertRegistryStorePath(value: string): void {
   if (!/^\/nix\/store\/[a-z0-9]{32}-[^/]+\/registry\.json$/u.test(value)) {
     throw new Error("reviewed registry must be the canonical immutable registry.json");

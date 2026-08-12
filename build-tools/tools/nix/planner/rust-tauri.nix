@@ -1,6 +1,18 @@
 { lib, P, ctx, nodeFor, normalizeList, sourcePath }:
 let
   clean = P.cleanLabel;
+  repoRoot = builtins.toString ctx.repoRoot;
+  tauriSourceRoot = builtins.path {
+    path = ctx.repoRoot;
+    name = "viberoots-tauri-source";
+    filter = path: _type:
+      let
+        absolute = builtins.toString path;
+        relative = lib.removePrefix "${repoRoot}/" absolute;
+      in absolute == repoRoot
+        || relative == "projects"
+        || lib.hasPrefix "projects/" relative;
+  };
   requiredString = name: field:
     let value = ctx.get (nodeFor name) field;
     in if value == null || !(builtins.isString value) || value == ""
@@ -10,7 +22,7 @@ let
     let value = ctx.get (nodeFor name) field;
     in if value == null then []
        else if builtins.isList value && builtins.all builtins.isString value
-       then map (item: builtins.toPath "${ctx.repoRootStr}/${sourcePath name item}") value
+       then map (item: tauriSourceRoot + "/${sourcePath name item}") value
        else builtins.throw "Tauri target ${name} ${field} must be a list of declared sources";
   stringList = name: field:
     let value = ctx.get (nodeFor name) field;
@@ -65,9 +77,10 @@ in {
     then builtins.throw "Tauri target ${name} sidecar mapping fields disagree"
     else {
       inherit platform;
+      sourceRoot = tauriSourceRoot;
       root = requiredString name "tauri_root";
-      config = builtins.toPath
-        "${ctx.repoRootStr}/${sourcePath name (requiredString name "tauri_config")}";
+      config = tauriSourceRoot
+        + "/${sourcePath name (requiredString name "tauri_config")}";
       frontend = ctx.dependencyArtifactOf frontend;
       resources = mappedSources name;
       capabilities = sourceList name "capabilities";

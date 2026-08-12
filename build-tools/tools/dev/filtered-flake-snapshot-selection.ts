@@ -54,10 +54,11 @@ export async function filteredSnapshotSelection(
   root: string,
   target: string,
   explicitGraphPath?: string,
+  explicitPackageScope = "",
 ): Promise<{ relPaths: string[]; declaredSources: string[] }> {
   const relPaths = new Set(defaultFilteredFlakeSnapshotRelPaths());
   let declaredSources: string[] = [];
-  const importer = targetPackageFromLabel(target);
+  const importer = explicitPackageScope || targetPackageFromLabel(target);
   const normalizedImporter = path.posix.normalize(importer);
   const importerAbs = path.resolve(root, importer);
   const importerFromRoot = path.relative(root, importerAbs);
@@ -72,23 +73,27 @@ export async function filteredSnapshotSelection(
   ) {
     throw new Error(`selected target package escapes the workspace: ${importer}`);
   }
-  const graphPath = path.resolve(String(explicitGraphPath || path.join(root, DEFAULT_GRAPH_PATH)));
-  try {
-    const graphSources = await graphSourcePaths(root, graphPath, target);
-    for (const sourcePath of graphSources.packagePaths) relPaths.add(sourcePath);
-    for (const sourcePath of graphSources.declaredSources) relPaths.add(sourcePath);
-    declaredSources = graphSources.declaredSources;
-  } catch (error) {
-    const graphExists = await fsp
-      .access(graphPath)
-      .then(() => true)
-      .catch(() => false);
-    if (graphExists) throw error;
-    if (target) {
-      throw new Error(
-        `selected artifact target requires the canonical Buck graph: target=${target} graph=${graphPath}`,
-        { cause: error },
-      );
+  if (!explicitPackageScope) {
+    const graphPath = path.resolve(
+      String(explicitGraphPath || path.join(root, DEFAULT_GRAPH_PATH)),
+    );
+    try {
+      const graphSources = await graphSourcePaths(root, graphPath, target);
+      for (const sourcePath of graphSources.packagePaths) relPaths.add(sourcePath);
+      for (const sourcePath of graphSources.declaredSources) relPaths.add(sourcePath);
+      declaredSources = graphSources.declaredSources;
+    } catch (error) {
+      const graphExists = await fsp
+        .access(graphPath)
+        .then(() => true)
+        .catch(() => false);
+      if (graphExists) throw error;
+      if (target) {
+        throw new Error(
+          `selected artifact target requires the canonical Buck graph: target=${target} graph=${graphPath}`,
+          { cause: error },
+        );
+      }
     }
   }
   if (!importer || importer === ".") return { relPaths: [...relPaths], declaredSources };

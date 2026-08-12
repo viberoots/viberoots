@@ -71,3 +71,35 @@ test("toolchain path realization progress is verbose-only", async () => {
   assert.equal(source.includes('path.join(root, ".viberoots", "workspace", "flake.nix")'), true);
   assert.equal(source.includes("run viberoots bootstrap or post-clone first"), true);
 });
+
+test("seeded temp setup copies toolchain sources without realizing store paths", async () => {
+  const setupSource = await fsp.readFile(
+    viberootsSourcePath(
+      "viberoots/build-tools/tools/tests/lib/test-helpers/run-in-temp/seeded-setup.ts",
+    ),
+    "utf8",
+  );
+  assert.equal(setupSource.includes("ensureToolchainSourcesForTempRepo"), true);
+  assert.equal(setupSource.includes("ensureToolchainPathsForTempRepo"), false);
+
+  const helperSource = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/tests/lib/test-helpers/toolchain-paths.ts"),
+    "utf8",
+  );
+  const sourceFiles = await fsp.readFile(
+    viberootsSourcePath(
+      "viberoots/build-tools/tools/tests/lib/test-helpers/toolchain-source-files.ts",
+    ),
+    "utf8",
+  );
+  assert.equal(helperSource.includes("export { ensureToolchainSourcesForTempRepo }"), true);
+  assert.equal(
+    helperSource.includes("export async function ensureToolchainPathsForTempRepo"),
+    true,
+  );
+  assert.equal(
+    sourceFiles.includes("await copyOptionalFile(toolSourceWorkspaceJson, jsonDst)"),
+    false,
+  );
+  assert.equal(sourceFiles.includes("Keep the active\n  // workspace JSON authoritative"), true);
+});

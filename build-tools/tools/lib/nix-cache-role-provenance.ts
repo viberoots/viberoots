@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
-type CacheRoles = {
+export type CacheRoles = {
   required: string[];
   optional: string[];
 };

@@ -27,6 +27,7 @@ const ALLOWED_PATHS = new Set([
   "build-tools/tools/dev/verify/owned-process-state.ts",
   "build-tools/tools/dev/verify/process-control.ts",
   "build-tools/tools/dev/verify/temp-repo-process-cleanup.ts",
+  "build-tools/tools/lib/process-inspection-runner.ts",
   "build-tools/tools/lib/process-inspection.ts",
   "build-tools/tools/lib/process-inspection-scanner.ts",
   "build-tools/tools/lib/open-file-inspection.ts",

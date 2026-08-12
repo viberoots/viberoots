@@ -8,7 +8,11 @@ import { buildRemoteVerifyTestEnvArgs } from "./buck2-test-remote-env";
 import { localVerifyToolPaths, resolveNixDirenvDirenvrc } from "./buck2-test-local-tools";
 import type { VerifyExecutionPolicy } from "./remote-policy";
 import type { CacheHealthResult } from "./nix-cache-health";
-import { nestedCacheRoleTransportEnv } from "./nested-cache-role-transport";
+import { macosNoindexPathSegment } from "../../lib/macos-metadata";
+import {
+  NESTED_CACHE_ROLE_CONFIG,
+  nestedCacheRoleTransportEnv,
+} from "./nested-cache-role-transport";
 import { renderReviewedNixCacheConfig } from "./nix-cache-health-config";
 
 type VerifyBuck2TestEnvArgsOptions = {
@@ -26,7 +30,9 @@ function verifyNestedBuckIsolation(iso: string, passName: string): string {
   const seed = `${iso}:${passName}`;
   const hash = crypto.createHash("sha256").update(seed).digest("hex").slice(0, 12);
   const ownerPid = (String(iso || "").match(/^v-(\d+)(?:-|$)/) || [])[1] || "";
-  return ownerPid ? `verify-nested-${ownerPid}-${hash}` : `verify-nested-${hash}`;
+  return macosNoindexPathSegment(
+    ownerPid ? `verify-nested-${ownerPid}-${hash}` : `verify-nested-${hash}`,
+  );
 }
 
 function maybeEnvArg(name: string, value: string | undefined): string[] {
@@ -58,7 +64,6 @@ export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): str
   const sslCertDir = process.env.SSL_CERT_DIR || process.env.NIX_SSL_CERT_DIR;
   const nodeExtraCaCerts = process.env.NODE_EXTRA_CA_CERTS || sslCertFile;
   const nixDaemonSocketPath = process.env.NIX_DAEMON_SOCKET_PATH || "/var/run/nix-daemon.socket";
-  const nixRemote = process.env.NIX_REMOTE || "daemon";
   const tools = localVerifyToolPaths(opts.artifactToolsRoot);
   const nixConfigEnv = withSanitizedInheritedNixConfig({
     NIX_CONFIG:
@@ -102,12 +107,15 @@ export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): str
     "--env",
     `NIX_PNPM_INSTALL_TIMEOUT=${opts.testNixTimeoutSecs}`,
     "--env",
+    `VBR_ARTIFACT_COMMAND_TIMEOUT_SECS=${opts.testNixTimeoutSecs}`,
+    "--env",
     "VBR_GC_MODE=off",
     ...maybeEnvArg("VBR_ARTIFACT_TOOLS_ROOT", opts.artifactToolsRoot),
     ...maybeEnvArg("VBR_NIX_DIRENV_DIRENVRC", resolveNixDirenvDirenvrc()),
     ...gitAutoMaintenanceDisabledTestEnvArgs(),
     ...maybeEnvArg("NIX_CONFIG", nixConfigEnv.NIX_CONFIG),
     ...maybeEnvArg("NIX_CONF_DIR", nixConfigEnv.NIX_CONF_DIR),
+    ...maybeEnvArg("VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG", nixConfigEnv.NIX_CONFIG),
     ...maybeEnvArg("VBR_NIX_CACHE_POLICY", process.env.VBR_NIX_CACHE_POLICY),
     ...maybeEnvArg(
       "VBR_NIX_CACHE_ROLE_REQUIRED",
@@ -121,6 +129,12 @@ export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): str
     ...maybeEnvArg(
       "VBR_NIX_CACHE_ROLE_BINDING",
       childCacheOutcome ? nixCachePolicyBindingDigest(childCacheOutcome) : undefined,
+    ),
+    ...maybeEnvArg(
+      NESTED_CACHE_ROLE_CONFIG,
+      childCacheOutcome
+        ? Buffer.from(childCacheOutcome.config, "utf8").toString("base64")
+        : undefined,
     ),
     ...Object.entries(nestedCacheTransport).flatMap(([name, value]) => maybeEnvArg(name, value)),
     "--env",
@@ -167,7 +181,7 @@ export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): str
     "--env",
     `NIX_DAEMON_SOCKET_PATH=${nixDaemonSocketPath}`,
     "--env",
-    `NIX_REMOTE=${nixRemote}`,
+    "NIX_REMOTE=daemon",
     ...maybeEnvArg("VBR_NIX_BIN", tools.NIX_BIN),
     ...Object.entries(tools).flatMap(([name, value]) => maybeEnvArg(name, value)),
     "--env",

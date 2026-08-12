@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { reproducibilityNodeArtifact } from "./artifact-reproducibility-node-contract";
+import { rustReproducibilityMatrixCases } from "./artifact-reproducibility-rust-matrix";
 import {
   coverage,
   proof,
@@ -72,33 +73,7 @@ const matrix = [
     ),
     languageProofs: [],
   },
-  {
-    id: "rust-pr5",
-    artifactFamily: "rust",
-    systems: RELEASE_BUILDER_SYSTEMS,
-    systemEvidence: {
-      nativeExecution: ["aarch64-darwin"],
-      failClosedUntilExternalEvidence: ["aarch64-linux", "x86_64-linux"],
-    },
-    scaffoldRecipe: recipe("rust", "cli", "repro-rust", "projects/apps/repro-rust"),
-    coverage: coverage(["base", "wasm", "wasi"]),
-    graphSelection: selection(
-      ["rust_nix_build"],
-      "//projects/apps/repro-rust:repro-rust",
-      "executable",
-      ["lang:rust", "kind:bin"],
-    ),
-    languageProofs: [
-      proof(["rust_nix_build"], "//projects/apps/repro-rust:repro-rust-wasm", [
-        "lang:rust",
-        "kind:wasm",
-      ]),
-      proof(["rust_nix_build"], "//projects/apps/repro-rust:repro-rust-wasi", [
-        "lang:rust",
-        "kind:wasi",
-      ]),
-    ],
-  },
+  ...rustReproducibilityMatrixCases(RELEASE_BUILDER_SYSTEMS),
   {
     id: "mixed-artifact",
     artifactFamily: "mixed",
@@ -185,6 +160,14 @@ export function hasReproducibilityMatrixId(id: string): boolean {
   return ARTIFACT_REPRODUCIBILITY_MATRIX.some((entry) => entry.id === id);
 }
 
+export function reproducibilityMatrixIdsForArtifactFamily(
+  artifactFamily: string,
+): readonly string[] {
+  return ARTIFACT_REPRODUCIBILITY_MATRIX.filter(
+    (entry) => entry.artifactFamily === artifactFamily,
+  ).map(({ id }) => id);
+}
+
 export function reproducibilityMatrixCaseCoversLanguage(id: string, languageId: string): boolean {
   return graphProvenLanguageIds(reproducibilityMatrixCase(id)).has(languageId);
 }
@@ -192,12 +175,21 @@ export function reproducibilityMatrixCaseCoversLanguage(id: string, languageId: 
 export function reproducibilityMatrixCoverage(
   ids: readonly string[],
   languageId: string,
-): Set<"base" | "wasm" | "wasi" | "mixed" | "addon"> {
+): Set<"base" | "wasm" | "wasi" | "mixed" | "addon" | "desktop"> {
   return new Set(
     ids.flatMap((id) => {
       const entry = reproducibilityMatrixCase(id);
       return graphProvenLanguageIds(entry).has(languageId) ? entry.coverage.routeCapabilities : [];
     }),
+  );
+}
+
+export function reproducibilityMatrixSystemPairs(): readonly {
+  matrixId: string;
+  system: string;
+}[] {
+  return ARTIFACT_REPRODUCIBILITY_MATRIX.flatMap(({ id, systems }) =>
+    systems.map((system) => ({ matrixId: id, system })),
   );
 }
 

@@ -75,14 +75,12 @@ function parseForkserverLinesForRepo(
 
 export async function pidCmdline(pid: number, $: any): Promise<string> {
   if (!Number.isFinite(pid) || pid <= 1) return "";
-  const psPath = await resolveToolPath("ps");
-  const res = await $({
-    stdio: "pipe",
-    reject: false,
-    nothrow: true,
-    timeout: 1500,
-  })`${psPath} -p ${pid} -o command=`;
-  return String(res.stdout || "").trim();
+  void $;
+  const lines = await processTableLines({
+    psArgs: ["-p", String(pid), "-o", "command="],
+    timeoutMs: 1500,
+  });
+  return lines.join("\n").trim();
 }
 
 export type Buck2dProc = { pid: number; iso: string; cmd: string };

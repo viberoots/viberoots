@@ -83,7 +83,7 @@ fi
           ),
         ) || []
       ).length,
-      2,
+      4,
     );
   } finally {
     await cleanupAccountFixture(fixture);

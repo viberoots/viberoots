@@ -37,17 +37,26 @@ use() {
     await fsp.writeFile(stage0, direnvStage0(), "utf8");
 
     const captured = "/host/tools/bin:/usr/bin:/bin";
-    await execFileAsync("/bin/bash", ["-c", 'source "$1"', "stage0-runtime-test", stage0], {
-      cwd: root,
-      env: {
-        ...process.env,
-        HOME: path.join(root, "home"),
-        IN_NIX_SHELL: "",
-        VBR_DEVSHELL_USE_GENERATED_AUTHORITY: "1",
-        VBR_HOST_PATH: captured,
-        VBR_NIX_CACHE_POLICY: "off",
+    await execFileAsync(
+      "/bin/bash",
+      [
+        "-c",
+        'watch_file() { :; }; use() { test "$1" = flake; test ! -e "$PWD/.viberoots/workspace/host-path"; test ! -e "$PWD/.viberoots/workspace/exact-env-smoke.out"; printf "%s\\n" clean > "$PWD/acquisition-state"; }; source "$1"',
+        "stage0-runtime-test",
+        stage0,
+      ],
+      {
+        cwd: root,
+        env: {
+          ...process.env,
+          HOME: path.join(root, "home"),
+          IN_NIX_SHELL: "",
+          VBR_DEVSHELL_USE_GENERATED_AUTHORITY: "1",
+          VBR_HOST_PATH: captured,
+          VBR_NIX_CACHE_POLICY: "off",
+        },
       },
-    });
+    );
 
     assert.equal(await fsp.readFile(path.join(root, "acquisition-state"), "utf8"), "clean\n");
     assert.equal(await fsp.readFile(path.join(workspace, "host-path"), "utf8"), `${captured}\n`);
@@ -87,17 +96,21 @@ use() { :; }
     const stage0 = path.join(root, "stage0.sh");
     await fsp.writeFile(stage0, direnvStage0(), "utf8");
 
-    await execFileAsync("/bin/bash", ["-c", 'source "$1"', "stage0-read-only-test", stage0], {
-      cwd: root,
-      env: {
-        ...process.env,
-        HOME: path.join(root, "home"),
-        IN_NIX_SHELL: "",
-        VBR_NIX_CACHE_POLICY: "off",
-        VIBEROOTS_FLAKE_INPUT_ROOT: localSource,
-        VIBEROOTS_SOURCE_ROOT: localSource,
+    await execFileAsync(
+      "/bin/bash",
+      ["-c", 'watch_file() { :; }; use() { :; }; source "$1"', "stage0-read-only-test", stage0],
+      {
+        cwd: root,
+        env: {
+          ...process.env,
+          HOME: path.join(root, "home"),
+          IN_NIX_SHELL: "",
+          VBR_NIX_CACHE_POLICY: "off",
+          VIBEROOTS_FLAKE_INPUT_ROOT: localSource,
+          VIBEROOTS_SOURCE_ROOT: localSource,
+        },
       },
-    });
+    );
 
     assert.deepEqual(await fsp.readFile(path.join(workspace, "flake.nix")), flakeBytes);
     assert.deepEqual(await fsp.readFile(path.join(workspace, "flake.lock")), lockBytes);

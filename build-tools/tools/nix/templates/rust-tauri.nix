@@ -217,6 +217,13 @@ in {
       { echo "tauri_app: executable must retain only the credential-free platform ad-hoc envelope" >&2; exit 2; }
     sidecar_bundle="$packaged_app/Contents/Resources/viberoots-sidecars"
     mkdir -p "$sidecar_bundle"
+    frontend_wasm="$frontend_root/frontend.wasm"
+    test -f "$frontend_wasm" ||
+      { echo "tauri_app: packaged frontend is missing frontend.wasm" >&2; exit 2; }
+    packaged_frontend="$packaged_app/Contents/Resources/viberoots-frontend"
+    mkdir -p "$packaged_frontend"
+    cp "$frontend_wasm" "$packaged_frontend/frontend.wasm"
+    frontend_wasm_digest="sha256:$(${pkgs.coreutils}/bin/sha256sum "$packaged_frontend/frontend.wasm" | cut -d' ' -f1)"
     ${lib.concatMapStringsSep "\n" (record:
       "mkdir -p \"$out/share/viberoots-tauri/resources/$(dirname ${lib.escapeShellArg record.destination})\"; cp -R ${lib.escapeShellArg (builtins.toString record.path)} \"$out/share/viberoots-tauri/resources/${record.destination}\""
     ) resources}
@@ -226,6 +233,8 @@ in {
     ${pkgs.jq}/bin/jq -n \
       --arg platform ${lib.escapeShellArg tauri.platform} \
       --arg frontend ${lib.escapeShellArg (builtins.toString frontend)} \
+      --arg frontend_wasm "$packaged_frontend/frontend.wasm" \
+      --arg frontend_wasm_digest "$frontend_wasm_digest" \
       --arg app_executable "$app_executable" \
       --argjson resources ${lib.escapeShellArg (builtins.toJSON resourceManifest)} \
       --slurpfile capabilities .viberoots-capabilities.json \
@@ -233,7 +242,7 @@ in {
       --argjson sidecars ${lib.escapeShellArg (builtins.toJSON sidecarManifest)} \
       --argjson app_commands ${lib.escapeShellArg (builtins.toJSON appCommands)} \
       --argjson app_windows ${lib.escapeShellArg (builtins.toJSON appWindows)} \
-      '{schema:"viberoots.tauri-artifact.v1", platform:$platform, frontend:$frontend, appExecutable:$app_executable, appWindows:$app_windows, withGlobalTauri:false, appCommands:$app_commands, resources:$resources, capabilities:$capabilities[0], icons:$icons, sidecars:$sidecars, signature:{mode:"adhoc-platform", credentialed:false, teamIdentifier:null, signingIdentity:null, releaseSigned:false, releaseAdmitted:false}}' \
+      '{schema:"viberoots.tauri-artifact.v1", platform:$platform, frontend:$frontend, frontendWasm:{path:$frontend_wasm,digest:$frontend_wasm_digest}, appExecutable:$app_executable, appWindows:$app_windows, withGlobalTauri:false, appCommands:$app_commands, resources:$resources, capabilities:$capabilities[0], icons:$icons, sidecars:$sidecars, signature:{mode:"adhoc-platform", credentialed:false, teamIdentifier:null, signingIdentity:null, releaseSigned:false, releaseAdmitted:false}}' \
       > "$out/share/viberoots-tauri/artifact-manifest.json"
     runHook postInstall
   '';

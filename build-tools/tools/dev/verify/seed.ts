@@ -12,6 +12,7 @@ import {
   verifySeedBuildArgs,
   type VerifySeedBuildMode,
 } from "./seed-build";
+import type { CacheHealthResult } from "./nix-cache-health-types";
 import { createSharedSeedStagePin, shouldStageSeed } from "./seed-staging";
 import {
   createVerifySeedPin,
@@ -20,6 +21,7 @@ import {
   writeCurrentSeed,
 } from "./seed-pins";
 import { writeVerifySeedRemoteManifest } from "./seed-manifest";
+import { seedProtocolIdentity } from "./seed-key-protocol";
 import { isNonBuildSystemOnlyVerifyTargets } from "./target-scope";
 import { pidAlive } from "./seed-utils";
 import { computeGitState } from "./seed-git-state";
@@ -112,6 +114,7 @@ async function computeSeedKey(root: string): Promise<string> {
     viberootsGit,
     hiddenWorkspaceState,
     seedConfig: {
+      seedProtocol: seedProtocolIdentity(),
       TEST_RSYNC_ROOTS: String(process.env.TEST_RSYNC_ROOTS || ""),
       TEST_PARTIAL_CLONE_GO_ONLY: String(process.env.TEST_PARTIAL_CLONE_GO_ONLY || ""),
       TEST_EXCLUDE_CPP_REQS: String(process.env.TEST_EXCLUDE_CPP_REQS || ""),
@@ -130,6 +133,7 @@ function seedBuildTimeoutSec(): number {
 async function buildSeedStorePath(
   root: string,
   artifactToolsRoot: string,
+  cacheHealth: CacheHealthResult | undefined,
   mode: VerifySeedBuildMode = "local",
 ): Promise<string> {
   const timeoutSec = seedBuildTimeoutSec();
@@ -139,6 +143,8 @@ async function buildSeedStorePath(
     stateRoot: path.join(root, "buck-out", "tmp", "artifact-environment"),
     workspaceRoot: root,
     artifactToolsRoot,
+    internal:
+      cacheHealth?.authority === "reviewed" ? { NIX_CONFIG: cacheHealth.nixConfig } : undefined,
   });
   const source = await makeFilteredFlakeRef({
     workspaceRoot: root,
@@ -179,6 +185,7 @@ async function buildSeedStorePath(
       flakeRef: source.flakeRef,
       mode,
       gcRootPath,
+      nixConfig: cacheHealth?.authority === "reviewed" ? cacheHealth.nixConfig : undefined,
     }),
     cwd: root,
     env: seedEnv,
@@ -220,6 +227,7 @@ export async function prepareVerifySeed(opts: {
   root: string;
   iso: string;
   artifactToolsRoot: string;
+  cacheHealth?: CacheHealthResult;
   mode?: VerifySeedBuildMode;
 }): Promise<SeedInfo> {
   await sweepStalePins(opts.root);
@@ -227,7 +235,8 @@ export async function prepareVerifySeed(opts: {
   const seedKey = await computeSeedKey(opts.root);
   const currentSeedPath = mode === "local" ? await readCurrentSeed(opts.root, seedKey) : null;
   const seedPath =
-    currentSeedPath || (await buildSeedStorePath(opts.root, opts.artifactToolsRoot, mode));
+    currentSeedPath ||
+    (await buildSeedStorePath(opts.root, opts.artifactToolsRoot, opts.cacheHealth, mode));
   if (mode === "remote-ready") {
     const remoteManifestPath = await writeVerifySeedRemoteManifest({
       root: opts.root,

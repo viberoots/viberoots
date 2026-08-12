@@ -25,7 +25,9 @@ Artifact construction now uses one canonical policy, immutable evaluation bundle
 tools and environment, and fail-closed sandbox, network, publication, and deployment admission.
 Relevant local untracked input selects a non-release development bundle; protected jobs reject it.
 Normal `i` and `b` remain read-only, while `u` is the sole repair boundary. CI contains the protected
-six-family, three-system, two-builder reproducibility lane and signed aggregate authority.
+case-declared-system, two-builder reproducibility lane and signed aggregate authority. The mature
+language cases and Rust native/extension/bridge/WASM cases cover three systems; the current
+credential-free Tauri application case is explicitly Darwin-only.
 
 The repository implementation and local validation gates are complete, but the full hermeticity
 claim remains disabled until release administration provisions six independent builder authorities,

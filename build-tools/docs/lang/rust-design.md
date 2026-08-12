@@ -8,8 +8,13 @@ is [`../rust-language-plan.md`](../rust-language-plan.md).
 
 The current Rust route compiles composed Cargo libraries, binaries, tests, native bridges, and the
 freestanding, WASI, static-linkable, browser-package, and component-model WASM families from
-checked-in manifests and locks. PR-10 adds the managed developer and dependency lifecycle. Release,
-publication, and independent three-system conformance remain later work.
+checked-in manifests and locks. PR-12 wires each representative family, cross-root composition, and
+the Darwin Tauri package into canonical sandbox/network and protected qualification gates.
+Experimental manifests can produce signed candidate qualification but not release admission. The
+separate Tauri release-admission contract binds reviewed external signing/notarization, provenance,
+semantic-manifest, and SBOM evidence without treating its unit fixtures as product evidence.
+External independent-builder, Linux-native, and signing/notarization evidence remains required
+before graduation or release claims.
 
 | Surface              | Current behavior                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Evidence                                                                                                                                      |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -127,6 +132,10 @@ Native macros share these explicit inputs where applicable:
 - `nixpkg_deps`, `nixpkgs_profile`, and `nixpkg_pins` for build scripts and native libraries.
 - `link_deps`, `header_deps`, `link_closure`, and `link_closure_overrides` for explicit native
   interop.
+- `behavior_probe`, defaulting to false, for the protected reproducibility lane only. When enabled,
+  the installed artifact must expose the kind-specific reserved `viberoots_observed_behavior`
+  contract and produce protected value 42 or 43; the builder records it at the fixed
+  `share/viberoots-rust/observed-behavior` path. It is not an arbitrary command or environment hook.
 
 Macros reject unknown or inapplicable arguments. Configuration that changes Cargo resolution or
 artifact identity must be exported as explicit graph fields, not encoded only in labels.
@@ -526,10 +535,13 @@ Rust is first-class only when all of the following are demonstrated:
 
 PR-11 adds an `aarch64-darwin` Tauri route with pinned cargo-tauri, a staged Buck frontend,
 declared desktop inputs, local ad-hoc platform-envelope metadata, and a deterministic scaffold. It
-does not claim Linux support, credentialed release signing, notarization, publication admission, independent builders,
-production remote execution, or release hermeticity; those remain PR-12 gates.
+does not claim Linux support, credentialed release signing, notarization, independent builders,
+production remote execution, or release hermeticity. PR-12 registers the route with the canonical
+repository gates, but those claims remain withheld until their external evidence exists.
 
 PR-7 adds native Python and Node managed-runtime extension contracts and explicitly rejects the
 currently unavailable Python WASM ABI. PR-8 adds reviewed C/C++ interoperability without promoting
 the language beyond experimental status. Current references
 must still call Rust experimental rather than a complete first-class or release-hermetic toolchain.
+Repository-owned sandbox/network and publication admission are wired; this status records the
+remaining external evidence boundary rather than an alternate artifact path.

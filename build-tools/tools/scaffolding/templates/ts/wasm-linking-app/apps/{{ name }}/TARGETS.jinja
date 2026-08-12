@@ -10,12 +10,11 @@ node_asset_stage(
     app = ":webapp_raw",
     assets = [
         {"src": "//projects/libs/{{ name }}-api:wasm", "dest": "top.wasm"},
-        {"src": "//projects/libs/{{ name }}-wasm-inline:wasm_inline", "dest": "wasm-inline/index.js"},
-        {"src": "//projects/libs/{{ name }}-wasm-inline:wasm_inline_cpp", "dest": "wasm-inline/cpp.js"},
-        {"src": "//projects/libs/{{ name }}-wasm-inline:wasm_inline_py", "dest": "wasm-inline/py.js"},
+        {"src": "//projects/libs/{{ name }}-wasm-inline:wasm_inline", "output_path": "index.js", "dest": "wasm-inline/index.js"},
+        {"src": "//projects/libs/{{ name }}-wasm-inline:wasm_inline_cpp", "output_path": "cpp.js", "dest": "wasm-inline/cpp.js"},
+        {"src": "//projects/libs/{{ name }}-wasm-inline:wasm_inline_py", "output_path": "py.js", "dest": "wasm-inline/py.js"},
     ],
     out = "dist",
 )
-
 
 

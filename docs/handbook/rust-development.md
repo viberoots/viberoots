@@ -27,6 +27,17 @@ those roots too; repository-root and filesystem-root watches are rejected as too
 Only the watcher-owned child ingress admits and captures that Rust override. Ordinary `p`
 ingress remains fail-closed, and unrelated override or ambient environment values are not forwarded.
 
+## Protected behavior observation
+
+The artifact-producing Rust macros expose `behavior_probe = True` only for protected
+reproducibility and patch-lifecycle qualification. It is not a developer command hook. Qualified
+fixture sources must implement the reserved `viberoots_observed_behavior` contract for their
+artifact kind and return `42` for baseline/restored source or `43` for the reviewed patched source.
+The build executes the installed artifact with pinned tools and writes the single result to
+`share/viberoots-rust/observed-behavior`; missing symbols, other values, custom commands, ambient
+environment, and custom output paths are unsupported and fail closed. Normal targets leave the
+default `False`.
+
 ## Dependencies and local overrides
 
 Commit `Cargo.lock`. Supported sources are crates.io, declared alternate/private registries,

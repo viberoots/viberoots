@@ -68,6 +68,69 @@ test("Git fixed sources reconstruct the full locked revision into one immutable 
   }
 });
 
+test("fixed-source production materialization batches immutable path hashing", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-git-batch-hash-"));
+  try {
+    const packages = ["dep_a", "dep_b"];
+    for (const name of packages) {
+      const packageRoot = path.join(root, "crates", name);
+      await fsp.mkdir(path.join(packageRoot, "src"), { recursive: true });
+      await fsp.writeFile(
+        path.join(packageRoot, "Cargo.toml"),
+        `[package]\nname="${name}"\nversion="1.0.0"\nedition="2021"\n`,
+      );
+      await fsp.writeFile(path.join(packageRoot, "src/lib.rs"), `pub fn ${name}() {}\n`);
+    }
+    await run("git", ["init", "-q"], root);
+    await run("git", ["config", "user.email", "fixture@example.invalid"], root);
+    await run("git", ["config", "user.name", "Fixture"], root);
+    await run("git", ["add", "."], root);
+    await run("git", ["commit", "-qm", "fixture"], root);
+    const revision = await run("git", ["rev-parse", "HEAD"], root);
+    const source = `git+https://example.invalid/repository#${revision}`;
+    const keys = packages.map((name) => `${name}@1.0.0#${source}`);
+    const added: string[] = [];
+    const storePathsByKey = new Map(
+      keys.map((key, index) => [key, `/nix/store/deferred-${index + 1}`]),
+    );
+    const hashCalls: string[][] = [];
+    const fixed = await materializeFixedSources(
+      Object.fromEntries(
+        packages.map((name, index) => [
+          keys[index],
+          { originPath: path.join(root, "crates", name), source, checksum: "" },
+        ]),
+      ),
+      async () => {
+        throw new Error("per-source materializer must not run");
+      },
+      run,
+      undefined,
+      {
+        add: async (key, entry) => {
+          assert.match(
+            await fsp.readFile(path.join(entry.originPath, "Cargo.toml"), "utf8"),
+            /1\.0\.0/u,
+          );
+          added.push(key);
+          return { storePath: storePathsByKey.get(key)! };
+        },
+        hash: async (storePaths) => {
+          hashCalls.push(storePaths);
+          return storePaths.map((_storePath, index) => `sha256-batch-${index + 1}`);
+        },
+      },
+    );
+    assert.deepEqual([...added].sort(), [...keys].sort());
+    assert.deepEqual(hashCalls, [["/nix/store/deferred-1", "/nix/store/deferred-2"]]);
+    assert.equal(fixed[keys[0]!]!.narHash, "sha256-batch-1");
+    assert.equal(fixed[keys[1]!]!.narHash, "sha256-batch-2");
+    assert.deepEqual(Object.keys(fixed), keys);
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
 test("Git fixed sources resolve workspace-inherited package versions through Cargo metadata", async () => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-git-workspace-integrity-"));
   try {

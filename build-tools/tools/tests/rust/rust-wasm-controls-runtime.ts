@@ -8,6 +8,7 @@ async function selected(
   current: string,
   tools: string,
   target: string,
+  derivationOutput: "out" | "provenance" = "out",
 ): Promise<string> {
   return (
     await buildCanonicalBundle(
@@ -18,6 +19,7 @@ async function selected(
       target,
       tools,
       true,
+      derivationOutput,
     )
   ).outPath;
 }
@@ -37,19 +39,44 @@ export async function verifyWasmControls(
       selected(tmp, current, tools, "//projects/apps/rust-wasm:component_debug"),
       selected(tmp, current, tools, "//projects/apps/rust-wasm:component_interface"),
     ]);
+  const [
+    staticDefaultEvidence,
+    staticDebugEvidence,
+    staticSizeEvidence,
+    componentDebugEvidence,
+    componentInterfaceEvidence,
+  ] = await Promise.all([
+    selected(tmp, current, tools, "//projects/apps/rust-wasm-static-profile:none", "provenance"),
+    selected(
+      tmp,
+      current,
+      tools,
+      "//projects/apps/rust-wasm-static-profile:speed_debug",
+      "provenance",
+    ),
+    selected(tmp, current, tools, "//projects/apps/rust-wasm-static-profile:size", "provenance"),
+    selected(tmp, current, tools, "//projects/apps/rust-wasm:component_debug", "provenance"),
+    selected(tmp, current, tools, "//projects/apps/rust-wasm:component_interface", "provenance"),
+  ]);
   const rawBytes = await fs.readFile(path.join(raw, "lib/rust_wasm_fixture.wasm"));
   const exports = WebAssembly.Module.exports(await WebAssembly.compile(rawBytes)).map(
     (entry) => entry.name,
   );
   assert.deepEqual(exports, ["answer"]);
   const staticManifest = JSON.parse(
-    await fs.readFile(path.join(staticDebug, "share/viberoots-rust/wasm-manifest.json"), "utf8"),
+    await fs.readFile(
+      path.join(staticDebugEvidence, "share/viberoots-rust/wasm-manifest.json"),
+      "utf8",
+    ),
   );
   assert.deepEqual([staticManifest.optimize, staticManifest.debug], ["speed", true]);
   assert.deepEqual(staticManifest.compilePolicy, { debuginfo: "2", optLevel: "2" });
   await fs.access(path.join(staticDebug, "include/rust_wasm_fixture.h"));
   const defaultManifest = JSON.parse(
-    await fs.readFile(path.join(staticDefault, "share/viberoots-rust/wasm-manifest.json"), "utf8"),
+    await fs.readFile(
+      path.join(staticDefaultEvidence, "share/viberoots-rust/wasm-manifest.json"),
+      "utf8",
+    ),
   );
   assert.deepEqual(defaultManifest.compilePolicy, { debuginfo: "0", optLevel: "0" });
   const defaultPrimary = await verifyArchiveMembers(
@@ -61,7 +88,10 @@ export async function verifyWasmControls(
   );
   const debugPrimary = await verifyArchiveMembers(tmp, command, staticDebug, staticManifest, true);
   const sizeManifest = JSON.parse(
-    await fs.readFile(path.join(staticSize, "share/viberoots-rust/wasm-manifest.json"), "utf8"),
+    await fs.readFile(
+      path.join(staticSizeEvidence, "share/viberoots-rust/wasm-manifest.json"),
+      "utf8",
+    ),
   );
   assert.deepEqual(sizeManifest.compilePolicy, { debuginfo: "0", optLevel: "z" });
   const sizePrimary = await verifyArchiveMembers(tmp, command, staticSize, sizeManifest, false);
@@ -74,7 +104,10 @@ export async function verifyWasmControls(
     `debug policy did not increase the primary answer member: ${debugPrimary.fileBytes} <= ${defaultPrimary.fileBytes}`,
   );
   const componentManifest = JSON.parse(
-    await fs.readFile(path.join(componentDebug, "share/viberoots-rust/wasm-manifest.json"), "utf8"),
+    await fs.readFile(
+      path.join(componentDebugEvidence, "share/viberoots-rust/wasm-manifest.json"),
+      "utf8",
+    ),
   );
   assert.deepEqual([componentManifest.optimize, componentManifest.debug], ["speed", true]);
   const component = path.join(componentDebug, "lib/rust_wasm_fixture.component.wasm");
@@ -86,7 +119,7 @@ export async function verifyWasmControls(
   );
   const interfaceManifest = JSON.parse(
     await fs.readFile(
-      path.join(componentInterface, "share/viberoots-rust/wasm-manifest.json"),
+      path.join(componentInterfaceEvidence, "share/viberoots-rust/wasm-manifest.json"),
       "utf8",
     ),
   );
@@ -108,9 +141,22 @@ export async function verifyWasmControls(
       .split(/\s+/)
       .at(-1)!;
     const root = path.isAbsolute(output) ? output : path.join(tmp, output);
+    const provenanceBuilt =
+      await command`buck2 build --target-platforms prelude//platforms:default --show-output ${`//projects/apps/rust-wasm:${name}[provenance]`}`;
+    const provenanceOutput = String(provenanceBuilt.stdout || provenanceBuilt.stderr)
+      .trim()
+      .split(/\n+/)
+      .at(-1)!
+      .split(/\s+/)
+      .at(-1)!;
+    const provenanceRoot = path.isAbsolute(provenanceOutput)
+      ? provenanceOutput
+      : path.join(tmp, provenanceOutput);
     for (const companion of companions) await fs.access(path.join(root, companion));
-    await fs.access(path.join(root, "share/viberoots-rust/materialization-manifest.json"));
-    await fs.access(path.join(root, "share/viberoots-rust/wasm-manifest.json"));
+    await fs.access(
+      path.join(provenanceRoot, "share/viberoots-rust/materialization-manifest.json"),
+    );
+    await fs.access(path.join(provenanceRoot, "share/viberoots-rust/wasm-manifest.json"));
   }
 }
 

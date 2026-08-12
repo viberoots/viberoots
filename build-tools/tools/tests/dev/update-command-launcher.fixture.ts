@@ -11,6 +11,7 @@ import {
 import { buckconfig } from "../../lib/consumer-bootstrap";
 import { derivePostCloneWorkspaceLock } from "../../lib/post-clone-workspace-lock";
 import { workspaceFlakeInputs } from "../../lib/workspace-flake-inputs";
+import { sharedCargoFixedSourceCacheRoot } from "../../dev/install/cargo-fixed-source-cache";
 import { sharedPnpmStoreHashCacheRoot } from "../../dev/update-pnpm-hash/verified-marker";
 import { VIBEROOTS_SOURCE_ROOT } from "../lib/test-helpers/source-paths";
 import { writeGlobalNixInputTargetFixtures } from "../lib/test-helpers/buck-config";
@@ -71,6 +72,7 @@ export async function runUpdateCommand(
   // authority so the launcher does not fall back to a fixture-local cache root
   // and recompute recursive timestamp normalization for every run.
   const sharedHashCacheRoot = sharedPnpmStoreHashCacheRoot(process.env, os.homedir());
+  const sharedCargoCacheRoot = sharedCargoFixedSourceCacheRoot(process.env, os.homedir());
   return await execFileAsync(path.join(immutableSource, "build-tools/tools/bin/u"), args, {
     cwd: root,
     env: {
@@ -83,6 +85,9 @@ export async function runUpdateCommand(
       VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT:
         String(envOverrides.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT || "").trim() ||
         sharedHashCacheRoot,
+      VBR_SHARED_CARGO_FIXED_SOURCE_CACHE_ROOT:
+        String(envOverrides.VBR_SHARED_CARGO_FIXED_SOURCE_CACHE_ROOT || "").trim() ||
+        sharedCargoCacheRoot,
     },
     timeout: timeoutSecs * 1000,
     maxBuffer: 1024 * 1024 * 32,

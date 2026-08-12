@@ -1,4 +1,3 @@
-import * as fsp from "node:fs/promises";
 import crypto from "node:crypto";
 import path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
@@ -12,6 +11,8 @@ import {
 import { buildToolPath, nodeBin, zxInitPath } from "./paths";
 import { runGluePipeline } from "../../buck/glue-pipeline";
 import { currentNixCachePolicyCapability } from "../../lib/nix-cache-policy-capability";
+import { macosNoindexPathSegment } from "../../lib/macos-metadata";
+import { debugListTargets } from "./debug";
 
 export async function cleanDevBuildWorkspace(root: string): Promise<void> {
   await $({
@@ -23,24 +24,6 @@ export async function cleanDevBuildWorkspace(root: string): Promise<void> {
     stdio: "ignore",
     cwd: root,
   })`bash --noprofile --norc -c 'rm -rf .tmp'`.nothrow();
-}
-
-async function debugListTargets(root: string): Promise<void> {
-  if ((process.env.DEVBUILD_DEBUG || "").trim() !== "1") return;
-  try {
-    console.warn("[dev-build][debug] listing TARGETS files before export:");
-    await $({
-      stdio: "inherit",
-      cwd: root,
-    })`bash --noprofile --norc -c 'find . -name TARGETS -type f | sort | sed -e s,^.,ROOT,'`;
-    const demoTargets = path.join(root, "libs", "demo-lib", "TARGETS");
-    try {
-      const txt = await fsp.readFile(demoTargets, "utf8").catch(() => "");
-      if (txt) console.warn("[dev-build][debug] projects/libs/demo-lib/TARGETS contents:\n" + txt);
-    } catch {}
-    console.warn("[dev-build][debug] running 'buck2 targets //...'");
-    await $({ stdio: "inherit", cwd: root, env: buckProcessEnv() })`buck2 targets //...`;
-  } catch {}
 }
 
 async function exportGraph(root: string, opts: { scope?: string; env: NodeJS.ProcessEnv }) {
@@ -63,7 +46,16 @@ async function exportGraph(root: string, opts: { scope?: string; env: NodeJS.Pro
 function stableExporterIsolation(root: string): string {
   const key = path.resolve(root);
   const h = crypto.createHash("sha256").update(key).digest("hex").slice(0, 10);
-  return `exporter-shared-${h}`;
+  return macosNoindexPathSegment(`exporter-shared-${h}`);
+}
+
+let exporterGeneration = 0;
+
+function nextExporterIsolation(root: string): string {
+  exporterGeneration += 1;
+  const key = `${path.resolve(root)}\0${process.pid}\0${exporterGeneration}`;
+  const h = crypto.createHash("sha256").update(key).digest("hex").slice(0, 10);
+  return macosNoindexPathSegment(`exporter-generation-${h}`);
 }
 
 function buckProcessEnv(
@@ -223,11 +215,13 @@ export async function refreshGlueAndExportGraph(
     stdio: verbose ? "inherit" : "pipe",
   });
 
-  await debugListTargets(root);
+  await debugListTargets(root, () => buckProcessEnv());
 
+  const exporterIsolation = nextExporterIsolation(root);
   const runEnv = buckProcessEnv(
     {
-      BUCK_NESTED_ISO: stableExporterIsolation(root),
+      BUCK_NESTED_ISO: exporterIsolation,
+      BUCK_ISOLATION_DIR_EXPORTER: exporterIsolation,
       BUCK_EXPORTER_REUSE_DAEMON: "1",
       ...(String(process.env.DEVBUILD_DEBUG || "").trim() === "1" ? { EXPORTER_DEBUG: "1" } : {}),
     },
@@ -237,7 +231,14 @@ export async function refreshGlueAndExportGraph(
   const scope = (process.env.DEVBUILD_SCOPE || "").trim();
   const graphPath = await exportGraph(root, { scope, env: runEnv });
   await ensureNonEmptyGraphOrExit(root, graphPath);
-  await runGluePipeline({ graphPath });
+  await runGluePipeline({
+    graphPath,
+    workspaceRoot: root,
+    toolSourceRoot: root,
+    env: runEnv,
+    nodeBin: node,
+    zxInitPath: zxInitPath(root),
+  });
 
   process.env.BUCK_GRAPH_JSON = graphPath;
   return graphPath;

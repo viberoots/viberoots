@@ -19,8 +19,28 @@ let
   importerDir = info.importer;
   n = nodeOfName name;
   labs = if n == null then [] else labelsOf n;
+  stageAppLabels = builtins.filter (label: lib.hasPrefix "node-stage-app-v1|" label) labs;
+  stageAppLabel =
+    if stageAppLabels == [] then null
+    else if builtins.length stageAppLabels == 1
+    then H.normalizeTargetLabel (lib.removePrefix "node-stage-app-v1|" (builtins.head stageAppLabels))
+    else builtins.throw "node planner: expected exactly one node_asset_stage app parent on ${name}";
+  stageAppArtifact =
+    if stageAppLabel == null then null
+    else
+      let resolved = dependencyArtifactOf stageAppLabel;
+      in if resolved == null
+         then builtins.throw "node planner: missing declared node_asset_stage app artifact ${stageAppLabel} on ${name}"
+         else resolved;
+  viberootsRootEnv = builtins.getEnv "VIBEROOTS_ROOT";
+  nestedViberootsRoot = repoStoreRoot + "/viberoots";
+  viberootsStoreRoot =
+    if viberootsRoot != null && builtins.pathExists (viberootsRoot + "/build-tools/tools/dev/zx-init.mjs") then viberootsRoot
+    else if builtins.pathExists (nestedViberootsRoot + "/build-tools/tools/dev/zx-init.mjs") then nestedViberootsRoot
+    else if viberootsRootEnv != "" then builtins.toPath viberootsRootEnv
+    else repoStoreRoot;
   stageAssets = import ./node-assets.nix {
-    inherit lib pkgs repoStoreRoot importerDir dependencyArtifactOf name;
+    inherit lib pkgs H repoStoreRoot importerDir dependencyArtifactOf name viberootsStoreRoot;
     labels = labs;
   };
   addons = nativeAddons.forTarget name;
@@ -41,13 +61,6 @@ let
       });
   sanitize = H.sanitizeName;
   nm = nodeMods.mkNodeModules { lockfilePath = info.lockfilePath; inherit importerDir; };
-  viberootsRootEnv = builtins.getEnv "VIBEROOTS_ROOT";
-  nestedViberootsRoot = repoStoreRoot + "/viberoots";
-  viberootsStoreRoot =
-    if viberootsRoot != null && builtins.pathExists (viberootsRoot + "/build-tools/tools/dev/zx-init.mjs") then viberootsRoot
-    else if builtins.pathExists (nestedViberootsRoot + "/build-tools/tools/dev/zx-init.mjs") then nestedViberootsRoot
-    else if viberootsRootEnv != "" then builtins.toPath viberootsRootEnv
-    else repoStoreRoot;
 in
   pkgs.stdenvNoCC.mkDerivation {
     pname = "node-webapp-" + (sanitize name);
@@ -60,6 +73,16 @@ in
       export WORKSPACE_ROOT="$REPO_ROOT"
       cd ${importerDir}
       export SOURCE_DATE_EPOCH=1
+      STAGE_APP_ARTIFACT=${lib.escapeShellArg (if stageAppArtifact == null then "" else builtins.toString stageAppArtifact)}
+      if [ -n "$STAGE_APP_ARTIFACT" ]; then
+        test -d "$STAGE_APP_ARTIFACT/dist" ||
+          { echo "node planner: declared app parent ${if stageAppLabel == null then "" else stageAppLabel} has no dist output" >&2; exit 2; }
+        rm -rf dist
+        mkdir -p dist
+        cp -R "$STAGE_APP_ARTIFACT/dist/." dist/
+        printf '%s\n' ${lib.escapeShellArg (if hasSsr then framework else "static")} > .viberoots-webapp-framework
+        ${stageAssets}
+      else
       stage_wasm_contract() {
         local wasm_src="$1"
         local client_root="$2"
@@ -197,6 +220,7 @@ EOF
         echo "${frameworkMissingError}" >&2
         exit 2
       ''}
+      fi
     '';
     installPhase = ''
       set -euo pipefail
@@ -204,7 +228,10 @@ EOF
       cp -R dist "$out/dist"
       ${nativeAddons.stage addons "$out/dist/native"}
       WEBAPP_FRAMEWORK="$(cat .viberoots-webapp-framework 2>/dev/null || printf static)"
-      if [ "$WEBAPP_FRAMEWORK" != "static" ]; then
+      STAGE_APP_ARTIFACT=${lib.escapeShellArg (if stageAppArtifact == null then "" else builtins.toString stageAppArtifact)}
+      if [ -n "$STAGE_APP_ARTIFACT" ] && [ -e "$STAGE_APP_ARTIFACT/node_modules" ]; then
+        ln -s "$(readlink -f "$STAGE_APP_ARTIFACT/node_modules")" "$out/node_modules"
+      elif [ "$WEBAPP_FRAMEWORK" != "static" ]; then
         ln -s "${nm}/node_modules" "$out/node_modules"
       fi
     '';

@@ -4,11 +4,10 @@ import crypto from "node:crypto";
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
+import { reconcileTempDependencyInputs, runBuildSelected, runInTemp } from "../lib/test-helpers";
 import { artifactSelectorNames, isArtifactAffectingEnvName } from "../../lib/artifact-environment";
 import { reconcileGeneratedGraph } from "../../patch/glue";
 import { createHermeticParityFixture } from "./nix-gaps.parity-and-hermeticity.helpers";
-import { runBuildSelected } from "../lib/test-helpers/selected-build";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -135,6 +134,10 @@ test(
         if (isArtifactAffectingEnvName(name)) delete minimalEnv[name];
       }
       delete minimalEnv.VBR_CANONICAL_ARTIFACT_ENTRYPOINT;
+      for (const name of "NIX_SSL_CERT_FILE NIX_SSL_CERT_DIR SSL_CERT_FILE SSL_CERT_DIR NODE_EXTRA_CA_CERTS".split(
+        " ",
+      ))
+        delete minimalEnv[name];
       const alternateEnv: Record<string, string> = {
         ...minimalEnv,
         HOME: path.join(tmp, "hostile-home-b"),

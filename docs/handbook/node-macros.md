@@ -73,6 +73,31 @@ Before Nix build execution, Node build entrypoint macros run read-only transitiv
     - `patch-pkg sync-required node --importer <importer>`
 - Command assembly is shared via `//build-tools/lang:nix_shell.bzl:nix_calling_node_patch_requirements_preflight(...)`.
 
+### Cross-cell asset labels
+
+`node_asset_stage` accepts relative labels, same-cell absolute labels, and external-cell labels such
+as `@viberoots//:bootstrap`. Macro helpers must preserve the complete `@cell//pkg:target` form and
+resolve it through `$(location ...)`; treating it as a filesystem path collapses the double slash
+and produces invalid paths such as `@viberoots/:bootstrap`. When adding a language or cross-cell
+asset consumer, exercise the public consumer build as well as label-query command assembly.
+
+Every asset has a typed `kind` of `file` or `wasm`. The macro infers `wasm` from a `.wasm` source or
+destination and from `artifact_name`/`artifact_glob`; extensionless assets must set `kind`
+explicitly. This keeps an extensionless WebAssembly module on the module-surface, file-type,
+magic-byte, and manifest-validation path.
+
+For a labeled raw file whose exported target name is not its repository path, set `source_path` to
+the exact repository-relative `export_file(src = ...)` path. The Nix graph consumes that declared
+path and fails closed when it is missing or escapes its source root; it never derives a source path
+from the target name. For a generated target, set `output_path` to the exact path below its typed
+dependency artifact (for example `index.js`). Canonical root exports such as
+`@viberoots//:bootstrap` retain their root-file shorthand. `source_path` and `output_path` are
+mutually exclusive and both are containment-checked.
+
+The `app` argument must be a same-cell target label. Both Buck and Nix consume that declared parent
+artifact: Nix copies the parent's `dist/` output and then applies the reviewed asset mappings. It
+does not rebuild the staging target's importer as a substitute for the parent.
+
 ### Related: `nix_node_test` (stamp policy)
 
 `nix_node_test(...)` is also Nix-backed, but it is not a genrule-style “macro builds via Nix” command string like `node_webapp` / bundled `nix_node_cli_bin`.

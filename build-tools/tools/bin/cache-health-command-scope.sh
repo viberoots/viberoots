@@ -4,8 +4,34 @@
 # probe. Every command front door begins a fresh review. build/p use
 # verified-ingress only to prove the shell authority before that review.
 vbr_cache_health_scope_mode="${1:-}"
-if [[ "${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG+x}" == "x" ]]; then
-	export NIX_CONFIG="${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG}"
+if [[ "${vbr_cache_health_scope_mode}" == "standalone" && "${VBR_NIX_CACHE_ROLE_AUTHORITY:-}" == "verify-nested-v1" && "${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG+x}" == "x" ]]; then
+	if ! NIX_CONFIG="$(node -e 'const e=String(process.env.VBR_NIX_CACHE_ROLE_CONFIG_B64||""),b=Buffer.from(e,"base64");if(b.toString("base64")!==e)process.exit(1);process.stdout.write(b)' </dev/null)"; then
+		echo "error: proof-bound Nix cache role config is invalid" 1>&2
+		return 1 2>/dev/null || exit 1
+	fi
+	export NIX_CONFIG
+elif [[ "${vbr_cache_health_scope_mode}" == "standalone" ]]; then
+	if [[ "${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG+x}" == "x" ]]; then
+		export NIX_CONFIG="${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG}"
+	fi
+	unset VBR_NIX_CACHE_ROLE_AUTHORITY VBR_NIX_CACHE_ROLE_REQUIRED
+	unset VBR_NIX_CACHE_ROLE_OPTIONAL VBR_NIX_CACHE_ROLE_POLICY
+	unset VBR_NIX_CACHE_ROLE_BINDING VBR_NIX_CACHE_ROLE_CONFIG_B64
+elif [[ "${vbr_cache_health_scope_mode}" == "verified-ingress" && "${VBR_NIX_CACHE_ROLE_AUTHORITY:-}" == "verify-nested-v1" ]]; then
+	if ! NIX_CONFIG="$(node -e 'const e=String(process.env.VBR_NIX_CACHE_ROLE_CONFIG_B64||""),b=Buffer.from(e,"base64");if(b.toString("base64")!==e)process.exit(1);process.stdout.write(b)' </dev/null)"; then
+		echo "error: proof-bound Nix cache role config is invalid" 1>&2
+		return 1 2>/dev/null || exit 1
+	fi
+	export NIX_CONFIG
+elif [[ "${vbr_cache_health_scope_mode}" == "verified-ingress" && "${VBR_NIX_CACHE_HEALTH_APPLIED:-}" == "1" && -n "${VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG:-}" ]]; then
+	export NIX_CONFIG="${VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG}"
+	unset VBR_NIX_CACHE_ROLE_AUTHORITY VBR_NIX_CACHE_ROLE_REQUIRED
+	unset VBR_NIX_CACHE_ROLE_OPTIONAL VBR_NIX_CACHE_ROLE_POLICY
+	unset VBR_NIX_CACHE_ROLE_BINDING VBR_NIX_CACHE_ROLE_CONFIG_B64
+elif [[ "${VBR_NIX_CACHE_ROLE_AUTHORITY:-}" != "verify-nested-v1" ]]; then
+	if [[ "${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG+x}" == "x" ]]; then
+		export NIX_CONFIG="${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG}"
+	fi
 fi
 unset VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG
 unset VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS

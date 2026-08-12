@@ -204,12 +204,11 @@ async function withNodeModulesEvaluationBundle<T>(
     targetPackages,
     env: artifactEnv,
   });
-  const target = importer === "." ? "" : `//${importer}:__node_modules__`;
   const graphPath = path.join(repoRoot, ".viberoots", "workspace", "buck", "graph.json");
   const source = await makeFilteredFlakeRef({
     workspaceRoot: repoRoot,
     attr: fullAttr,
-    target,
+    packageScope: importer === "." ? "" : importer,
     graphPath,
     logPrefix: "[node-modules-build]",
     classification: inventory.localDevelopment ? "local-development" : "hermetic",

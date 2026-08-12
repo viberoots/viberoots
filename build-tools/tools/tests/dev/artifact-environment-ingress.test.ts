@@ -42,12 +42,16 @@ test("known local compiler and language selectors fail before sanitization", () 
 test("canonical ingress preserves a validated build concurrency cap", () => {
   const toolsRoot = canonicalArtifactToolsRoot(process.cwd());
   const withConcurrency = buildCanonicalIngressEnvironment({
-    env: { NIX_BUILD_CORES: "4" },
+    env: {
+      NIX_BUILD_CORES: "4",
+      VBR_HEAVY_FANOUT_PERMIT: "viberoots-heavy-fanout",
+    },
     workspaceRoot: process.cwd(),
     toolsRoot,
     wasmBackend: "",
   });
   assert.equal(withConcurrency.NIX_BUILD_CORES, "4");
+  assert.equal(withConcurrency.VBR_HEAVY_FANOUT_PERMIT, undefined);
   assert.throws(
     () =>
       buildCanonicalIngressEnvironment({

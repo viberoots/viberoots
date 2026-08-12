@@ -8,7 +8,11 @@ MODULE_PROVIDERS = {}
 load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")
 WASM_ASSET_MANIFEST_TOOL = "@viberoots//build-tools/tools/node:wasm-asset-manifest.ts"
 def _is_label_ref(v):
-    return isinstance(v, str) and (v.startswith("//") or v.startswith(":"))
+    return isinstance(v, str) and (
+        v.startswith("//") or
+        v.startswith(":") or
+        (v.startswith("@") and "//" in v)
+    )
 def _to_abs_label(v):
     return "//%s:%s" % (native.package_name(), v[1:]) if v.startswith(":") else v
 def _label_package(v):
@@ -16,7 +20,7 @@ def _label_package(v):
         return ""
     if v.startswith(":"):
         return native.package_name()
-    trimmed = v[2:]
+    trimmed = v.split("//", 1)[1] if v.startswith("@") else v[2:]
     i = trimmed.find(":")
     return trimmed if i < 0 else trimmed[:i]
 def _apply_default_lockfile_label(lockfile_label, labels, macro_name):
@@ -74,6 +78,10 @@ def node_asset_stage(
     if out == None:
         out = "dist"
     lockfile_label = _apply_default_lockfile_label(lockfile_label, labels, "node_asset_stage")
+    app_output_subdir = "dist" if (
+        "webapp:static" in labels or
+        "webapp:ssr" in labels
+    ) else ""
     app_ref = app
     app_pkg = ""
     selected_route_target = ""
@@ -87,10 +95,19 @@ def node_asset_stage(
         src = selected.src
         dest = selected.dest
         stage_srcs.append(src)
+        resolve_provenance = "PROVENANCE_PATH=''; "
+        if selected.provenance:
+            stage_srcs.append(selected.provenance)
+            provenance_hint = "$(location %s)" % _to_abs_label(selected.provenance)
+            resolve_provenance = (
+                ("PROVENANCE_RAW=%s; PROVENANCE_HINT=%s; " % (sh_quote(selected.provenance), sh_quote(provenance_hint)))
+                + "resolve_node_source_path node_asset_stage \"$PROVENANCE_RAW\" \"$PROVENANCE_HINT\" || exit $?; "
+                + "PROVENANCE_PATH=\"$VBR_WASM_RESOLVED_PATH\"; "
+            )
         asset_hint_assign = ("ASSET_HINT=%s; " % sh_quote(src))
         if _is_label_ref(src):
             asset_hint_assign = ("ASSET_HINT=\"$(location %s)\"; " % _to_abs_label(src))
-        copy_assets.append(
+        resolve_asset = (
             asset_hint_assign
             + ("ASSET_RAW=%s; " % sh_quote(src))
             + ("ASSET_NAME=%s; " % sh_quote(selected.artifact_name))
@@ -98,9 +115,20 @@ def node_asset_stage(
             + "if resolve_node_source_path node_asset_stage \"$ASSET_RAW\" \"$ASSET_HINT\"; then "
             + "ASSET_SRC=\"$VBR_WASM_RESOLVED_PATH\"; "
             + "else ASSET_SRC=\"$SRCDIR\"; fi; "
-            + "resolve_node_wasm_artifact node_asset_stage \"$ASSET_RAW\" \"$ASSET_SRC\" \"$ASSET_NAME\" \"$ASSET_GLOB\" || exit $?; "
-            + "ASSET_SRC=\"$VBR_WASM_RESOLVED_PATH\"; "
-            + ("DEST=\"$OUT_ABS/%s\"; " % dest)
+        )
+        if selected.kind == "wasm":
+            resolve_asset += (
+                "resolve_node_wasm_artifact node_asset_stage \"$ASSET_RAW\" \"$ASSET_SRC\" \"$ASSET_NAME\" \"$ASSET_GLOB\" || exit $?; "
+                + "ASSET_SRC=\"$VBR_WASM_RESOLVED_PATH\"; "
+            )
+        else:
+            resolve_asset += (
+                "if [ ! -f \"$ASSET_SRC\" ]; then "
+                + "echo \"node_asset_stage: raw asset is not a file for '$ASSET_RAW': $ASSET_SRC\" >&2; exit 2; "
+                + "fi; "
+            )
+        copy_asset = (
+            ("DEST=\"$OUT_ABS/%s\"; " % dest)
             + "if [ -e \"$DEST\" ] && [ ! -f \"$DEST\" ]; then "
             + "echo \"node_asset_stage: destination is not a file: $DEST\" >&2; exit 2; "
             + "fi; "
@@ -108,8 +136,11 @@ def node_asset_stage(
             + "if [ \"$DEST_DIR\" = \"$DEST\" ]; then DEST_DIR=\"$OUT_ABS\"; fi; "
             + "mkdir -p \"$DEST_DIR\"; "
             + "if [ \"$ASSET_SRC\" != \"$DEST\" ]; then cp -f \"$ASSET_SRC\" \"$DEST\"; fi; "
-            + ("NODE_OPTIONS= \"$VBR_ARTIFACT_TOOLS_ROOT/bin/node\" --experimental-strip-types \"$SRCDIR/wasm-asset-manifest.ts\" \"$ASSET_RAW\" \"$ASSET_SRC\" %s \"$DEST\" \"$ASSET_MANIFEST\"; " % sh_quote(dest))
         )
+        if selected.kind == "wasm":
+            copy_asset += resolve_provenance
+            copy_asset += ("NODE_OPTIONS= \"$VBR_ARTIFACT_TOOLS_ROOT/bin/node\" --experimental-strip-types \"$VBR_ARTIFACT_TOOLS_ROOT/share/viberoots-source/build-tools/tools/node/wasm-asset-manifest.ts\" \"$ASSET_RAW\" \"$ASSET_SRC\" %s \"$DEST\" \"$ASSET_MANIFEST\" \"$PROVENANCE_PATH\"; " % sh_quote(dest))
+        copy_assets.append(resolve_asset + copy_asset)
     cmd = (
         "SCRATCH=\"$PWD\"; OUT_ABS=\"$SCRATCH/$OUT\"; "
         + nix_calling_genrule_bootstrap(
@@ -133,11 +164,17 @@ def node_asset_stage(
         + "if [ ! -e \"$APP_OUT\" ] && [ -e \"$SRCDIR/$APP_OUT\" ]; then APP_OUT=\"$SRCDIR/$APP_OUT\"; fi; "
         + "if [ ! -e \"$APP_OUT\" ] && [ -e \"$WORKSPACE_ROOT/$APP_OUT\" ]; then APP_OUT=\"$WORKSPACE_ROOT/$APP_OUT\"; fi; "
         + "if [ ! -e \"$APP_OUT\" ] && [ -n \"$APP_PKG\" ] && [ -d \"$WORKSPACE_ROOT/$APP_PKG/dist\" ]; then APP_OUT=\"$WORKSPACE_ROOT/$APP_PKG/dist\"; fi; "
+        + ("APP_OUTPUT_SUBDIR=%s; " % sh_quote(app_output_subdir))
+        + "APP_CONTENT=\"$APP_OUT\"; "
+        + "if [ -n \"$APP_OUTPUT_SUBDIR\" ]; then "
+        + "  if [ ! -d \"$APP_OUT/$APP_OUTPUT_SUBDIR\" ]; then echo \"node_asset_stage: declared webapp parent output is missing $APP_OUTPUT_SUBDIR: $APP_OUT\" >&2; exit 2; fi; "
+        + "  APP_CONTENT=\"$APP_OUT/$APP_OUTPUT_SUBDIR\"; "
+        + "fi; "
         + "mkdir -p \"$OUT_ABS\"; "
-        + "if [ -e \"$APP_OUT\" ]; then "
-        + "  if [ -d \"$APP_OUT\" ]; then "
-        + "    if [ \"`cd \"$APP_OUT\" && pwd -P`\" != \"`cd \"$OUT_ABS\" && pwd -P`\" ]; then cp -R \"$APP_OUT\"/. \"$OUT_ABS\"; fi; "
-        + "  elif [ \"$APP_OUT\" != \"$OUT_ABS\" ]; then cp -f \"$APP_OUT\" \"$OUT_ABS\"; fi; "
+        + "if [ -e \"$APP_CONTENT\" ]; then "
+        + "  if [ -d \"$APP_CONTENT\" ]; then "
+        + "    if [ \"`cd \"$APP_CONTENT\" && pwd -P`\" != \"`cd \"$OUT_ABS\" && pwd -P`\" ]; then cp -R \"$APP_CONTENT\"/. \"$OUT_ABS\"; fi; "
+        + "  elif [ \"$APP_CONTENT\" != \"$OUT_ABS\" ]; then cp -f \"$APP_CONTENT\" \"$OUT_ABS\"; fi; "
         + "fi; "
         + "ASSET_MANIFEST=\"$OUT_ABS/asset-manifest.json\"; "
         + "printf '%s\\n' '{\"schemaVersion\":\"viberoots.node-wasm-assets.v1\",\"assets\":[]}' > \"$ASSET_MANIFEST\"; "
@@ -160,6 +197,7 @@ def node_wasm_inline_module(
         out = None,
         artifact_name = None,
         artifact_glob = None,
+        provenance = None,
         labels = [],
         lockfile_label = None,
         deps = [],
@@ -174,6 +212,7 @@ def node_wasm_inline_module(
     selected_route_target = ""
     if _is_label_ref(src):
         src_ref = "$(location %s)" % _to_abs_label(src)
+    provenance_ref = "$(location %s)" % _to_abs_label(provenance) if provenance else ""
     cmd = (
         "SCRATCH=\"$PWD\"; OUT_ABS=\"$SCRATCH/$OUT\"; "
         + nix_calling_genrule_bootstrap(
@@ -213,7 +252,10 @@ def node_wasm_inline_module(
         + "resolve_node_wasm_artifact node_wasm_inline_module \"$SRC_RAW\" \"$SRC_PATH\" \"$SRC_NAME\" \"$SRC_GLOB\" || exit $?; "
         + "SRC_PATH=\"$VBR_WASM_RESOLVED_PATH\"; "
         + "if [ ! -f \"$SRC_PATH\" ]; then echo \"node_wasm_inline_module: source not found: $SRC_PATH\" >&2; exit 2; fi; "
-        + "PRODUCER_JSON=`NODE_OPTIONS= \"$VBR_ARTIFACT_TOOLS_ROOT/bin/node\" --experimental-strip-types \"$SRCDIR/wasm-asset-manifest.ts\" --lineage \"$SRC_PATH\"`; "
+        + ("PROVENANCE_RAW=%s; PROVENANCE_HINT=%s; " % (sh_quote(provenance), sh_quote(provenance_ref)))
+        + "PROVENANCE_PATH=''; "
+        + "if [ -n \"$PROVENANCE_RAW\" ]; then resolve_node_source_path node_wasm_inline_module \"$PROVENANCE_RAW\" \"$PROVENANCE_HINT\" || exit $?; PROVENANCE_PATH=\"$VBR_WASM_RESOLVED_PATH\"; fi; "
+        + "PRODUCER_JSON=`NODE_OPTIONS= \"$VBR_ARTIFACT_TOOLS_ROOT/bin/node\" --experimental-strip-types \"$VBR_ARTIFACT_TOOLS_ROOT/share/viberoots-source/build-tools/tools/node/wasm-asset-manifest.ts\" --lineage \"$SRC_PATH\" \"$PROVENANCE_PATH\"`; "
         + "b64=\"\"; b64=`base64 < \"$SRC_PATH\" | tr -d '\\n'`; "
         + "OUT_DIR=\"${OUT_ABS%/*}\"; "
         + "mkdir -p \"$OUT_DIR\"; "
@@ -240,10 +282,12 @@ def node_wasm_inline_module(
     wiring_deps = list(deps or [])
     if _is_label_ref(src):
         wiring_deps.append(src)
+    if provenance:
+        wiring_deps.append(provenance)
     wiring = _prepare_node_nix_calling_genrule(
         name = name,
         kwargs = kw,
-        srcs = [src, WASM_ASSET_MANIFEST_TOOL],
+        srcs = [src, provenance, WASM_ASSET_MANIFEST_TOOL] if provenance else [src, WASM_ASSET_MANIFEST_TOOL],
         deps = wiring_deps,
         labels = labels,
         lockfile_label = lockfile_label,

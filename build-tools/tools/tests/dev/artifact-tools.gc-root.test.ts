@@ -134,7 +134,20 @@ test("toolchain repair roots bootstrap and final canonical artifact tools", asyn
   assert.match(source, /storePath: canonicalArtifactToolsRoot\(root\)/);
   assert.match(source, /error instanceof MissingGeneratedArtifactToolAuthorityError/);
   assert.match(source, /storePath: bootstrap\.artifactTools\.root/);
+  assert.match(source, /currentPointsToLiveCheckout/);
+  assert.match(source, /materializeFilteredViberootsSource\([\s\S]*active\.viberootsRoot/);
+  assert.match(source, /artifactToolsFlakeRef: `path:\$\{materialized\.storePath\}`/);
   assert.match(source, /storePath: finalPaths\.artifactTools\.root/);
+});
+
+test("remote worker runtime source keeps Starlark files loaded by top-level TARGETS", async () => {
+  const source = await fsp.readFile(
+    viberootsSourcePath(
+      "viberoots/build-tools/tools/nix/flake/packages/filter-viberoots-runtime.nix",
+    ),
+    "utf8",
+  );
+  assert.match(source, /\$\{testRoot\}\/defs\.bzl/);
 });
 
 test("toolchain bootstrap recovery is identified only by a missing generated authority", async () => {

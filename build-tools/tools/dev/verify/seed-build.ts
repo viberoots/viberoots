@@ -1,6 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { artifactNixPolicyArgs } from "../../lib/artifact-nix-policy";
+import { parseNixCacheConfigValues } from "../../lib/nix-cache-readiness";
 
 export type VerifySeedBuildMode = "local" | "remote-ready";
 
@@ -36,6 +37,7 @@ export function verifySeedBuildArgs(opts: {
   flakeRef: string;
   mode: VerifySeedBuildMode;
   gcRootPath?: string;
+  nixConfig?: string;
 }): string[] {
   if (!evaluationBundleSeedRef.test(opts.flakeRef)) {
     throw new Error("verify seed build requires the canonical immutable evaluation-bundle source");
@@ -43,6 +45,7 @@ export function verifySeedBuildArgs(opts: {
   const base = [
     "build",
     ...artifactNixPolicyArgs(),
+    ...verifySeedCacheArgs(opts.nixConfig),
     "--option",
     "eval-cache",
     "false",
@@ -53,4 +56,20 @@ export function verifySeedBuildArgs(opts: {
   if (opts.mode === "remote-ready") return [...base, "--no-link", "--print-out-paths"];
   if (!opts.gcRootPath) throw new Error("local verify seed build requires a GC root out-link");
   return [...base, "--out-link", opts.gcRootPath, "--print-out-paths"];
+}
+
+function verifySeedCacheArgs(nixConfig: string | undefined): string[] {
+  if (nixConfig === undefined) return [];
+  const parsed = parseNixCacheConfigValues(nixConfig);
+  return [
+    "--option",
+    "substituters",
+    (parsed.get("substituters") || []).join(" "),
+    "--option",
+    "extra-substituters",
+    (parsed.get("extra-substituters") || []).join(" "),
+    "--option",
+    "fallback",
+    "true",
+  ];
 }

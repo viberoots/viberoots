@@ -1,6 +1,6 @@
 import * as fsp from "node:fs/promises";
 
-export const PREPARED_SEED_MARKER = ".seed-store-prepared-v8";
+export const PREPARED_SEED_MARKER = ".seed-store-prepared-v9";
 
 export type SeedStoreConfiguration =
   | { mode: "rsync"; seedKey: ""; seedPath: "" }

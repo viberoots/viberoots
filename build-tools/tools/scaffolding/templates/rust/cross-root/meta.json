@@ -1,0 +1,14 @@
+{
+  "language": "rust",
+  "template": "cross-root",
+  "description": "Experimental composed Rust libraries in separate Cargo roots",
+  "resolverDestination": "projects",
+  "help": {
+    "usage": "scaf new rust cross-root <name> [--path=DEST]",
+    "notes": [
+      "Creates sibling app and core Rust libraries with separate Cargo roots.",
+      "The app library consumes the core library through an explicit Buck dependency."
+    ],
+    "examples": ["scaf new rust cross-root demo --yes"]
+  }
+}

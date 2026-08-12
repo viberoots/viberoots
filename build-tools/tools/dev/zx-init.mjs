@@ -89,15 +89,11 @@ try {
     } catch {}
   } catch {}
 }
-
 const { register } = await import("node:module");
-const { pathToFileURL } = await import("node:url");
-const fsp = await import("node:fs/promises");
-const pathMod2 = await import("node:path");
-const WORKSPACE_ROOT_URL = pathToFileURL(
-  WORKSPACE_ROOT_FIXED.endsWith(pathMod2.sep)
+const WORKSPACE_ROOT_URL = urlMod.pathToFileURL(
+  WORKSPACE_ROOT_FIXED.endsWith(pathMod.sep)
     ? WORKSPACE_ROOT_FIXED
-    : WORKSPACE_ROOT_FIXED + pathMod2.sep,
+    : WORKSPACE_ROOT_FIXED + pathMod.sep,
 ).href;
 
 // Minimal resolver:
@@ -199,12 +195,16 @@ const dataUrl = "data:text/javascript," + encodeURIComponent(src);
 const workspaceRootUrl = WORKSPACE_ROOT_FIXED.endsWith("/")
   ? WORKSPACE_ROOT_FIXED
   : WORKSPACE_ROOT_FIXED + "/";
-register(dataUrl, pathToFileURL(workspaceRootUrl));
-
+register(dataUrl, urlMod.pathToFileURL(workspaceRootUrl));
+const processKill = await import("./zx-process-kill.mjs");
+export const { descendantPids, installZxProcessKill, killZxProcessTree } = processKill;
+installZxProcessKill(globalThis.$);
 const verifyProcessStateFile = String(process.env.VBR_VERIFY_PROCESS_STATE_FILE || "").trim();
 const verifyLogFile = String(process.env.VBR_VERIFY_LOG_FILE || "").trim();
 const verifyTarget = String(process.env.BUCK_TEST_TARGET || "").trim();
-const verifyOwnerPidRaw = String(process.env.VBR_VERIFY_OWNER_PID || "").trim();
+const verifyOwnerPid = verifyProcessStateFile
+  ? (await import("./verify/owner-pid.mjs")).establishVerifyOwnerPid()
+  : process.pid;
 const shouldRegisterVerifyProcess =
   String(process.env.VBR_VERIFY_REGISTER_PROCESS || "").trim() === "1";
 if (shouldRegisterVerifyProcess) {
@@ -230,20 +230,18 @@ if (
     });
   } catch {}
 }
-
 const nestedBuckIso = String(
   process.env.BUCK_NESTED_ISO || process.env.BUCK_ISOLATION_DIR || "",
 ).trim();
 if (verifyProcessStateFile && nestedBuckIso && !globalThis.__vbrVerifyBuckIsolationRegistered) {
   try {
     globalThis.__vbrVerifyBuckIsolationRegistered = true;
-    const ownerPid = Number(verifyOwnerPidRaw || process.pid);
     const ownedState = await import("./verify/owned-process-state");
     await ownedState.registerBuckIsolation({
       stateFile: verifyProcessStateFile,
       iso: nestedBuckIso,
       repoRoot: process.env.WORKSPACE_ROOT || WORKSPACE_ROOT_FIXED,
-      ownerPid: Number.isFinite(ownerPid) && ownerPid > 1 ? ownerPid : process.pid,
+      ownerPid: verifyOwnerPid,
       kind: "zx-test-nested",
     });
   } catch {}

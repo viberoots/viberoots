@@ -7,6 +7,7 @@ import {
   planVerifyTargetPasses,
   VERIFY_BROAD_RESOURCE_LIMITED_TARGET_MIN,
   VERIFY_BROAD_RESOURCE_LIMITED_THREADS,
+  VERIFY_ISOLATED_LABEL,
   VERIFY_RESOURCE_LIMITED_LABEL,
 } from "../../dev/verify/target-passes";
 
@@ -24,12 +25,17 @@ async function testFiles(dir: string): Promise<string[]> {
   return out;
 }
 
-test("tests that invoke public pnpm reconciliation use the resource-limited lane", async () => {
+test("tests that invoke public pnpm reconciliation use a constrained lane", async () => {
   const taxonomy = await fsp.readFile(
     path.join(testsRoot, "resource_limited_taxonomy.bzl"),
     "utf8",
   );
+  const isolatedTaxonomy = await fsp.readFile(
+    path.join(testsRoot, "isolated_test_conventions.bzl"),
+    "utf8",
+  );
   const missing: string[] = [];
+  const isolatedReconciliationTests: string[] = [];
 
   const directPublicUpdateTests: string[] = [];
   for (const abs of await testFiles(testsRoot)) {
@@ -47,7 +53,10 @@ test("tests that invoke public pnpm reconciliation use the resource-limited lane
     }
     const rel = path.relative(root, abs).split(path.sep).join(path.posix.sep);
     if (invokesPublicUpdate || invokesUpdateLauncher) directPublicUpdateTests.push(rel);
-    if (!taxonomy.includes(`${JSON.stringify(rel)}: True`)) missing.push(rel);
+    const isResourceLimited = taxonomy.includes(`${JSON.stringify(rel)}: True`);
+    const isIsolated = isolatedTaxonomy.includes(`${JSON.stringify(rel)}: True`);
+    if (isIsolated) isolatedReconciliationTests.push(rel);
+    if (!isResourceLimited && !isIsolated) missing.push(rel);
   }
 
   assert.deepEqual(missing, []);
@@ -61,6 +70,26 @@ test("tests that invoke public pnpm reconciliation use the resource-limited lane
     "build-tools/tools/tests/scaffolding/scaf-go-test.cli.auto-wires.test.ts",
     "build-tools/tools/tests/scaffolding/scaf-go-test.lib.auto-wires.test.ts",
   ]);
+  assert.deepEqual(isolatedReconciliationTests.sort(), [
+    "build-tools/tools/tests/rust/rust.native-build.rejects-cross-root-deps.test.ts",
+    "build-tools/tools/tests/scaffolding/scaf-new.ts.wasm-linking-app.scaffold-and-build.test.ts",
+  ]);
+
+  assert.deepEqual(
+    planVerifyTargetPasses(
+      isolatedReconciliationTests.map((target) => ({
+        target,
+        labels: [VERIFY_ISOLATED_LABEL],
+      })),
+    ),
+    [
+      {
+        name: "isolated",
+        targets: isolatedReconciliationTests,
+        threadsOverride: 1,
+      },
+    ],
+  );
 
   const broadLaneTargets = [
     ...directPublicUpdateTests,

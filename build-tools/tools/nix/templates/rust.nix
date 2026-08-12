@@ -8,10 +8,10 @@ let
   lib = pkgs.lib;
   H = import ../lib/lang-helpers.nix { inherit pkgs; };
   Contract = import ./rust-contract.nix { inherit lib; };
+  validateExtension = import ./rust-extension-selection.nix { inherit pkgs Contract; };
   validateLockSources = lockFile: import ../../../rust/cargo-source-policy.nix { inherit lockFile; };
-  validateKindTarget = Contract.validateKindTarget;
 in {
-  inherit validateKindTarget;
+  validateKindTarget = Contract.validateKindTarget;
   rustPackage = {
     name, kind,
     cargoRoot, cargoManifest, cargoLock,
@@ -27,6 +27,7 @@ in {
     publicCrate ? crate,
     hostRole ? "target",
     generatedOutputs ? [],
+    behaviorProbe ? false,
     module ? "",
     buildPyDeps ? [],
     pythonWheelhouse ? null,
@@ -37,19 +38,15 @@ in {
     interop ? {}, wasm ? {}, tauri ? {}, coverage ? false,
     }:
     let
-      validatedTarget = validateKindTarget kind target;
+      validatedTarget = Contract.validateKindTarget kind target;
       _wasmTarget = Contract.validateWasmTarget kind validatedTarget wasm;
       _sources = validateLockSources cargoLock;
       compositionRoots = if sourceComposition == null then [ cargoRoot ]
         else map (root: root.cargoRoot) sourceComposition.roots;
       _cargoConfig = Contract.validateCargoConfigs compositionRoots;
       _crateRole = Contract.validateCrateRole crateType hostRole validatedTarget;
-      _extension = Contract.validateExtension {
+      _extension = validateExtension {
         inherit kind module buildPyDeps addonName nodeApiVersion platform pythonAbi;
-        selectedPythonAbi =
-          "cp${lib.versions.major pkgs.python3.pythonVersion}${lib.versions.minor pkgs.python3.pythonVersion}";
-        selectedNodeApiVersion = 10;
-        system = pkgs.stdenv.hostPlatform.system;
       };
       validatedPublicCrate = Contract.validatePublicCrate publicCrate;
       targetName = lib.last (lib.splitString ":" name);
@@ -66,7 +63,10 @@ in {
       dynamicExtension = pkgs.stdenv.hostPlatform.extensions.sharedLibrary;
       rustc = rustToolchain;
       nativePackages = nativeInputs.libraries ++ nativeInputs.headers;
-      nativeLibraryFlags = map (package: "-Lnative=${package}/lib") nativeInputs.libraries ++ map (linkName: "-lstatic=${linkName}") (nativeInputs.linkNames or []);
+      nativeLibraryFlags = map (package: "-Lnative=${package}/lib") nativeInputs.libraries
+        ++ map (link: "-l${link.kind}=${link.name}") (nativeInputs.nativeLinks or (
+          map (linkName: { name = linkName; kind = "static"; }) (nativeInputs.linkNames or [])
+        ));
       testProfileFlags = lib.optionals (cargoProfile == "release") [ "--release" ];
       testBuildFlags = [
         "--offline"
@@ -106,7 +106,8 @@ in {
           publicCrate = validatedPublicCrate; inherit wasm;
         };
       wasmPostprocess = import ./rust-wasm-postprocess.nix {
-        inherit pkgs wasmtimePkgs rustToolchain rustPlatform lib kind crate wasm;
+        inherit pkgs wasmtimePkgs rustToolchain rustPlatform lib kind crate wasm behaviorProbe;
+        publicCrate = validatedPublicCrate;
       };
       extensionRuntime = import ./rust-extension-runtime.nix { inherit pkgs lib kind;
         runtimePackages = if builtins.elem kind [ "pyext" "addon" ] then runtimePackages else []; };
@@ -142,14 +143,18 @@ in {
       quality = import ./rust-quality.nix {
         inherit pkgs lib rustToolchain crate packagePath featureFlags coverage;
       };
-      tauriContract = import ./rust-tauri.nix {
-        inherit pkgs lib kind tauri targetName cargoTarget cargoProfile;
-      };
+      tauriContract = import ./rust-tauri.nix { inherit pkgs lib kind tauri targetName cargoTarget cargoProfile; };
+      isWasm = builtins.elem kind [
+        "wasm" "wasi" "wasm_static" "wasi_static" "wasm_browser" "wasm_component"
+      ];
       installPhase = (if kind == "tauri" then tauriContract.installPhase else baseInstallPhase) + import ./rust-evidence-install.nix {
         inherit lib kind coverage interopContract wasmPostprocess compositionEvidence
           dependencyInventory extensionRuntime H name sourcePlan artifactNixRoot pkgs
           producerLineage;
-      };
+        inherit isWasm;
+      } + lib.optionalString behaviorProbe (import ./rust-behavior-observer.nix {
+        inherit pkgs lib rustToolchain kind crate crateType publicCrate targetName module tauri;
+      });
       _overrideTrace =
         if devOverrides == {} then true
         else builtins.trace
@@ -160,6 +165,7 @@ in {
     rustPlatform.buildRustPackage ({
       pname = "rust-${sanitized}";
       version = "0.1.0";
+      outputs = if isWasm then [ "out" "provenance" ] else [ "out" ];
       src = vendorPlan.sourceWithVendor;
       unpackPhase = ''
         runHook preUnpack
@@ -189,6 +195,8 @@ in {
         ++ lib.optional (nativePackages != []) (lib.makeSearchPath "include" nativePackages));
       LIBRARY_PATH = lib.makeLibraryPath nativeInputs.libraries;
       VIBEROOTS_RUST_LINK_LIBRARY_PATHS = lib.makeLibraryPath nativeInputs.libraries;
+      VIBEROOTS_TAURI_SOURCE_ROOT =
+        if kind == "tauri" then tauri.sourceRoot else "";
       postPatch = ''
         test -f Cargo.toml
         test -f Cargo.lock

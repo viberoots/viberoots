@@ -159,8 +159,7 @@ export async function runGlue(dryRun: boolean, verbose: boolean, priorGlobalInpu
   const nodeBin = process.execPath || "node";
   const wsRoot = await workspaceRoot();
   const nodeBase = zxNodeBase(wsRoot);
-  const reconcileGlobalInputs = priorGlobalInputs !== "";
-  await ensureWorkspaceGlobalNixInputTargets(reconcileGlobalInputs);
+  await ensureWorkspaceGlobalNixInputTargets(true);
   const globalInputsBeforePipeline = await globalNixInputFingerprint(wsRoot);
   if (priorGlobalInputs !== "" && globalInputsBeforePipeline !== priorGlobalInputs) {
     await handoffChangedGlobalInputConsumers(wsRoot);

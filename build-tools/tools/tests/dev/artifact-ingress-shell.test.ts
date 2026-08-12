@@ -5,11 +5,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
-const ingressScript = "viberoots/build-tools/tools/bin/artifact-ingress-env.sh";
-const cacheScopeScript = path.resolve(
-  "viberoots/build-tools/tools/bin/cache-health-command-scope.sh",
-);
+const ingressScript = viberootsSourcePath("build-tools/tools/bin/artifact-ingress-env.sh");
+const cacheScopeScript = viberootsSourcePath("build-tools/tools/bin/cache-health-command-scope.sh");
 
 function writeManifest(workspace: string, root: string): void {
   const manifest = path.join(workspace, ".viberoots", "workspace", "toolchain-paths.json");

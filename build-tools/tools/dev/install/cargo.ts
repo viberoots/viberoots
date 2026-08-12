@@ -2,20 +2,21 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { canonicalArtifactToolsRoot } from "../../lib/artifact-environment";
 import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
+import { timeAsyncDetail } from "../../lib/timing-detail";
 import { staleMetadataError } from "./metadata-mode";
 import { withFileRollback } from "../update-command/file-transaction";
 import { projectModuleDirs } from "../update-command/surfaces";
 import { assertCargoConfigIsolation, runCargo } from "./cargo-command";
+import { cargoCommandHome, workspaceCargoHome } from "./cargo-home";
 import { assertSupportedCargoLockSources } from "./cargo-source-policy";
 import {
   fixedSourcesFromCargoMetadata,
-  fixedSourceManifestMatches,
-  fixedSourceManifestPath,
   materializeFixedSources,
   mergeFixedSourceMaps,
   type FixedSourceEntry,
   type FixedSourceMap,
 } from "./cargo-fixed-sources";
+import { fixedSourceManifestMatches, fixedSourceManifestPath } from "./cargo-fixed-source-manifest";
 import { cargoSourceMaterialization } from "./cargo-source-materializer";
 import { cargoLocks, copyCargoRoot } from "./cargo-root-copy";
 
@@ -77,26 +78,50 @@ async function prepareCargoRoot(
   fixedSources: FixedSourceMap;
   cleanup: () => Promise<void>;
 }> {
-  const before = await cargoLocks(cargoRoot);
-  const copy = await copyCargoRoot(cargoRoot, workspaceRoot);
+  const relativeRoot = path.relative(workspaceRoot, cargoRoot) || ".";
+  const timed = async <T>(label: string, fn: () => Promise<T>): Promise<T> =>
+    await timeAsyncDetail(`Rust dependency repair ${relativeRoot} ${label}`, fn);
+  const before = await timed("initial lock discovery", async () => await cargoLocks(cargoRoot));
+  const copy = await timed(
+    "temporary root copy",
+    async () => await copyCargoRoot(cargoRoot, workspaceRoot),
+  );
   try {
     const rootLock = path.join(cargoRoot, "Cargo.lock");
     if (
-      await fsp.access(rootLock).then(
+      !upgrade &&
+      (await fsp.access(rootLock).then(
         () => true,
         () => false,
-      )
+      ))
     ) {
-      // Explicit `u` is the reviewed network-bearing authoring boundary. Fetch only
-      // the already-locked graph into the workspace-owned Cargo home; resolution,
-      // metadata validation, fixed-source publication, and all builds remain offline.
+      // Reconciliation may fetch only the already-locked graph into the
+      // workspace-owned Cargo home. Upgrade must reach `cargo update --offline`
+      // before requiring a current lock so stale path dependency metadata can be
+      // repaired transactionally.
       await assertSupportedCargoLockSources(rootLock);
-      await runCargo(cargoBin, ["fetch", "--locked"], copy.root, workspaceRoot, false);
+      await timed(
+        "locked fetch",
+        async () =>
+          await runCargo(cargoBin, ["fetch", "--locked"], copy.root, workspaceRoot, false),
+      );
     }
-    if (upgrade) await runCargo(cargoBin, ["update", "--offline"], copy.root, workspaceRoot);
-    else await runCargo(cargoBin, metadataArgs, copy.root, workspaceRoot);
-    const metadataJSON = await runCargo(cargoBin, lockedMetadataArgs, copy.root, workspaceRoot);
-    const after = await cargoLocks(copy.root);
+    if (upgrade) {
+      await timed(
+        "offline update",
+        async () => await runCargo(cargoBin, ["update", "--offline"], copy.root, workspaceRoot),
+      );
+    } else {
+      await timed(
+        "offline metadata reconciliation",
+        async () => await runCargo(cargoBin, metadataArgs, copy.root, workspaceRoot),
+      );
+    }
+    const metadataJSON = await timed(
+      "locked offline metadata",
+      async () => await runCargo(cargoBin, lockedMetadataArgs, copy.root, workspaceRoot),
+    );
+    const after = await timed("generated lock discovery", async () => await cargoLocks(copy.root));
     for (const lock of after) await assertSupportedCargoLockSources(lock);
     const relativeLocks = new Set([
       ...before.map((file) => path.relative(cargoRoot, file)),
@@ -112,9 +137,10 @@ async function prepareCargoRoot(
         return { destination: path.join(cargoRoot, relative), bytes };
       }),
     );
-    const fixedSources = await fixedSourcesFromCargoMetadata(
-      metadataJSON,
-      path.join(copy.root, "Cargo.lock"),
+    const fixedSources = await timed(
+      "fixed source extraction",
+      async () =>
+        await fixedSourcesFromCargoMetadata(metadataJSON, path.join(copy.root, "Cargo.lock")),
     );
     return { outputs, fixedSources, cleanup: copy.cleanup };
   } catch (error) {
@@ -149,7 +175,12 @@ export async function repairRustDependencies(
           `[update] Rust: ${upgrade ? "upgrading" : "reconciling"} ${path.relative(root, cargoRoot) || "."}`,
         );
       }
-      prepared.push(await prepareCargoRoot(cargoRoot, upgrade, resolvedCargo, root));
+      prepared.push(
+        await timeAsyncDetail(
+          `Rust dependency repair ${path.relative(root, cargoRoot) || "."} preparation total`,
+          async () => await prepareCargoRoot(cargoRoot, upgrade, resolvedCargo, root),
+        ),
+      );
     }
     const mergedFixedSources = mergeFixedSourceMaps(prepared.map((entry) => entry.fixedSources));
     const materializedEntries = Object.values(mergedFixedSources).filter(
@@ -160,15 +191,20 @@ export async function repairRustDependencies(
       (!materializeSource && materializedEntries.length > 0) || (needsGit && !runGitSource)
         ? cargoSourceMaterialization(root)
         : undefined;
-    const fixedSources = await materializeFixedSources(
-      mergedFixedSources,
-      materializeSource ||
-        productionMaterialization?.materialize ||
-        (async () => {
-          throw new Error("Cargo fixed-source materialization authority is unavailable");
-        }),
-      runGitSource || productionMaterialization?.runGit,
-      path.join(root, ".viberoots/workspace/cargo-home"),
+    const fixedSources = await timeAsyncDetail(
+      "Rust dependency repair fixed source materialization",
+      async () =>
+        await materializeFixedSources(
+          mergedFixedSources,
+          materializeSource ||
+            productionMaterialization?.materialize ||
+            (async () => {
+              throw new Error("Cargo fixed-source materialization authority is unavailable");
+            }),
+          runGitSource || productionMaterialization?.runGit,
+          cargoCommandHome(root),
+          productionMaterialization?.deferredMaterialization,
+        ),
     );
     const fixedSourceManifest = fixedSourceManifestPath(root);
     const outputs = [

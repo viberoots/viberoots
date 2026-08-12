@@ -12,7 +12,11 @@ import { runMain } from "../lib/cli-wrap";
 import { withScopedEnv } from "../lib/scoped-env";
 import { inspectArtifactSource } from "../lib/artifact-source-inventory";
 import { targetPackageFromLabel } from "./build-selected-helpers";
-import { parseSelectedBuildOutPath, selectedNixBuildArgs } from "./build-selected-nix-command";
+import {
+  parseSelectedBuildOutPath,
+  selectedNixBuildArgs,
+  type SelectedDerivationOutput,
+} from "./build-selected-nix-command";
 import { makeFilteredFlakeRef } from "./filtered-flake";
 import { resolveFinalPnpmStore } from "./update-pnpm-hash/realized-store";
 import { pnpmStoreAttrFromImporter } from "./update-pnpm-hash/paths";
@@ -182,6 +186,12 @@ async function main(artifactToolsRoot: string) {
     console.error(`[build-selected] ${parsedSource.sourceError}`);
     process.exit(2);
   }
+  const outputRaw = getFlagStr("derivation-output", "out").trim();
+  if (outputRaw !== "out" && outputRaw !== "provenance") {
+    console.error("--derivation-output must be out or provenance");
+    process.exit(2);
+  }
+  const derivationOutput = outputRaw as SelectedDerivationOutput;
   const targetRaw = getFlagStr("target", "").trim();
   if (!targetRaw) {
     console.error("--target is required (e.g., --target //projects/apps/foo:foo)");
@@ -343,10 +353,12 @@ async function main(artifactToolsRoot: string) {
   });
   emitArtifactPolicyEvidence(policyEvidence);
   const targetImporter = targetPackageFromLabel(target);
+  const printDerivationIdentity = getFlagBool("print-derivation-identity");
   let fixedStore: Awaited<ReturnType<typeof resolveFinalPnpmStore>> | null = null;
   let attempt: any;
   try {
     fixedStore =
+      !printDerivationIdentity &&
       targetImporter &&
       (await pathExists(path.join(workspaceRoot, targetImporter, "pnpm-lock.yaml")))
         ? await resolveFinalPnpmStore({
@@ -357,7 +369,7 @@ async function main(artifactToolsRoot: string) {
             env: flakeEnv,
           })
         : null;
-    if (getFlagBool("print-derivation-identity")) {
+    if (printDerivationIdentity) {
       const nix = ensureNixStoreToolPathSync("nix", flakeEnv);
       const identity = await runCommand({
         command: nix,
@@ -369,7 +381,7 @@ async function main(artifactToolsRoot: string) {
           "--json",
           flakeSource.flakeRef,
           "--apply",
-          "package: [ package.drvPath package.outPath ]",
+          `package: [ package.drvPath package.${derivationOutput} ]`,
         ],
         env: flakeEnv,
       });
@@ -391,6 +403,7 @@ async function main(artifactToolsRoot: string) {
       const args = selectedNixBuildArgs({
         flakeRef: flakeSource.flakeRef,
         showTrace: Boolean(nixTrace),
+        output: derivationOutput,
       });
       const command = ensureNixStoreToolPathSync(args[0] || "nix", flakeEnv);
       return await runCommand({

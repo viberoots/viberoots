@@ -1,3 +1,9 @@
 fn main() {
-    tauri_build::build()
+    if std::env::var_os("CARGO_FEATURE_DESKTOP").is_some()
+        && !std::env::var("TARGET")
+            .unwrap_or_default()
+            .starts_with("wasm32-")
+    {
+        tauri_build::build()
+    }
 }

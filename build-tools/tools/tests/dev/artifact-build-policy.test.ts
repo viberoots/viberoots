@@ -12,7 +12,11 @@ import {
   hasRejectedNixPolicyDiagnostics,
   inspectArtifactBuildPolicy,
 } from "../../dev/artifact-policy-inspection";
-import { REVIEWED_PUBLIC_KEYS, REVIEWED_SUBSTITUTERS } from "../../lib/artifact-nix-policy";
+import {
+  REVIEWED_PUBLIC_KEYS,
+  REVIEWED_SUBSTITUTERS,
+  reviewedArtifactSandboxPaths,
+} from "../../lib/artifact-nix-policy";
 import {
   inspectArtifactSource,
   parseUntrackedInventory,
@@ -107,7 +111,8 @@ test("protected admission rejects explicit impurity and missing inspection", () 
       nixConfig: {
         sandbox: { value: field === "sandbox" ? undefined : true },
         "sandbox-fallback": { value: false },
-        "sandbox-paths": { value: {} },
+        "sandbox-paths": { value: [...reviewedArtifactSandboxPaths()] },
+        "extra-sandbox-paths": { value: {} },
         builders: { value: field === "builders" ? undefined : "" },
         substituters: {
           value: field === "substituters" ? undefined : [...REVIEWED_SUBSTITUTERS],

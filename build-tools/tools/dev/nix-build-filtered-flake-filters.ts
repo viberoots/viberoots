@@ -16,6 +16,8 @@ export const DEFAULT_FILTERED_FLAKE_WORKSPACE_PATHS = [
 ];
 
 export const FILTERED_FLAKE_RSYNC_EXCLUDES = [
+  ".viberoots/cargo-home",
+  ".viberoots/cargo-home.noindex",
   ".git",
   ".metadata_never_index",
   ".env",
@@ -55,12 +57,14 @@ export const FILTERED_FLAKE_RSYNC_EXCLUDES = [
   ".viberoots/workspace/buck",
   ".viberoots/workspace/cache",
   ".viberoots/workspace/cargo-home",
+  ".viberoots/workspace/cargo-home.noindex",
   ".viberoots/workspace/codex-test-logs",
   ".viberoots/workspace/exact-env-smoke.out",
   ".viberoots/workspace/host-path",
   ".viberoots/workspace/install-cache",
   ".viberoots/workspace/nix-xdg-cache",
   ".viberoots/workspace/node",
+  ".viberoots/workspace/node-modules-hidden",
   ".viberoots/workspace/prelude",
   ".viberoots/workspace/pr-logs",
   ".viberoots/workspace/viberoots-flake-input",
@@ -130,6 +134,18 @@ export function defaultFilteredFlakeSnapshotRelPaths(): string[] {
     ...DEFAULT_FILTERED_FLAKE_WORKSPACE_PATHS,
     ...DEFAULT_FILTERED_FLAKE_ROOTS,
   ];
+}
+
+export function relPathsForImmutableViberootsInput(
+  relPaths: readonly string[],
+  immutableInputRoot: string,
+): string[] {
+  if (!String(immutableInputRoot || "").trim()) return [...relPaths];
+  return relPathsWithoutNestedViberoots(relPaths);
+}
+
+export function relPathsWithoutNestedViberoots(relPaths: readonly string[]): string[] {
+  return relPaths.filter((rel) => rel !== "viberoots" && !rel.startsWith("viberoots/"));
 }
 
 export function defaultFilteredFlakeSnapshotRsyncSources(relPaths: readonly string[]): string[] {

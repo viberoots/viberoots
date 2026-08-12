@@ -127,7 +127,6 @@ _TEMPLATE_TEST_CONVENTIONS = {
     "build-tools/tools/tests/scaffolding/webapp-ssr-vite.runnable-contracts.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],
         "classification": "template:contract",
-        "extra_labels": ["verify:isolated-bounded"],
     },
     "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-hmr.local-ts-dep.test.ts": {
         "template_roots": ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite"],

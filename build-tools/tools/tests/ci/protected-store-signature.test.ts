@@ -7,6 +7,7 @@ import { REVIEWED_EVIDENCE_PUBLIC_KEY } from "../../lib/artifact-nix-policy";
 import {
   assertEvidenceStoreLocatorMatchesRegistry,
   assertReviewedEvidenceStoreUri,
+  isProtectedReproducibilityAggregate,
 } from "../../lib/protected-reproducibility-aggregate";
 import {
   ensureProtectedStorePath,
@@ -108,6 +109,18 @@ test("fresh aggregate ingress copies then verifies aggregate and registry before
     registryCopy > aggregateRead && registryCopy < registryVerify && registryVerify < registryRead,
   );
   assert.ok(source.lastIndexOf("assertEvidenceStoreLocatorMatchesRegistry") > registryRead);
+  const parsed = source.lastIndexOf("parseArtifactReproducibilityAggregate(text");
+  const frozen = source.indexOf("const protectedAggregate = deepFreeze");
+  const branded = source.indexOf("verifiedAggregates.add(protectedAggregate)");
+  assert.ok(frozen > registryRead && frozen < parsed && parsed < branded);
+  assert.equal(
+    isProtectedReproducibilityAggregate({
+      storePath: `${root}/aggregate.json`,
+      aggregate: {},
+      evidenceStoreUri: "s3://reviewed-evidence/reproducibility",
+    } as never),
+    false,
+  );
 });
 
 test("protected evidence verification rejects non-store and nested paths", () => {

@@ -142,5 +142,6 @@ export function verifyPassIsolationDir(opts: {
   dedicated: boolean;
 }): string {
   if (!opts.dedicated) return opts.baseIso;
-  return `${opts.baseIso}-${passIsolationSuffix(opts.passName)}`;
+  return extendMacosNoindexPathSegment(opts.baseIso, `-${passIsolationSuffix(opts.passName)}`);
 }
+import { extendMacosNoindexPathSegment } from "../../lib/macos-metadata";

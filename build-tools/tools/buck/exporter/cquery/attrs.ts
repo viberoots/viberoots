@@ -94,6 +94,7 @@ export const attrList = Array.from(
     "target_triple",
     "features",
     "default_features",
+    "behavior_probe",
     "profile",
     "target",
     "local_patch_dirs",

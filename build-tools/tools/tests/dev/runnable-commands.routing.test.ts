@@ -89,16 +89,19 @@ test("d routes to run.dev and fails clearly when unavailable", async () => {
       ) + "\n",
       "utf8",
     );
+    const commandLog = path.join(tmp, "buck-out", "tmp", "runnable.dev-command.json");
 
-    const dev = await $({
+    await $({
       cwd: tmp,
       stdio: "pipe",
       env: {
         ...withoutArtifactEnvironmentInfluence(process.env),
         PATH: `${stubBin}:${process.env.PATH || ""}`,
       },
-    })`zx-wrapper ${fixtureRunner} --mode dev //projects/apps/web:web --fixture-manifest=${manifestPath}`;
-    assert.match(String(dev.stdout || ""), /dev-ok/);
+    })`zx-wrapper ${fixtureRunner} --mode dev //projects/apps/web:web --fixture-manifest=${manifestPath} --fixture-command-log=${commandLog}`;
+    const devCommand = JSON.parse(await fsp.readFile(commandLog, "utf8"));
+    assert.deepEqual(devCommand.argv, ["pnpm", "--dir", "projects/apps/web", "dev"]);
+    assert.equal(devCommand.cwd, tmp);
 
     const noDevManifestPath = path.join(tmp, "buck-out", "tmp", "runnable.no-dev.manifest.json");
     await fsp.writeFile(
@@ -227,8 +230,11 @@ test("SSR runnable routes to canonical node prod and dev:ssr commands", async ()
         ...withoutArtifactEnvironmentInfluence(process.env),
         PATH: `${stubBin}:${process.env.PATH || ""}`,
       },
-    })`zx-wrapper ${fixtureRunner} --mode dev //projects/apps/ssr:app --fixture-manifest=${manifestPath}`;
-    assert.match(String(dev.stdout || ""), /pnpm-ok:--dir projects\/apps\/ssr dev:ssr/);
+    })`zx-wrapper ${fixtureRunner} --mode dev //projects/apps/ssr:app --fixture-manifest=${manifestPath} --fixture-command-log=${manifestPath}.command`;
+    assert.equal(dev.exitCode, 0);
+    const devCommand = JSON.parse(await fsp.readFile(`${manifestPath}.command`, "utf8"));
+    assert.deepEqual(devCommand.argv, ["pnpm", "--dir", "projects/apps/ssr", "dev:ssr"]);
+    assert.equal(devCommand.cwd, tmp);
   });
 });
 

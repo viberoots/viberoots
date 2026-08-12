@@ -77,7 +77,7 @@ test("dev-build housekeeping skips optimise by default when disk is healthy", as
     await assert.rejects(fsp.stat(stamp));
     await assert.rejects(fsp.stat(path.join(root, "nix.log")));
     assert.equal(cleanCount, 1);
-    assert.ok(logs.includes("[housekeeping] optimise: skipped (sufficient free space)"));
+    assert.ok(logs.includes("[housekeeping] optimise: skipped (off)"));
     assert.ok(logs.includes("[housekeeping] finished."));
   } finally {
     restore();
@@ -94,7 +94,7 @@ test("dev-build housekeeping skips optimise by default when disk is healthy", as
   }
 });
 
-test("dev-build housekeeping runs optimise under pressure and respects cooldown", async () => {
+test("dev-build housekeeping runs explicitly requested optimise and respects cooldown", async () => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "dev-build-housekeeping-"));
   const bin = path.join(root, "bin");
   const prevPath = process.env.PATH;
@@ -121,7 +121,7 @@ test("dev-build housekeeping runs optimise under pressure and respects cooldown"
     process.env.VBR_GC_MODE = "off";
     process.env.VBR_HOUSEKEEPING = "1";
     process.env.VBR_VERBOSE = "1";
-    delete process.env.VBR_OPTIMISE_MODE;
+    process.env.VBR_OPTIMISE_MODE = "always";
     delete process.env.VBR_VERIFY_LOCK_DIR;
 
     const pressureStats = async () => ({ freeBytes: 5 * 1024 * 1024 * 1024, freePct: 5 });
@@ -197,7 +197,7 @@ test("dev-build housekeeping skips automatic nix GC while verify lock is live", 
     process.env.PATH = `${bin}${path.delimiter}${prevPath || ""}`;
     process.env.VBR_GC_MODE = "auto";
     process.env.VBR_HOUSEKEEPING = "1";
-    delete process.env.VBR_OPTIMISE_MODE;
+    process.env.VBR_OPTIMISE_MODE = "always";
     process.env.VBR_VERIFY_LOCK_DIR = lockDir;
     process.env.VBR_VERBOSE = "1";
 

@@ -29,6 +29,21 @@ test("linting: zx_test exports a stable nested buck isolation for child buck com
   );
   assert.match(
     txt,
+    /--isolation-dir=\*\).*has_isolation=1/,
+    "expected the nested buck2 shim to preserve explicit caller-owned isolations",
+  );
+  assert.match(
+    txt,
+    /set -- --isolation-dir \\\"\$BUCK_NESTED_ISO\\\" \\\"\$@\\\"/,
+    "expected bare nested buck2 commands to use the registered test isolation",
+  );
+  assert.match(
+    txt,
+    /nested isolation is missing/,
+    "expected bare nested buck2 commands to fail closed without registered isolation",
+  );
+  assert.match(
+    txt,
     /TEST_LOG_DIR=.*buck-out\/test-logs/,
     "expected zx_test to write test logs under the stable buck-out/test-logs path",
   );
@@ -56,6 +71,11 @@ test("linting: zx_test exports a stable nested buck isolation for child buck com
     txt,
     /buck-out\/zx_shims\/\.metadata_never_index/,
     "expected zx_test to mark shim directories as excluded from macOS metadata indexing",
+  );
+  assert.match(
+    txt,
+    /SHIMROOT=\\"\$\{SHIMROOT\}\.noindex\\"/,
+    "expected Darwin zx_test shim roots to use a physical .noindex directory",
   );
   assert.doesNotMatch(
     txt,

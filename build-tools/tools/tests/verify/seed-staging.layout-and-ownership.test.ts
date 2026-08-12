@@ -26,18 +26,18 @@ test("verify seed staging stays outside volatile verify TMPDIR", () => {
   if (process.platform === "darwin") {
     assert.ok(root.startsWith("/tmp/viberoots-test-seed"));
     assert.ok(root.includes(".noindex"));
-    assert.ok(root.endsWith(path.join(".noindex", "stage-v9")));
+    assert.ok(root.endsWith(path.join(".noindex", "stage-v10")));
     assert.ok(!root.includes("/viberoots-verify"));
     return;
   }
   assert.ok(root.startsWith("/tmp/viberoots-test-seed"));
-  assert.ok(root.endsWith("stage-v9"));
+  assert.ok(root.endsWith("stage-v10"));
   assert.ok(!root.includes("/viberoots-verify"));
 });
 
 test("verify seed staging uses a protocol-versioned shared root", async () => {
   const source = await readRepoFile("build-tools/tools/dev/verify/seed-stage-layout.ts");
-  assert.match(source, /STAGE_ROOT_PROTOCOL_DIR = "stage-v9"/);
+  assert.match(source, /STAGE_ROOT_PROTOCOL_DIR = "stage-v10"/);
   assert.match(source, /return path\.join\(base, STAGE_ROOT_PROTOCOL_DIR\)/);
 });
 

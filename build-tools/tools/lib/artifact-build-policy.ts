@@ -1,7 +1,10 @@
 import path from "node:path";
 import { isNixStorePath } from "./tool-paths";
-import { REVIEWED_PUBLIC_KEYS, REVIEWED_SUBSTITUTERS } from "./artifact-nix-policy";
-
+import {
+  REVIEWED_PUBLIC_KEYS,
+  REVIEWED_SUBSTITUTERS,
+  reviewedArtifactSandboxPaths,
+} from "./artifact-nix-policy";
 export { serializeArtifactPolicyEvidence } from "./artifact-policy-serialization";
 export type ArtifactBuildClassification = "hermetic" | "local-development" | "diagnostic-impure";
 export type ArtifactJobPurpose =
@@ -11,7 +14,6 @@ export type ArtifactJobPurpose =
   | "cache-publication"
   | "provenance"
   | "deployment";
-
 export type ArtifactPolicyEvidence = {
   schema: "viberoots.artifact-policy-evidence.v1";
   classification: ArtifactBuildClassification;
@@ -72,13 +74,11 @@ function listConfig(value: unknown): string[] | null {
   if (typeof value !== "string") return null;
   return value.trim().split(/\s+/).filter(Boolean);
 }
-
 function boolConfig(value: unknown): boolean | null {
   if (value === true || value === "true") return true;
   if (value === false || value === "false") return false;
   return null;
 }
-
 function sameReviewedValues(actual: string[] | null, reviewed: readonly string[]) {
   if (actual === null) return "unknown" as const;
   if (actual.length === 0) return "none" as const;
@@ -87,7 +87,11 @@ function sameReviewedValues(actual: string[] | null, reviewed: readonly string[]
     ? ("reviewed" as const)
     : ("unreviewed" as const);
 }
-
+function sameValues(actual: string[] | null, reviewed: readonly string[]): boolean | null {
+  if (actual === null) return null;
+  const expected = new Set(reviewed);
+  return actual.length === expected.size && actual.every((entry) => expected.has(entry));
+}
 function toolAuthority(tool: string, toolPath: string | undefined) {
   if (!toolPath) return "missing" as const;
   if (tool === "nix" && path.resolve(toolPath) === "/nix/var/nix/profiles/default/bin/nix") {
@@ -95,7 +99,6 @@ function toolAuthority(tool: string, toolPath: string | undefined) {
   }
   return isNixStorePath(toolPath) ? ("nix-store" as const) : ("host" as const);
 }
-
 export function buildArtifactPolicyEvidence(opts: {
   classification: ArtifactBuildClassification;
   purpose: ArtifactJobPurpose;
@@ -115,7 +118,8 @@ export function buildArtifactPolicyEvidence(opts: {
   ].filter((name) => String(opts.env[name] || "").trim());
   const sandboxValue = configValue(opts.nixConfig, "sandbox");
   const sandboxFallback = boolConfig(configValue(opts.nixConfig, "sandbox-fallback"));
-  const hostPaths = listConfig(configValue(opts.nixConfig, "sandbox-paths"));
+  const sandboxPaths = listConfig(configValue(opts.nixConfig, "sandbox-paths"));
+  const reviewedSandboxPaths = sameValues(sandboxPaths, reviewedArtifactSandboxPaths());
   const builders = listConfig(configValue(opts.nixConfig, "builders"));
   const substituters = listConfig(configValue(opts.nixConfig, "substituters"));
   const publicKeys = listConfig(configValue(opts.nixConfig, "trusted-public-keys"));
@@ -149,7 +153,8 @@ export function buildArtifactPolicyEvidence(opts: {
       sandbox: sandbox === true ? "enabled" : sandbox === false ? "disabled" : "unknown",
       sandboxFallback:
         sandboxFallback === false ? "disabled" : sandboxFallback === true ? "enabled" : "unknown",
-      hostPaths: hostPaths === null ? "unknown" : hostPaths.length === 0 ? "none" : "configured",
+      hostPaths:
+        reviewedSandboxPaths === null ? "unknown" : reviewedSandboxPaths ? "none" : "configured",
       multiUser: opts.nixStoreUrl === "daemon" ? "daemon" : opts.nixStoreUrl ? "direct" : "unknown",
       builders: builders === null ? "unknown" : builders.length === 0 ? "local-only" : "configured",
       substituters: sameReviewedValues(substituters, REVIEWED_SUBSTITUTERS),

@@ -140,6 +140,7 @@ test("Rust scaffold inventory covers the supported PR-10 shapes", async () => {
   >;
   assert.deepEqual(Object.keys(resolver.rust).sort(), [
     "cli",
+    "cross-root",
     "cxx-bridge",
     "lib",
     "node-addon",

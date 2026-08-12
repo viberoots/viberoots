@@ -32,6 +32,7 @@ import { expectedNixosSharedHostArtifactIdentities } from "./deployment-artifact
 import { stagedUploadTempPath } from "./nixos-shared-host-staged-artifact";
 
 export type NixosSharedHostRemoteDeploySummary = {
+  remotePlan: NixosSharedHostRemotePlan;
   executionMode: "remote-profile";
   deploymentId: string;
   deploymentLabel: string;
@@ -195,6 +196,7 @@ export async function runNixosSharedHostRemoteDeploy(opts: {
     throw new Error("remote service submission finished without a machine-readable summary");
   }
   return {
+    remotePlan: opts.plan,
     executionMode: "remote-profile",
     deploymentId: opts.deployment.deploymentId,
     deploymentLabel: opts.deployment.label,

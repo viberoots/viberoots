@@ -26,6 +26,7 @@ test("filter-repo excludes generated app output directories from flake snapshots
     "viberoots",
     "viberoots-flake-input",
     "xdg-cache",
+    ".viberoots",
   ]) {
     assert.match(
       file,

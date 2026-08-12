@@ -1,6 +1,5 @@
 import path from "node:path";
 import fs from "node:fs";
-
 import {
   buildCanonicalArtifactEnvironment,
   canonicalArtifactToolsRoot,
@@ -24,12 +23,10 @@ import {
   isCanonicalArtifactEntrypointEnvironment,
   type ReviewedNixConfigOutcome,
 } from "./canonical-reviewed-nix-config";
-
 export {
   consumeArtifactIngressReviewedNixConfig,
   isCanonicalArtifactEntrypointEnvironment,
 } from "./canonical-reviewed-nix-config";
-
 function canonicalZxInit(toolsRoot: string): string {
   const zxInit = path.join(
     toolsRoot,
@@ -45,14 +42,12 @@ function canonicalZxInit(toolsRoot: string): string {
   }
   return zxInit;
 }
-
 function environmentBeforeCanonicalWrapper(
   canonicalEnv: NodeJS.ProcessEnv,
   toolsRoot: string,
 ): NodeJS.ProcessEnv {
   return { ...canonicalEnv, ZX_INIT: canonicalZxInit(toolsRoot) };
 }
-
 function environmentAfterCanonicalWrapper(
   canonicalEnv: NodeJS.ProcessEnv,
   toolsRoot: string,
@@ -67,7 +62,9 @@ function environmentAfterCanonicalWrapper(
 export function canonicalArtifactReentryEnvironment(
   workspaceRoot: string,
   artifactToolsRoot: string,
-  opts: { nixCacheHealth?: ReviewedNixConfigOutcome } = {},
+  opts: {
+    nixCacheHealth?: ReviewedNixConfigOutcome;
+  } = {},
 ): NodeJS.ProcessEnv {
   const toolsRoot = validateArtifactToolsRoot(
     artifactToolsRoot,
@@ -76,7 +73,9 @@ export function canonicalArtifactReentryEnvironment(
   return attachCanonicalReviewedNixConfig(
     {
       ...environmentBeforeCanonicalWrapper(
-        buildCanonicalArtifactEnvironment(workspaceRoot, { artifactToolsRoot: toolsRoot }),
+        buildCanonicalArtifactEnvironment(workspaceRoot, {
+          artifactToolsRoot: toolsRoot,
+        }),
         toolsRoot,
       ),
       VBR_CANONICAL_ARTIFACT_ENTRYPOINT: "1",

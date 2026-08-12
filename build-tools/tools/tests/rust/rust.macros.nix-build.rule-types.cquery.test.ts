@@ -5,22 +5,15 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import {
+  assertBehaviorProbeCqueryContract,
+  firstCqueryNode,
+} from "./rust-behavior-probe-cquery-contract";
+import {
   assertRustNixRuleKinds,
   assertWasmCqueryContract,
   wasmDeclarations,
   writeWasmContractFiles,
 } from "./rust-wasm-cquery-fixture";
-
-function firstCqueryNode<T>(json: unknown): T | null {
-  if (Array.isArray(json)) return (json[0] as T) ?? null;
-  if (json && typeof json === "object") {
-    const values = Object.values(json as Record<string, unknown>);
-    const first = values[0];
-    if (Array.isArray(first)) return (first[0] as T) ?? null;
-    return (first as T) ?? null;
-  }
-  return null;
-}
 
 test("rust macros export native build, test, and source-selection contracts", async () => {
   await runInTemp("rust-nix-build-rule-types", async (tmp, $) => {
@@ -57,17 +50,17 @@ test("rust macros export native build, test, and source-selection contracts", as
       [
         'load("@viberoots//build-tools/rust:defs.bzl", "rust_binary", "rust_cdylib", "rust_library", "rust_node_addon", "rust_proc_macro", "rust_python_extension", "rust_static_library", "rust_test", "rust_wasi_binary", "rust_wasm_browser_package", "rust_wasm_component", "rust_wasm_library", "rust_wasm_static_library")',
         "",
-        'rust_library(name = "lib", crate = "rustapp", cargo_output_hashes = {"remote-1.0.0": "sha256-fixture"}, cargo_fixed_sources = {"remote@1.0.0#registry+https://registry.example/index": "{\\"source\\":\\"registry+https://registry.example/index\\"}"}, features = ["demo"], default_features = False, nixpkg_deps = ["pkgs.zlib"], nixpkgs_profile = "default", nixpkg_pins = {"pkgs.zlib": {"nixpkgs_profile": "default", "rationale": "fixture"}}, srcs = ["src/lib.rs"])',
-        'rust_binary(name = "app", crate = "rustapp", srcs = ["src/main.rs"], deps = [":lib"])',
-        'rust_test(name = "test", crate = "rustapp", srcs = ["src/lib.rs"])',
-        'rust_wasm_library(name = "raw", crate = "rustapp", srcs = ["src/lib.rs"])',
-        'rust_wasi_binary(name = "wasi", crate = "rustapp", srcs = ["src/main.rs"])',
+        'rust_library(name = "lib", crate = "rustapp", behavior_probe = True, cargo_output_hashes = {"remote-1.0.0": "sha256-fixture"}, cargo_fixed_sources = {"remote@1.0.0#registry+https://registry.example/index": "{\\"source\\":\\"registry+https://registry.example/index\\"}"}, features = ["demo"], default_features = False, nixpkg_deps = ["pkgs.zlib"], nixpkgs_profile = "default", nixpkg_pins = {"pkgs.zlib": {"nixpkgs_profile": "default", "rationale": "fixture"}}, srcs = ["src/lib.rs"])',
+        'rust_binary(name = "app", crate = "rustapp", behavior_probe = True, srcs = ["src/main.rs"], deps = [":lib"])',
+        'rust_test(name = "test", crate = "rustapp", behavior_probe = True, srcs = ["src/lib.rs"])',
+        'rust_wasm_library(name = "raw", crate = "rustapp", behavior_probe = True, srcs = ["src/lib.rs"])',
+        'rust_wasi_binary(name = "wasi", crate = "rustapp", behavior_probe = True, srcs = ["src/main.rs"])',
         ...wasmDeclarations,
-        'rust_static_library(name = "static", crate = "rustapp", public_crate = "rust_public", srcs = ["src/lib.rs"])',
-        'rust_cdylib(name = "dynamic", crate = "rustapp", srcs = ["src/lib.rs"])',
-        'rust_proc_macro(name = "derive_demo", crate = "rustapp", generated_outputs = ["generated.rs"], srcs = ["src/lib.rs"])',
-        'rust_python_extension(name = "pyext", module = "demo._native", crate = "rustapp", build_py_deps = ["setuptools"], lockfile_label = "lockfile:projects/apps/rustapp/uv.lock#projects/apps/rustapp", srcs = ["src/lib.rs"])',
-        'rust_node_addon(name = "addon", addon_name = "demo_native", node_api_version = 8, crate = "rustapp", srcs = ["src/lib.rs"])',
+        'rust_static_library(name = "static", crate = "rustapp", public_crate = "rust_public", behavior_probe = True, srcs = ["src/lib.rs"])',
+        'rust_cdylib(name = "dynamic", crate = "rustapp", behavior_probe = True, srcs = ["src/lib.rs"])',
+        'rust_proc_macro(name = "derive_demo", crate = "rustapp", behavior_probe = True, generated_outputs = ["generated.rs"], srcs = ["src/lib.rs"])',
+        'rust_python_extension(name = "pyext", module = "demo._native", crate = "rustapp", behavior_probe = True, build_py_deps = ["setuptools"], lockfile_label = "lockfile:projects/apps/rustapp/uv.lock#projects/apps/rustapp", srcs = ["src/lib.rs"])',
+        'rust_node_addon(name = "addon", addon_name = "demo_native", node_api_version = 8, crate = "rustapp", behavior_probe = True, srcs = ["src/lib.rs"])',
         "",
       ].join("\n"),
       "utf8",
@@ -102,6 +95,7 @@ test("rust macros export native build, test, and source-selection contracts", as
 
     await assertRustNixRuleKinds($);
     await assertWasmCqueryContract(tmp, $);
+    await assertBehaviorProbeCqueryContract($);
 
     const extensionFields = await $({
       cwd: tmp,

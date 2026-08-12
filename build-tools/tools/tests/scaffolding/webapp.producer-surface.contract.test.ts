@@ -82,7 +82,7 @@ test("producer surfaces expose deterministic contract attrs", async () => {
         'node_webapp(name = "app_raw", ts_module_roots = ["src/ts-modules"])',
         "node_asset_stage(",
         '  name = "app",',
-        '  app = "index.html",',
+        '  app = ":app_raw",',
         '  wasm_module_roots = ["src/wasm-producer"],',
         '  labels = ["framework:vite"],',
         ")",

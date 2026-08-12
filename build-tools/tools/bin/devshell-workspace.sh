@@ -47,6 +47,17 @@ ensure_buck_prelude() {
 		fi
 		return 0
 	fi
+	local shared_prelude_path="${VBR_SHARED_PRELUDE_PATH:-}"
+	if [[ "${VBR_NIX_CACHE_HEALTH_APPLIED:-}" == "1" && -n "${shared_prelude_path}" && -f "${shared_prelude_path}/prelude.bzl" ]]; then
+		if [[ -L "${prelude_path}" || ! -e "${prelude_path}" ]]; then
+			mkdir -p "$(dirname "${prelude_path}")"
+			rm -f "${prelude_path}"
+			ln -s "${shared_prelude_path}" "${prelude_path}"
+			return 0
+		fi
+		echo "error: ${prelude_path} exists but is not a valid symlink; expected prelude/prelude.bzl" 1>&2
+		return 1
+	fi
 	command -v nix >/dev/null 2>&1 || return 1
 
 	local cache_dir="${live_root}/.viberoots/workspace/buck/tmp/devshell-cache"

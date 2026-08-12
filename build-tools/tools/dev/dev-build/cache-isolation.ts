@@ -2,6 +2,7 @@ import * as fsp from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import process from "node:process";
+import { extendMacosNoindexPathSegment } from "../../lib/macos-metadata";
 
 const BINDING_RE = /^[0-9a-f]{64}$/u;
 const ISOLATION_RE = /^[A-Za-z0-9._-]+$/u;
@@ -24,10 +25,14 @@ function assertBaseIsolation(isolation: string): void {
   }
 }
 
-export function artifactBuckIsolation(baseIsolation: string, binding: string): string {
+export function artifactBuckIsolation(
+  baseIsolation: string,
+  binding: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
   assertBaseIsolation(baseIsolation);
   assertBinding(binding);
-  return `${baseIsolation}${SUFFIX}${binding.slice(0, 24)}`;
+  return extendMacosNoindexPathSegment(baseIsolation, `${SUFFIX}${binding.slice(0, 24)}`, platform);
 }
 
 export function artifactBuckAuthorityBinding(opts: {

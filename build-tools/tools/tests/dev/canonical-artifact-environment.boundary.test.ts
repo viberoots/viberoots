@@ -7,12 +7,24 @@ import path from "node:path";
 import { test } from "node:test";
 import {
   artifactSelectorNames,
+  artifactNodeCompileCachePath,
   assertNoArtifactSelectorInjection,
   buildArtifactEnvironment,
   canonicalArtifactToolsRoot,
   isArtifactAffectingEnvName,
   withoutArtifactEnvironmentInfluence,
 } from "../../lib/artifact-environment";
+
+test("artifact Node compile cache uses a physical .noindex directory on Darwin only", () => {
+  assert.equal(
+    artifactNodeCompileCachePath("/state", "darwin"),
+    path.join("/state", "tmp", "node-compile-cache.noindex"),
+  );
+  assert.equal(
+    artifactNodeCompileCachePath("/state", "linux"),
+    path.join("/state", "tmp", "node-compile-cache"),
+  );
+});
 
 test("canonical artifact environments isolate state and bypass hostile host tools and selectors", async () => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "artifact-env-"));
@@ -25,6 +37,7 @@ test("canonical artifact environments isolate state and bypass hostile host tool
       baseEnv: {
         PATH: `/host/bin${path.delimiter}${storeBin}`,
         HOME: "/host/home",
+        NODE_COMPILE_CACHE: "/host/node-compile-cache",
         XDG_CONFIG_HOME: "/host/config",
         VBR_NIX_CACHE_POLICY: "off",
         VBR_NIX_BIN: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-unreviewed/bin/nix",
@@ -45,6 +58,8 @@ test("canonical artifact environments isolate state and bypass hostile host tool
     assert.equal(env.HOME, path.join(tmp, "home"));
     assert.equal(env.LANG, "C.UTF-8");
     assert.equal(env.TZ, "UTC");
+    assert.equal(env.NODE_COMPILE_CACHE, artifactNodeCompileCachePath(tmp));
+    assert.equal((await fsp.stat(String(env.NODE_COMPILE_CACHE))).isDirectory(), true);
     assert.equal(env.VBR_NIX_CACHE_POLICY, "off");
     assert.equal(env.CC, undefined);
     assert.equal(env.PYTHONPATH, undefined);
