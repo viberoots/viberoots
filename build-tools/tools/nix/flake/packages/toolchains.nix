@@ -18,9 +18,11 @@ let
     test "$(${pkgs.viberootsRustToolchain}/bin/rustc --version)" = "rustc 1.88.0 (6b00bc388 2025-06-23)"
     raw_target="$(${pkgs.viberootsRustToolchain}/bin/rustc --print target-libdir --target wasm32-unknown-unknown)"
     wasi_target="$(${pkgs.viberootsRustToolchain}/bin/rustc --print target-libdir --target wasm32-wasip1)"
+    emscripten_target="$(${pkgs.viberootsRustToolchain}/bin/rustc --print target-libdir --target wasm32-unknown-emscripten)"
     test -d "$raw_target"
     test -d "$wasi_target"
-    printf '%s\n%s\n' "$raw_target" "$wasi_target" > "$out/nix-support/rust-target-libdirs"
+    test -d "$emscripten_target"
+    printf '%s\n%s\n%s\n' "$raw_target" "$wasi_target" "$emscripten_target" > "$out/nix-support/rust-target-libdirs"
   '';
 in
 {
@@ -48,6 +50,7 @@ in
     rustWasmTools.wasmtime
     rustWasmTools.adapters.reactor
     rustWasmTools.adapters.command
+    pkgs.emscripten
   ];
   opentofu = toolchain "toolchain-opentofu" pkgs.opentofu;
 }

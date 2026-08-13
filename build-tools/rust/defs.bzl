@@ -30,7 +30,7 @@ def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, inte
     header_deps = kw.pop("header_deps", []) or []
     if is_wasm_kind(kind) and (header_deps or has_nixpkg_inputs(kw)):
         fail("%s: header_deps and nixpkg dependencies are unsupported for Rust WASM targets" % rust_macro_name(kind))
-    if not interop and not is_wasm_kind(kind) and (link_deps or header_deps):
+    if not interop and kind != "pyext_wasm" and not is_wasm_kind(kind) and (link_deps or header_deps):
         fail("%s: native link_deps/header_deps are private bridge wiring; use rust_c_ffi_library or rust_cxx_bridge_library with a reviewed binding_config" % rust_macro_name(kind))
     link_closure = kw.pop("link_closure", "direct") or "direct"
     link_mode = kw.pop("link_mode", "")
@@ -96,10 +96,9 @@ def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, inte
     if not isinstance(target, str):
         fail("rust target target must be a string")
     validate_rust_runtime_args(build_py_deps, runtime_deps, behavior_probe)
-    if kind == "pyext":
-        kw = prepare_python_build_wiring(kw, python_lockfile_label, build_py_deps)
+    if kind in ["pyext", "pyext_wasm"]: kw = prepare_python_build_wiring(kw, python_lockfile_label, build_py_deps)
     runtime_deps = normalize_labels(native.package_name(), runtime_deps)
-    expected_target = wasm_attrs.get("wasm_target", "")
+    expected_target = "wasm32-unknown-emscripten" if kind == "pyext_wasm" else wasm_attrs.get("wasm_target", "")
     if target != expected_target:
         fail("rust target target must be %s for kind %s" % (expected_target if expected_target else "empty", kind))
     if "local_patch_dirs" in kw:
@@ -216,12 +215,9 @@ def tauri_app(name, frontend_dist, **kwargs):
 def rust_test(name, **kwargs):
     _rust_nix_target(name = name, kind = "test", out = name + ".stamp", kwargs = kwargs)
 def rust_wasm_library(name, wasm_abi = "bare", **kwargs):
-    if wasm_abi not in ["bare", "wasi"]:
-        fail("rust_wasm_library: wasm_abi must be bare or wasi")
-    kw = dict(kwargs)
-    kw["wasm_abi"] = wasm_abi
-    target = "wasm32-wasip1" if wasm_abi == "wasi" else "wasm32-unknown-unknown"
-    kw = with_required_target(kw, "rust_wasm_library", target); _rust_nix_target(name = name, kind = "wasm", out = name + ".wasm", kwargs = kw); rust_wasm_module_surface(name, "module")
+    if wasm_abi not in ["bare", "wasi"]: fail("rust_wasm_library: wasm_abi must be bare or wasi")
+    kw = dict(kwargs); kw["wasm_abi"] = wasm_abi
+    kw = with_required_target(kw, "rust_wasm_library", "wasm32-wasip1" if wasm_abi == "wasi" else "wasm32-unknown-unknown"); _rust_nix_target(name = name, kind = "wasm", out = name + ".wasm", kwargs = kw); rust_wasm_module_surface(name, "module")
 def rust_wasi_binary(name, **kwargs):
     kw = with_required_target(kwargs, "rust_wasi_binary", "wasm32-wasip1"); _rust_nix_target(name = name, kind = "wasi", out = name + ".wasm", kwargs = kw); rust_wasm_module_surface(name, "module")
 def rust_wasm_static_library(name, wasm_abi = "bare", **kwargs):
@@ -234,16 +230,19 @@ def rust_wasm_component(name, **kwargs):
     _rust_nix_target(name = name, kind = "wasm_component", out = name + ".component.wasm", kwargs = kwargs); rust_wasm_module_surface(name, "component")
 def rust_python_extension(name, module, python_abi = "selected", lockfile_label = None, **kwargs):
     ident_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_0123456789"
-    if not isinstance(module, str) or module == "" or not all([part != "" and part[0] not in "0123456789" and all([char in ident_chars for char in part.elems()]) for part in module.split(".")]):
-        fail("rust_python_extension: module must be a dotted Python identifier")
+    valid_module = isinstance(module, str) and module != "" and all([part != "" and part[0] not in "0123456789" and all([char in ident_chars for char in part.elems()]) for part in module.split(".")])
+    if not valid_module: fail("rust_python_extension: module must be a dotted Python identifier")
     kw = fixed_artifact_contract(kwargs, "rust_python_extension", "cdylib", "target")
-    kw.update({"module": module, "python_abi": python_abi})
-    _rust_nix_target(name = name, kind = "pyext", out = name + ".pyext.stamp", kwargs = kw, python_lockfile_label = lockfile_label)
-def rust_python_wasm_extension(name, backend, **kwargs):
-    if backend in ["wasi", "pyodide"]:
-        fail("rust_python_wasm_extension: backend %s is unavailable because the pinned Rust/Python toolchains do not provide an importable dynamic-extension ABI" % backend)
-    fail("rust_python_wasm_extension: unsupported backend %s; expected wasi or pyodide" % backend)
-    _rust_nix_target(name = name, kind = "pyext_wasm", out = name + ".pyext-wasm.stamp", kwargs = kwargs)
+    kw.update({"module": module, "python_abi": python_abi}); _rust_nix_target(name = name, kind = "pyext", out = name + ".pyext.stamp", kwargs = kw, python_lockfile_label = lockfile_label)
+def rust_python_wasm_extension(name, backend, module, lockfile_label = None, **kwargs):
+    ident_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_0123456789"
+    valid_module = isinstance(module, str) and module != "" and all([part != "" and part[0] not in "0123456789" and all([char in ident_chars for char in part.elems()]) for part in module.split(".")])
+    if not valid_module: fail("rust_python_wasm_extension: module must be a dotted Python identifier")
+    if backend == "wasi": fail("rust_python_wasm_extension: backend wasi is unsupported because the shared Python WASI runtime cannot load kind:pyext_wasm dynamic extension modules; use backend pyodide")
+    if backend != "pyodide": fail("rust_python_wasm_extension: unsupported backend %s; expected wasi or pyodide" % backend)
+    kw = fixed_artifact_contract(kwargs, "rust_python_wasm_extension", "cdylib", "target")
+    kw["labels"] = list(kw.get("labels", []) or []) + ["backend:pyodide"]; kw.update({"module": module, "target": "wasm32-unknown-emscripten"})
+    _rust_nix_target(name = name, kind = "pyext_wasm", out = name + ".pyext-wasm", kwargs = kw, python_lockfile_label = lockfile_label)
 def rust_node_addon(name, addon_name = None, node_api_version = 8, platform = "selected", **kwargs):
     resolved_name = validate_addon_name(addon_name or name); validate_node_api_version(node_api_version)
     kw = fixed_artifact_contract(kwargs, "rust_node_addon", "cdylib", "target"); kw.update({"addon_name": resolved_name, "node_api_version": node_api_version, "platform": platform}); _rust_nix_target(name = name, kind = "addon", out = resolved_name + ".node", kwargs = kw)

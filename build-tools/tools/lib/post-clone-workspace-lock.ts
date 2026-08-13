@@ -19,6 +19,7 @@ const directWorkspaceInputs = [
   "viberoots",
 ] as const;
 const followedViberootsInputs = ["buck2", "gomod2nix", "nixpkgs"] as const;
+const sourceOwnedWorkspaceInputs = ["rust-overlay", "wasmtime-nixpkgs"] as const;
 
 function isObject(value: unknown): value is JsonObject {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -87,9 +88,11 @@ export function derivePostCloneWorkspaceLock(opts: {
   rootLockText: string;
   workspaceFlakeDir: string;
   localInputPath: string;
+  sourceLockText?: string;
 }): PostCloneFlakeLock {
   assertCanonicalLocalInput(opts);
   const lock = parseAuthoritativeRootLock(opts.rootLockText);
+  const sourceLock = opts.sourceLockText ? parseSourceLock(opts.sourceLockText) : null;
   const cloned = structuredClone(lock);
   const rootNode = cloned.nodes[cloned.root]!;
   const viberootsName = (rootNode.inputs as JsonObject).viberoots as string;
@@ -111,7 +114,72 @@ export function derivePostCloneWorkspaceLock(opts: {
     original: { path: opts.localInputPath, type: "path" },
     parent: [],
   };
+  if (sourceLock) syncSourceOwnedWorkspaceInputs(cloned, viberootsName, sourceLock);
+  const syncedRootInputs = cloned.nodes[cloned.root]!.inputs as JsonObject;
+  for (const input of sourceOwnedWorkspaceInputs) {
+    if (!isObject(cloned.nodes[syncedRootInputs[input] as string])) {
+      throw new Error(`post-clone source lock has no locked ${input} input`);
+    }
+  }
   return cloned;
+}
+
+function parseSourceLock(text: string): PostCloneFlakeLock {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error("post-clone requires a valid local viberoots flake.lock");
+  }
+  if (!isObject(parsed) || parsed.version !== 7 || typeof parsed.root !== "string") {
+    throw new Error("post-clone local viberoots flake.lock has an incompatible schema");
+  }
+  if (!isObject(parsed.nodes) || !isObject(parsed.nodes[parsed.root])) {
+    throw new Error("post-clone local viberoots flake.lock has an incompatible root topology");
+  }
+  return parsed as unknown as PostCloneFlakeLock;
+}
+
+function syncSourceOwnedWorkspaceInputs(
+  target: PostCloneFlakeLock,
+  viberootsName: string,
+  source: PostCloneFlakeLock,
+): void {
+  const sourceRoot = source.nodes[source.root]!;
+  const sourceInputs = isObject(sourceRoot.inputs) ? sourceRoot.inputs : {};
+  const targetRoot = target.nodes[target.root]!;
+  const targetInputs = { ...((targetRoot.inputs || {}) as JsonObject) };
+  const viberootsNode = target.nodes[viberootsName]!;
+  const viberootsInputs = { ...((viberootsNode.inputs || {}) as JsonObject) };
+  for (const input of sourceOwnedWorkspaceInputs) {
+    const sourceRef = sourceInputs[input];
+    if (typeof sourceRef !== "string" || !isObject(source.nodes[sourceRef])) {
+      throw new Error(`post-clone local viberoots flake.lock has no locked ${input} input`);
+    }
+    const existing = targetInputs[input];
+    const targetRef =
+      typeof existing === "string" && isObject(target.nodes[existing])
+        ? existing
+        : availableLockNodeName(target, input, sourceRef);
+    target.nodes[targetRef] = structuredClone(source.nodes[sourceRef]);
+    targetInputs[input] = targetRef;
+    viberootsInputs[input] = [input];
+  }
+  targetRoot.inputs = targetInputs;
+  viberootsNode.inputs = viberootsInputs;
+}
+
+function availableLockNodeName(
+  lock: PostCloneFlakeLock,
+  canonical: string,
+  sourceRef: string,
+): string {
+  if (!isObject(lock.nodes[canonical])) return canonical;
+  if (!isObject(lock.nodes[sourceRef])) return sourceRef;
+  let suffix = 2;
+  let candidate = `${canonical}_${suffix}`;
+  while (isObject(lock.nodes[candidate])) candidate = `${canonical}_${++suffix}`;
+  return candidate;
 }
 
 export async function writePostCloneWorkspaceLock(opts: {
@@ -122,18 +190,25 @@ export async function writePostCloneWorkspaceLock(opts: {
   const workspaceFlakeDir = path.join(opts.workspaceRoot, ".viberoots", "workspace");
   const workspaceFlake = path.join(workspaceFlakeDir, "flake.nix");
   const inputRoot = path.resolve(workspaceFlakeDir, opts.localInputPath);
-  const [rootLockText, workspaceFlakeText] = await Promise.all([
-    fsp.readFile(rootLock, "utf8").catch(() => {
-      throw new Error("post-clone requires an existing committed root flake.lock");
-    }),
-    fsp.readFile(workspaceFlake, "utf8"),
-    fsp.access(path.join(inputRoot, "flake.nix")),
-  ]);
+  const [rootLockText, workspaceFlakeText, _sourceFlakePresent, sourceLockText] = await Promise.all(
+    [
+      fsp.readFile(rootLock, "utf8").catch(() => {
+        throw new Error("post-clone requires an existing committed root flake.lock");
+      }),
+      fsp.readFile(workspaceFlake, "utf8"),
+      fsp.access(path.join(inputRoot, "flake.nix")),
+      fsp.readFile(path.join(inputRoot, "flake.lock"), "utf8").catch((error) => {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return "";
+        throw error;
+      }),
+    ],
+  );
   assertCanonicalWorkspaceFlakeInputs(workspaceFlakeText, `path:${opts.localInputPath}`);
   const lock = derivePostCloneWorkspaceLock({
     rootLockText,
     workspaceFlakeDir,
     localInputPath: opts.localInputPath,
+    sourceLockText,
   });
   const lockFile = path.join(workspaceFlakeDir, "flake.lock");
   const temporary = `${lockFile}.${process.pid}.${Date.now()}.tmp`;

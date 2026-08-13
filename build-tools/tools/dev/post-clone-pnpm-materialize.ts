@@ -8,7 +8,20 @@ import { discoverImportersWithLock } from "./install/importers";
 async function main(): Promise<void> {
   const repoRoot = await findRepoRoot(process.cwd());
   const updater = buildToolPath(repoRoot, "tools/dev/update-pnpm-hash.ts");
-  const importers = await discoverImportersWithLock(repoRoot, { cwd: repoRoot });
+  const sourceRoot = path.resolve(
+    String(process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || "").trim(),
+  );
+  const sourceImporter =
+    sourceRoot && path.relative(repoRoot, sourceRoot).split(path.sep).join("/");
+  const importers = (
+    await Promise.all(
+      (await discoverImportersWithLock(repoRoot, { cwd: repoRoot })).map(async (importer) => {
+        if (importer === sourceImporter) return null;
+        if (importer === "viberoots") return null;
+        return importer;
+      }),
+    )
+  ).filter((importer): importer is string => importer !== null);
   for (const importer of importers) {
     const lockfile = importer === "." ? "pnpm-lock.yaml" : path.join(importer, "pnpm-lock.yaml");
     await runNodeWithZx({

@@ -4,6 +4,9 @@ const staticInputAssignments = [
   'buck2.url = "github:facebook/buck2/201beb86106fecdc84e30260b0f1abb5bf576988";',
   'gomod2nix.url = "github:nix-community/gomod2nix";',
   'gomod2nix.inputs.nixpkgs.follows = "nixpkgs";',
+  'rust-overlay.url = "github:oxalica/rust-overlay/c67ce00525464a710971351c183ce67acb6ca827";',
+  'rust-overlay.inputs.nixpkgs.follows = "nixpkgs";',
+  'wasmtime-nixpkgs.url = "github:NixOS/nixpkgs/d407951447dcd00442e97087bf374aad70c04cea";',
 ] as const;
 
 export function workspaceFlakeInputs(viberootsUrl: string): string {
@@ -13,6 +16,8 @@ export function workspaceFlakeInputs(viberootsUrl: string): string {
     'viberoots.inputs.nixpkgs.follows = "nixpkgs";',
     'viberoots.inputs.buck2.follows = "buck2";',
     'viberoots.inputs.gomod2nix.follows = "gomod2nix";',
+    'viberoots.inputs.rust-overlay.follows = "rust-overlay";',
+    'viberoots.inputs.wasmtime-nixpkgs.follows = "wasmtime-nixpkgs";',
   ];
   return ["  inputs = {", ...assignments.map((line) => `    ${line}`), "  };"].join("\n");
 }

@@ -180,7 +180,18 @@ export async function checkConsumerConsistency(
 }
 
 async function main(): Promise<void> {
-  await checkConsumerConsistency(await findRepoRoot(process.cwd()));
+  const allowStaleMetadata =
+    process.argv.includes("--post-clone") ||
+    process.env.VBR_POST_CLONE_ALLOW_STALE_METADATA === "1";
+  await checkConsumerConsistency(
+    await findRepoRoot(process.cwd()),
+    allowStaleMetadata
+      ? {
+          checkPnpm: async () => {},
+          checkLanguages: async () => {},
+        }
+      : {},
+  );
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {

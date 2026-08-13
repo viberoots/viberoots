@@ -12,7 +12,7 @@ let
   collectPyExtDepsTransitive = pyext.collectPyExtDepsTransitive;
   backendFor = wasmPyExt.backendFor;
   collectPyExtWasmDepsTransitive = wasmPyExt.collectPyExtWasmDepsTransitive;
-  mkPyExtWasm = wasmPyExt.mkPyExtWasm;
+  mkNativePyExtWasmOverlay = ctx.dependencyArtifactOf;
 
   mkWasmApp = name:
     let
@@ -56,7 +56,7 @@ let
         ) directDeps;
       overlays = map mkWasmLib pyLibDeps;
       nativeOverlays =
-        if pyExtWasmDeps == [] then [] else map mkPyExtWasm pyExtWasmDeps;
+        if pyExtWasmDeps == [] then [] else map mkNativePyExtWasmOverlay pyExtWasmDeps;
     in builtins.seq _noPyExt (builtins.seq _pyExtWasmUnsupported (builtins.seq _pyExtWasmBackendOk (T.pyWasmApp {
       inherit name;
       lockfile = lockRelFor name;
@@ -99,7 +99,7 @@ let
           hits = builtins.filter (l: (builtins.typeOf l) == "string" && lib.hasPrefix "trim:" l) (if labs == null then [] else labs);
         in if hits == [] then "none" else (lib.removePrefix "trim:" (builtins.head hits));
       nativeOverlays =
-        if pyExtWasmDeps == [] then [] else map mkPyExtWasm pyExtWasmDeps;
+        if pyExtWasmDeps == [] then [] else map mkNativePyExtWasmOverlay pyExtWasmDeps;
     in
       builtins.seq _noPyExt (builtins.seq _pyExtWasmUnsupported (builtins.seq _pyExtWasmBackendOk (T.pyWasmLib {
         inherit name;

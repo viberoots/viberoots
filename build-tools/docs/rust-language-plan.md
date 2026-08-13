@@ -76,20 +76,22 @@ meaningful affected-target union, and independent scope review, while recording 
 suite in the integration debt ledger. A Turbo PR escalates to full scope before commit whenever its
 affected consumers cannot be bounded or validation exposes a cross-cutting regression.
 
-| PR    | Required validation mode | Required minimum beyond the common focused gate                         |
-| ----- | ------------------------ | ----------------------------------------------------------------------- |
-| PR-1  | Turbo risk-based         | Native build/failure and Rust macro/planner affected union              |
-| PR-2  | Full scope               | First native lifecycle baseline and supported configuration evidence    |
-| PR-3  | Turbo risk-based         | Install/update mutation, rollback, timeout, and process-lifecycle union |
-| PR-4  | Turbo risk-based         | Conservative patch/provider/dependency affected union                   |
-| PR-5  | Full scope               | Initial interop, WASM, scaffolding, remote, and platform checkpoint     |
-| PR-6  | Turbo risk-based         | Cross-root, crate-kind, proc-macro, and host/target affected union      |
-| PR-7  | Turbo risk-based         | Conservative Python/Node extension and packaging affected union         |
-| PR-8  | Turbo risk-based         | Bidirectional ABI, generated binding, and link-closure affected union   |
-| PR-9  | Full scope               | Cross-language/browser/component WASM checkpoint                        |
-| PR-10 | Turbo risk-based         | Developer, dependency-source, watcher, and tooling affected union       |
-| PR-11 | Turbo risk-based         | Conservative Tauri/scaffolding/cross-language/platform affected union   |
-| PR-12 | Full scope               | Final Rust and Tauri hermeticity, publication, builders, and assessment |
+| PR    | Required validation mode | Required minimum beyond the common focused gate                                       |
+| ----- | ------------------------ | ------------------------------------------------------------------------------------- |
+| PR-1  | Turbo risk-based         | Native build/failure and Rust macro/planner affected union                            |
+| PR-2  | Full scope               | First native lifecycle baseline and supported configuration evidence                  |
+| PR-3  | Turbo risk-based         | Install/update mutation, rollback, timeout, and process-lifecycle union               |
+| PR-4  | Turbo risk-based         | Conservative patch/provider/dependency affected union                                 |
+| PR-5  | Full scope               | Initial interop, WASM, scaffolding, remote, and platform checkpoint                   |
+| PR-6  | Turbo risk-based         | Cross-root, crate-kind, proc-macro, and host/target affected union                    |
+| PR-7  | Turbo risk-based         | Conservative Python/Node extension and packaging affected union                       |
+| PR-8  | Turbo risk-based         | Bidirectional ABI, generated binding, and link-closure affected union                 |
+| PR-9  | Full scope               | Cross-language/browser/component WASM checkpoint                                      |
+| PR-10 | Turbo risk-based         | Developer, dependency-source, watcher, and tooling affected union                     |
+| PR-11 | Turbo risk-based         | Conservative Tauri/scaffolding/cross-language/platform affected union                 |
+| PR-12 | Full scope               | Final Rust and Tauri hermeticity, publication, builders, and assessment               |
+| PR-13 | Turbo risk-based         | PyEmscripten toolchain, graph, build, import, and failure-contract union              |
+| PR-14 | Full scope               | Pyodide lifecycle, scaffold, remote/cache, reproducibility, and assessment checkpoint |
 
 ## Turbo Mode Policy
 
@@ -110,9 +112,11 @@ Rust-flow cadence.
   changes remain high risk. Use broader targeted validation immediately and run the full suite early
   when their blast radius cannot be proven smaller.
 - PR-11 records its deferred full suite and Tauri-specific assumptions in the integration debt
-  ledger after its conservative affected union. PR-12 closes every Rust and Tauri ledger item with
-  `i && b && ALL_TESTS=1 v`, high-risk selector reruns, plan/design assessments, and same-system
-  independent-builder evidence.
+  ledger after its conservative affected union. PR-12 closes the original Rust and Tauri ledger
+  with `i && b && ALL_TESTS=1 v`, high-risk selector reruns, plan/design assessments, and
+  same-system independent-builder evidence. PR-13 records the bounded PyEmscripten implementation
+  debt. PR-14 closes that added debt with another full checkpoint and fresh plan/design
+  assessments.
 
 ## De-Risking Checkpoints
 
@@ -128,8 +132,8 @@ Rust-flow cadence.
    stable enough for the remaining parity work.
 6. After PR-6, cross-root crates, explicit artifact kinds, proc macros, and build scripts compose
    without injecting compiler-private artifacts into Cargo.
-7. After PR-7, native and WASM Python extensions plus Node-API addons are packaged and exercised by
-   their owning language runtimes.
+7. After PR-7, native Python extensions plus Node-API addons are packaged and exercised by their
+   owning language runtimes; Rust Python WASM remains fail-closed pending PR-13 and PR-14.
 8. After PR-8, C and C++ consumers work in both directions through reviewed generated bindings and
    explicit ABI policy.
 9. After PR-9, Rust covers static-linkable WASM, browser packages, cross-language WASM linking, and
@@ -141,6 +145,11 @@ Rust-flow cadence.
     path discovery.
 12. After PR-12, sandbox, network, publication, provenance, and independent-builder evidence close
     the Rust and Tauri hermeticity and first-class parity claims.
+13. After PR-13, a locked Rust/PyO3 `cdylib` uses the pinned PyEmscripten ABI, installs through the
+    shared `kind:pyext_wasm` contract, and imports and executes in pinned Pyodide; WASI remains
+    rejected at the shared Python loader boundary.
+14. After PR-14, Rust Pyodide extensions have patch, update, scaffold, filtered-source,
+    remote/cache, protected-matrix, documentation, and end-of-range assessment parity.
 
 ## Integration Debt Ledger
 
@@ -152,7 +161,8 @@ Rust-flow cadence.
 | Patch/provider ambiguity             | Current baseline | PR-4     | Closed                    | Applied dependency patch and explicit no-provider contract                                                                                               |
 | Initial interop, WASM, and remote    | Current baseline | PR-5     | Closed locally            | Native/WASM execution and remote-policy checkpoint; production worker evidence remains part of release administration                                    |
 | Cross-root composition and outputs   | Parity review    | PR-6     | Closed                    | Multi-root build plus explicit crate-type and proc-macro tests                                                                                           |
-| Python and Node extensions           | Parity review    | PR-7     | Closed                    | Runtime import/load tests for native and WASM artifacts                                                                                                  |
+| Python and Node extensions           | Parity review    | PR-7     | Native closed; WASM open  | Native Python and Node runtime import/load tests pass; Rust Pyodide extension parity moves to PR-13 and PR-14                                            |
+| Rust Pyodide extension parity        | PR-7 assessment  | PR-14    | Planned                   | Pinned PyEmscripten build/import in PR-13; lifecycle, scaffold, remote/cache, reproducibility, docs, and assessment closure in PR-14                     |
 | Complete C and C++ interoperability  | Parity review    | PR-8     | Closed                    | Bidirectional ABI and generated-binding tests                                                                                                            |
 | WASM ecosystem breadth               | Parity review    | PR-9     | Closed                    | Static, browser, cross-language, and component execution                                                                                                 |
 | Developer and dependency lifecycle   | Parity review    | PR-10    | Closed                    | Tooling, coverage, dev, and dependency-source fixtures                                                                                                   |
@@ -1872,6 +1882,229 @@ cache, publish, deploy, sign, or reproduce under the repository's hermetic contr
 Independent builders, GUI/WebView platform matrices, complete artifact families, and protected
 publication/signing tests have substantial validation and infrastructure cost.
 
+## PR-13: Establish The Rust PyEmscripten Build And Import Contract
+
+### 1. Intent
+
+Replace the fail-closed Pyodide branch of `rust_python_wasm_extension` with one real, importable
+Rust/PyO3 extension route that reuses the repository's existing PyEmscripten ABI and
+`kind:pyext_wasm` overlay authorities. Keep WASI extensions fail-closed at the shared Python
+runtime boundary.
+
+### 2. Scope of changes
+
+- Extend the pinned Rust toolchain with `wasm32-unknown-emscripten` and export its target component,
+  `emcc`, and required linker tools through reviewed Nix-store toolchain closures. Do not use
+  rustup, a host Emscripten SDK, ambient Cargo target configuration, or inherited `RUSTFLAGS`.
+- Make the source-owned Pyodide toolchain the single PyEmscripten ABI authority. Expose its exact
+  Pyodide, CPython, Emscripten, extension-suffix, sysconfig, Python-header, PyO3 cross-build, target
+  feature, exception, and linker configuration as declared Nix inputs and materialization evidence.
+  Rust and C/C++ extension builders must consume the same identity instead of copying constants.
+- Activate `rust_python_wasm_extension` only for `backend = "pyodide"`. Require a valid dotted
+  Python module, canonical package-local `Cargo.toml` and `Cargo.lock`, a `cdylib` Cargo target,
+  explicit features/profile, importer-scoped Python lock authority when `build_py_deps` are used,
+  and the ordinary Rust source, patch, and source-selection contracts.
+- Export module, backend, Cargo target, PyEmscripten ABI identity, Python lock, build dependencies,
+  declared link/header intent, and installed artifact shape through Buck graph, typed Rust
+  contracts, planner input, and materialization manifests. Labels remain routing metadata rather
+  than hidden build configuration.
+- Add a focused Rust Pyodide extension builder that runs pinned Cargo locked and offline for
+  `wasm32-unknown-emscripten`, selects pinned `emcc`, and emits an Emscripten side module with only
+  the required `PyInit_<leaf-module>` public entrypoint. Reject pthreads, incompatible target
+  features, unsupported crate types, unexpected exports, missing init symbols, and ABI drift
+  before publication.
+- Install the artifact at `site/<dotted-module><PYODIDE_EXT_SUFFIX>` and feed it through the
+  existing transitive `kind:pyext_wasm` overlay collector used by Python WASM applications. The
+  Python planner and runtime staging must not branch on whether the producer is Rust or C/C++.
+- Preserve `backend = "wasi"` as an actionable analysis failure that cites the shared Python WASI
+  extension-loader limitation. Do not construct a Rust WASI artifact, add a Rust-only loader, or
+  weaken the Python application's existing rejection.
+- Remove the unreachable placeholder construction after the fail-closed macro branch once the
+  Pyodide production path owns construction. Keep unsupported backends as explicit failures rather
+  than compatibility aliases.
+
+### 3. External prerequisites
+
+The pinned Pyodide release, its matching Emscripten closure, CPython/sysconfig inputs, and a Rust
+toolchain capable of producing `wasm32-unknown-emscripten` `cdylib` outputs must be available from
+reviewed Nix inputs on the executing system. No external service, credential, or mutable package
+index is required for local construction and import evidence.
+
+### 4. Tests to be added
+
+- Add macro and cquery coverage for the Pyodide backend, dotted module, Cargo fields, Python lock,
+  build dependencies, explicit target, action inputs, labels, installed shape, unknown arguments,
+  and deterministic provider ordering.
+- Prove the exported Rust toolchain contains the Emscripten target and that Rust and C/C++ consume
+  one exact PyEmscripten configuration. Reject mismatched Emscripten, CPython, extension suffix,
+  exception, pthread, target-feature, or PyO3 configuration before building.
+- Build a minimal locked PyO3 `cdylib`, stage it into a Python WASM application, import the dotted
+  module in the pinned Pyodide runtime, call a Rust function, and assert its observed value and
+  exception translation. A derivation-only, file-existence, or raw-WASM assertion is insufficient.
+- Run the build under poisoned `PATH`, `HOME`, Cargo configuration, credentials, Python variables,
+  compiler variables, and network access. Prove every artifact-affecting executable and config file
+  resolves from declared Nix-store inputs and Cargo remains locked and offline.
+- Patch a locked Rust dependency through the public patch workflow and prove the imported Pyodide
+  behavior and artifact identity change, then restore exactly after patch removal.
+- Reject WASI with the same shared loader-boundary diagnostic as the Python application path, and
+  reject unsupported backends without invoking Nix construction.
+- Compare Rust and C/C++ Pyodide extension output/overlay contracts so downstream application
+  planning, staging, and import use no producer-language fallback.
+
+### 5. Docs to be added or updated
+
+Document the PyEmscripten ABI authority, supported Pyodide-only backend, Cargo/PyO3 requirements,
+module naming, Python overlay consumption, patch workflow, diagnostics, Starlark API, and the
+language-neutral prerequisite for future WASI dynamic extensions. Correct every prior statement
+that describes Rust WASI extensions or construction-only WASM output as supported.
+
+### 5.5. Expected regression scope
+
+Rust toolchain construction, Rust macro/graph/planner contracts, Python Pyodide toolchains,
+`kind:pyext_wasm` collection and staging, Cargo and uv lock inputs, patch invalidation, Emscripten
+static linking, filtered source, artifact manifests, and existing C/C++ Pyodide extensions.
+
+### 6. Acceptance criteria
+
+A locked Rust/PyO3 extension builds with one declared pinned PyEmscripten ABI, installs under the
+canonical Python WASM site layout, and imports and executes in pinned Pyodide through the existing
+language-neutral overlay. Host tools, ambient flags, network, ABI drift, and unsupported WASI or
+backend requests fail closed before a misleading artifact can be published.
+
+### 7. Risks
+
+Rust, PyO3, Emscripten, CPython, and Pyodide encode ABI-sensitive behavior in different tools and
+configuration surfaces. A build can succeed while producing a side module that fails only during
+load, symbol resolution, exception handling, or function execution.
+
+### 8. Mitigations
+
+Centralize the PyEmscripten identity, declare every tool and flag, export only the init symbol,
+accept executable import as the minimum positive proof, preserve poisoned-environment and ABI
+negative tests, and refuse unreviewed target or loader variants.
+
+### 9. Consequences of not implementing this PR
+
+Rust would remain unable to implement Python extension modules for the repository's supported
+Pyodide runtime even though C/C++ extensions already use a reviewed executable ABI.
+
+### 10. Downsides for implementing this PR
+
+The additional Rust target and Emscripten/PyO3 closure increase toolchain size and couple extension
+compatibility to the pinned PyEmscripten platform, requiring deliberate upgrades when any member of
+that ABI set changes.
+
+## PR-14: Complete Rust Pyodide Lifecycle And Reproducibility Parity
+
+### 1. Intent
+
+Carry the executable Rust Pyodide extension from PR-13 through the complete Rust and Python WASM
+lifecycle: dependency/update authority, declared interop, scaffolding, selected and remote-prepared
+execution, cache and protected reproducibility evidence, current documentation, and end-of-range
+assessment.
+
+### 2. Scope of changes
+
+- Add a source-owned Rust Pyodide extension scaffold with checked-in Cargo and Python lock metadata,
+  a minimal PyO3 module, TARGETS wiring, package-local patch directory, Python WASM consumer, and an
+  executable import assertion. Scaffold creation and lock reconciliation use reviewed tools and the
+  ordinary `u` transaction; `i`, post-clone, devshell entry, and `b` remain read-only.
+- Complete importer-scoped `build_py_deps`, Cargo features, runtime dependency, package-local patch,
+  and explicit `link_deps`/`header_deps` behavior. Admit only PyEmscripten-compatible reviewed
+  static producers and compare ABI, target, libc, exception, allocator, runtime, and toolchain
+  identities before construction.
+- Prove combined Cargo and Python metadata reconciliation, timeout, interruption, rollback, source
+  pin isolation, fresh-clone, flake-input, and submodule lifecycles without adding a second mutation
+  owner or an online resolution path.
+- Register the Rust Pyodide family with canonical filtered-source, immutable evaluation bundle,
+  artifact environment, sandbox/network, remote snapshot, cache publication, provenance, semantic
+  manifest, SBOM, cleanup, and affected-target authorities.
+- Add a representative Rust Pyodide extension and its real Python consumer to the protected Rust
+  reproducibility matrix. Baseline, patched, and restored phases must compare graph, source,
+  derivation, output, semantic, behavior, PyEmscripten ABI, and consumer execution identities across
+  both reviewed builder slots for every system the pinned Pyodide runtime actually supports.
+- Keep release and platform claims fail-closed where external builders have not supplied protected
+  evidence. Do not infer WASI extension support or broader platform admission from Pyodide results.
+- Reconcile the Rust design, language plan, Starlark API, scaffolding and patching guides, Nix gaps,
+  remote/cache documentation, language registry capabilities, troubleshooting, and completion
+  status. Remove stale PR-12 handoff language and distinguish repository-complete work from pending
+  external release administration.
+- Run independent end-of-range plan and design assessments after implementation and validation.
+  Append further PRs instead of declaring completion if either assessment finds another
+  repository-owned implementation or meaningful-test gap.
+
+### 3. External prerequisites
+
+PR-13's executable Pyodide import contract must be complete. Protected cross-builder qualification
+requires the existing reviewed builder registry, evidence store, and signing authority; absence of
+those external services keeps release admission pending but does not permit simulated evidence.
+
+### 4. Tests to be added
+
+- Exercise scaffold dry-run, materialization, `u`, read-only `i`, selected build, Pyodide import and
+  function execution, patch/apply/remove behavior, and clean fresh-clone lifecycles in both supported
+  source modes.
+- Exercise declared Python build dependencies and Rust-to-C/C++ PyEmscripten static linking through
+  the same direct/transitive closure rules and backend compatibility diagnostics used by existing
+  extension producers.
+- Prove combined Cargo/Python update rollback byte-for-byte on failure, timeout, and interruption,
+  including prior lock absence, while preserving the viberoots pin and source mode.
+- Execute the extension consumer from the selected local build, immutable filtered bundle,
+  remote-prepared snapshot with poisoned live source, exported cache, and cold imported cache.
+  Require the same observed Python behavior and declared PyEmscripten identity throughout.
+- Add protected matrix, semantic-manifest, provenance, SBOM, tamper, missing-builder, ABI-mismatch,
+  candidate-qualification, and publication-admission tests. Unit fixtures may validate schemas and
+  rejection but may not be reported as external independent-builder evidence.
+- Run the prior native Python/Node extension, C/C++ Pyodide extension, Rust WASM, patch, update,
+  source-selection, remote/cache, artifact-policy, scaffolding, and fresh-clone regression unions.
+- Run `i && b && ALL_TESTS=1 v`, the supported-system Rust/Pyodide matrix, full-suite timing
+  comparison, independent scope review, and final plan/design assessments before committing.
+
+### 5. Docs to be added or updated
+
+Publish current Rust Pyodide usage, scaffolding, ABI and platform matrix, patch/update workflow,
+remote/cache and reproducibility behavior, operator diagnostics, backout steps, and the remaining
+WASI loader and external release-evidence boundaries. Remove claims that WASI extensions work merely
+because Python WASM apps and libraries support the WASI backend.
+
+### 5.5. Expected regression scope
+
+All Rust extension and WASM paths, Python Pyodide applications and extensions, Emscripten and static
+linking, Cargo/uv update transactions, scaffolding, filtered source, remote execution preparation,
+cache publication/import, artifact policy, protected evidence aggregation, language registry,
+fresh-clone behavior, and verification scheduling.
+
+### 6. Acceptance criteria
+
+A scaffolded Rust/PyO3 extension imports and executes through pinned Pyodide across local selected,
+filtered, remote-prepared, and cache-restored paths; declared dependency patches change behavior and
+restore exactly; combined metadata lifecycles remain transactional; protected evidence includes the
+new family without overstating external facts; current docs and independent assessments report no
+remaining repository-owned Rust Pyodide parity gap. WASI remains explicitly unsupported until the
+shared Python runtime gains an executable dynamic-extension ABI.
+
+### 7. Risks
+
+The new family crosses Rust, Python, Emscripten, browser/runtime, patch/update, remote/cache, and
+protected evidence boundaries. A narrow happy-path test could miss stale graph fields, host
+configuration leakage, consumer-specific packaging, or cross-builder ABI disagreement.
+
+### 8. Mitigations
+
+Reuse the existing authorities, test observed imports at every materialization boundary, keep
+producer-language-independent overlay contracts, include hostile and tamper cases, compare exact
+ABI and semantic identities, and require the final full-suite and independent assessments.
+
+### 9. Consequences of not implementing this PR
+
+The core extension could work in one local fixture while remaining absent from normal scaffolding,
+dependency repair, remote/cache, reproducibility, documentation, and release-safety contracts.
+
+### 10. Downsides for implementing this PR
+
+Executable browser/Pyodide and cross-builder coverage adds slow integration tests and another
+artifact family to protected evidence administration.
+
 ## Rollout And Sequencing
 
 1. Land PR-1 before exposing new Rust examples. Existing placeholder fixtures must convert in the
@@ -1894,6 +2127,12 @@ publication/signing tests have substantial validation and infrastructure cost.
 12. Land PR-12 last. Remove experimental Rust/Tauri status and enable platform or signed-release
     claims only after independent builders, native packaging/launch evidence, protected admission,
     debt reconciliation, assessments, and the final full-suite checkpoint pass.
+13. Land PR-13 after the original PR-1 through PR-12 range. Keep Rust Pyodide extension support
+    experimental until the executable import contract passes; keep WASI extension requests
+    fail-closed at the shared Python loader boundary.
+14. Land PR-14 after PR-13. Treat the Rust Pyodide extension range as complete only after lifecycle,
+    scaffold, remote/cache, protected-matrix, full-suite, timing, scope-review, and end-of-range
+    assessment gates pass.
 
 Each PR may ship independently with current unsupported features documented as such. A failed
 checkpoint blocks later rollout. Generated provider and graph files are regenerated only through

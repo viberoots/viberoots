@@ -5,6 +5,7 @@
   defaultFeatures, sourcePlan, producerLineage, cargoOutputHashes,
   cargoFixedSources, vendorAuthorities, nativeInputs, sourceComposition,
   runtimePackages, wasm, wasmPostprocess, cargoLock, dependencyInventory,
+  pyemscriptenContract ? { enabled = false; config = {}; },
 }:
 {
   inherit kind crate features profile crateType hostRole generatedOutputs
@@ -31,5 +32,6 @@
     (runtimePackages ++ interopContract.runtimePackages);
   runtime_packages = runtimePackages ++ interopContract.runtimePackages;
   wasm = wasm // wasmPostprocess.passthru;
+  pyemscripten = if pyemscriptenContract.enabled then pyemscriptenContract.config else {};
   cargo_packages = dependencyInventory;
 }

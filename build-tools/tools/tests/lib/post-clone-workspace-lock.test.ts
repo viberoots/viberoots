@@ -48,6 +48,26 @@ const rootLock = {
   version: 7,
 };
 
+const sourceLock = {
+  nodes: {
+    root: {
+      inputs: {
+        "rust-overlay": "rust-overlay_2",
+        "wasmtime-nixpkgs": "wasmtime-nixpkgs",
+      },
+    },
+    "rust-overlay_2": {
+      inputs: { nixpkgs: ["nixpkgs"] },
+      locked: { narHash: "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=", type: "github" },
+    },
+    "wasmtime-nixpkgs": {
+      locked: { narHash: "sha256-CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=", type: "github" },
+    },
+  },
+  root: "root",
+  version: 7,
+};
+
 function workspaceFlake(localInputPath: string): string {
   return `{
 ${workspaceFlakeInputs(`path:${localInputPath}`)}
@@ -66,17 +86,29 @@ test("post-clone derives the workspace lock solely from committed authority", as
   await fsp.writeFile(path.join(root, "flake.lock"), JSON.stringify(rootLock));
   await fsp.writeFile(path.join(workspace, "flake.nix"), workspaceFlake("./viberoots-flake-input"));
   await fsp.writeFile(path.join(input, "flake.nix"), "{}\n");
+  await fsp.writeFile(path.join(input, "flake.lock"), JSON.stringify(sourceLock));
 
   await writePostCloneWorkspaceLock({
     workspaceRoot: root,
     localInputPath: "./viberoots-flake-input",
   });
   const actual = JSON.parse(await fsp.readFile(path.join(workspace, "flake.lock"), "utf8"));
-  for (const name of ["root", "buck2", "gomod2nix", "nixpkgs", "nixpkgs_23_11"]) {
+  for (const name of ["buck2", "gomod2nix", "nixpkgs", "nixpkgs_23_11"]) {
     assert.deepEqual(actual.nodes[name], rootLock.nodes[name]);
   }
+  assert.deepEqual(actual.nodes.root.inputs, {
+    ...rootLock.nodes.root.inputs,
+    "rust-overlay": "rust-overlay",
+    "wasmtime-nixpkgs": "wasmtime-nixpkgs",
+  });
+  assert.deepEqual(actual.nodes["rust-overlay"], sourceLock.nodes["rust-overlay_2"]);
+  assert.deepEqual(actual.nodes["wasmtime-nixpkgs"], sourceLock.nodes["wasmtime-nixpkgs"]);
   assert.deepEqual(actual.nodes.viberoots, {
-    inputs: rootLock.nodes.viberoots.inputs,
+    inputs: {
+      ...rootLock.nodes.viberoots.inputs,
+      "rust-overlay": ["rust-overlay"],
+      "wasmtime-nixpkgs": ["wasmtime-nixpkgs"],
+    },
     locked: { path: "./viberoots-flake-input", type: "path" },
     original: { path: "./viberoots-flake-input", type: "path" },
     parent: [],
@@ -120,6 +152,7 @@ test("post-clone lock derivation fails closed on missing topology or mutable pat
     rootLockText: JSON.stringify(rootLock),
     workspaceFlakeDir: "/workspace/.viberoots/workspace",
     localInputPath: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-source",
+    sourceLockText: JSON.stringify(sourceLock),
   });
   assert.deepEqual(storeLock.nodes.viberoots.locked, {
     narHash: "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",

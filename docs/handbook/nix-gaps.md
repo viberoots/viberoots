@@ -94,7 +94,7 @@ Notes on Nix-backed Python outputs:
 - `rust_wasm_browser_package` → Nix build (`rust_nix_build` → pinned wasm-bindgen JS/TS/WASM package directory).
 - `rust_wasm_component` → Nix build (`rust_nix_build` → explicit WIT world, pinned adapter, validated component).
 - `rust_python_extension` → Nix build (`rust_nix_build` → selected CPython extension site).
-- `rust_python_wasm_extension` → Nix build (`rust_nix_build` reserved fail-closed route).
+- `rust_python_wasm_extension` → Nix build (`rust_nix_build` → Pyodide PyO3 `kind:pyext_wasm`; WASI fails closed at the shared Python loader boundary).
 - `rust_node_addon` → Nix build (`rust_nix_build` → stable Node-API `.node` artifact).
 - `tauri_app` → Nix build (`rust_nix_build` → credential-free platform-ad-hoc macOS application
   bundle plus executable; not release-signed or release-admitted).
@@ -107,6 +107,14 @@ native dependencies resolve through `nixpkg_deps`, `nixpkgs_profile`, and `nixpk
 Native C/C++ inputs use explicit link intent. Rust, C++, and TinyGo WASM static inputs use the same
 direct/transitive closure model and fail closed on ABI, target, libc, allocator, exception, or
 runtime mismatch.
+Rust Pyodide extensions consume the same source-owned PyEmscripten ABI authority as C/C++ Pyodide
+extensions, use importer-scoped `build_py_deps` lock authority when declared, and keep
+package-local Rust patches in the ordinary `local_patch_dirs` workflow. Rust `pyext_wasm`
+`link_deps` consume the same reviewed C/C++ `lang:cpp`, `kind:wasm`, `wasm:static` archives as the
+mature Python Pyodide extension path, while `header_deps` contribute reviewed C/C++ include roots.
+ABI diagnostics reject missing `PyInit_<leaf>` exports, unexpected exports, pthread/atomic target
+features, extension suffix drift, and PyO3 cross-build mismatches before the Python WASM app
+publishes the overlay.
 `tauri_app` uses the shared `kind:app` contract with `app:tauri`, consumes a Buck-built
 `node_asset_stage` frontend with a locked module-based Tauri API, carries explicit resource and
 sidecar destinations plus command/window capabilities, and rejects hidden Tauri build/dev commands. Its current reviewed

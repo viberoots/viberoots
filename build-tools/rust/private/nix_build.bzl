@@ -90,6 +90,10 @@ def _rust_nix_build_impl(ctx):
         + "  if [ ! -d \"$outPath/site\" ]; then echo \"rust_nix_build (%s): expected Python extension site directory not found\" >&2; exit 2; fi; " % raw
         + "  echo rust_python_extension > \"$0\"; exit 0; "
         + "fi; "
+        + "if [ \"%s\" = \"pyext_wasm\" ]; then " % kind
+        + "  if [ ! -d \"$outPath/site\" ]; then echo \"rust_nix_build (%s): expected Rust Pyodide extension site directory not found\" >&2; exit 2; fi; " % raw
+        + "  mkdir -p \"$0\"; cp -R \"$outPath/.\" \"$0/\"; chmod -R u+w \"$0\"; exit 0; "
+        + "fi; "
         + "if [ \"%s\" = \"addon\" ]; then " % kind
         + ("  ADDON=\"$outPath/lib/%s.node\"; " % ctx.attrs.addon_name)
         + "  if [ ! -f \"$ADDON\" ]; then echo \"rust_nix_build (%s): expected Node-API addon not found\" >&2; exit 2; fi; " % raw
@@ -133,7 +137,7 @@ def _rust_nix_build_impl(ctx):
         + "fi; "
         + "DEST=\"$0\"; cp -f \"$CAND\" \"$DEST\"; "
     )
-    directory_family = kind in ["tauri", "wasm", "wasi", "wasm_static", "wasi_static", "wasm_browser", "wasm_component"]
+    directory_family = kind in ["pyext_wasm", "tauri", "wasm", "wasi", "wasm_static", "wasi_static", "wasm_browser", "wasm_component"]
     wasm_family = kind in ["wasm", "wasi", "wasm_static", "wasi_static", "wasm_browser", "wasm_component"]
     out = ctx.actions.declare_output(ctx.attrs.out, dir = directory_family)
     remote_inputs = [

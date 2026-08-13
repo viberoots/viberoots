@@ -36,7 +36,7 @@ let
     let
       toolchain = final.rust-bin.stable."1.88.0".minimal.override {
         extensions = [ "clippy" "llvm-tools-preview" "rust-src" "rustfmt" ];
-        targets = [ "wasm32-unknown-unknown" "wasm32-wasip1" ];
+        targets = [ "wasm32-unknown-unknown" "wasm32-wasip1" "wasm32-unknown-emscripten" ];
       };
       rustPlatform = final.makeRustPlatform {
         cargo = toolchain;

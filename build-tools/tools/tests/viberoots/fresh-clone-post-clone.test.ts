@@ -20,10 +20,7 @@ test("fresh recursive clone runs real post-clone initialization without tracked 
   const { stdout } = await fixture.postClone(clone, { runInstall: true });
   assert.match(stdout, /status bootstrapped/);
   assert.match(stdout, /workspace initialized/);
-  assert.match(
-    stdout,
-    /cold importer metadata is fresh: projects\/apps\/viberoots-site\/pnpm-lock\.yaml/,
-  );
+  assert.match(stdout, /post-clone skipped projects\/apps\/viberoots-site\/pnpm-lock\.yaml/);
   assert.equal(await fsp.readlink(path.join(clone, ".viberoots", "current")), "../viberoots");
   const marketplace = JSON.parse(
     await fsp.readFile(path.join(clone, ".agents", "plugins", "marketplace.json"), "utf8"),
@@ -46,13 +43,22 @@ test("fresh recursive clone runs real post-clone initialization without tracked 
     await fsp.readFile(path.join(clone, ".viberoots", "workspace", "flake.lock"), "utf8"),
   );
   for (const [name, node] of Object.entries(rootLock.nodes)) {
+    if (name === "root") {
+      const normalizedRoot = JSON.parse(JSON.stringify(workspaceLock.nodes.root));
+      delete normalizedRoot.inputs["rust-overlay"];
+      delete normalizedRoot.inputs["wasmtime-nixpkgs"];
+      assert.deepEqual(normalizedRoot, node);
+      continue;
+    }
     if (name !== "viberoots") assert.deepEqual(workspaceLock.nodes[name], node);
   }
+  assert.deepEqual(workspaceLock.nodes.root.inputs["rust-overlay"], "rust-overlay");
+  assert.deepEqual(workspaceLock.nodes.root.inputs["wasmtime-nixpkgs"], "wasmtime-nixpkgs");
   assert.equal(workspaceLock.nodes.viberoots.locked.path, "./viberoots-flake-input");
   const nixInvocations = await fsp.readFile(fixture.nixLog, "utf8");
   assert.match(
     nixInvocations,
-    /post-clone materialize committed pnpm stores[\s\S]*post-clone read-only install/,
+    /nix run .* -- init-consumer --mode submodule .* --source .* --run-install --no-direnv/,
   );
   assert.doesNotMatch(nixInvocations, /nix flake (?:lock|update|metadata)\b/);
 });
@@ -83,7 +89,7 @@ test("fresh flake-mode clone runs cold post-clone from immutable source without 
   const nixInvocations = await fsp.readFile(fixture.nixLog, "utf8");
   assert.match(
     nixInvocations,
-    /post-clone materialize committed pnpm stores[\s\S]*post-clone read-only install/,
+    /nix run .* -- init-consumer --mode flake .* --post-clone --run-install --no-direnv/,
   );
   assert.match(nixInvocations, new RegExp(`nix flake metadata .*rev=${fixture.submoduleRev}`));
   assert.doesNotMatch(nixInvocations, /nix flake (?:lock|update)\b/);

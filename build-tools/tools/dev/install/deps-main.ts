@@ -203,12 +203,14 @@ const priorGlobalInputs = await globalNixInputFingerprint(repoRoot);
 const metadataMode = installMetadataMode();
 const refreshPnpmHashes = metadataMode === "reconcile";
 const readOnlyMetadata = metadataMode === "read-only";
+const postCloneReadOnlyInstall =
+  readOnlyMetadata && String(process.env.VBR_POST_CLONE_ALLOW_STALE_METADATA || "").trim() === "1";
 // install-deps never owns tracked Go reconciliation. The explicit u dispatcher
 // calls repairGoDependencies directly before build or prebuild work begins.
 const readOnlyGoMetadata = true;
 await checkBootstrapCompletion({
   workspaceRoot: repoRoot,
-  repair: !dryRun,
+  repair: !dryRun && !postCloneReadOnlyInstall,
   verbose,
 });
 await applyNixCacheHealthPolicy(repoRoot);
@@ -221,8 +223,27 @@ try {
     process.env.BUCK_TEST_SRC = repoRoot;
   }
 } catch {}
+if (postCloneReadOnlyInstall) {
+  const postCloneImporters = await discoverImportersWithLock(repoRoot, { cwd: process.cwd() });
+  for (const imp of postCloneImporters) {
+    const relLock = imp === "viberoots" ? "pnpm-lock.yaml" : path.join(imp, "pnpm-lock.yaml");
+    const reason = imp === "viberoots" ? "source-owned importer" : "read-only post-clone";
+    console.log(`[install-deps] post-clone skipped ${relLock}: ${reason}`);
+  }
+  console.log("[install-deps] post-clone skipped generated workspace lock repair");
+  console.log("[install-deps] post-clone skipped toolchain realization");
+  console.log("[install-deps] post-clone skipped unified pnpm prewarm");
+  console.log("[install-deps] post-clone skipped secret readiness");
+  if (verbose) console.log("Dependencies installed and node_modules linked.");
+  else ui.ok("install", "complete");
+  process.exit(0);
+}
 const toolchainPaths = await ensureToolchainPathsFiles(repoRoot, {
   refresh: metadataMode === "reconcile",
+  toolchainFlakeRef:
+    metadataMode === "read-only" && String(process.env.VIBEROOTS_SOURCE_ROOT || "").trim()
+      ? `path:${String(process.env.VIBEROOTS_SOURCE_ROOT).trim()}`
+      : "",
   frozenArtifactToolsRoot:
     metadataMode === "read-only" ? String(process.env.VBR_ARTIFACT_TOOLS_ROOT || "") : "",
 });
@@ -256,8 +277,12 @@ if (glueOnly) {
   const glueOnlyImporters = await discoverImportersWithLock(repoRoot, { cwd: process.cwd() });
   await syncModuleContractsForWebapps(repoRoot, glueOnlyImporters, dryRun, verbose);
   if (!dryRun && shouldRunFinalWorkspaceLockRepair()) {
-    if (readOnlyMetadata) {
+    if (readOnlyMetadata && !postCloneReadOnlyInstall) {
       await assertGeneratedWorkspaceLockReady({ repoRoot, verbose });
+    } else if (readOnlyMetadata && verbose) {
+      console.log(
+        "[install-deps] post-clone read-only install skips generated workspace lock repair",
+      );
     } else {
       await withExclusiveInstallLock(
         "workspace-lock-repair",
@@ -302,8 +327,12 @@ if (dryRun) {
         console.log("[install-deps] lock acquired");
       }
       try {
-        if (readOnlyMetadata) {
+        if (readOnlyMetadata && !postCloneReadOnlyInstall) {
           await assertGeneratedWorkspaceLockReady({ repoRoot, verbose });
+        } else if (readOnlyMetadata && verbose) {
+          console.log(
+            "[install-deps] post-clone read-only install skips generated workspace lock repair",
+          );
         } else {
           await runGeneratedWorkspaceLockRepair({ repoRoot, dryRun, verbose, phase: "initial" });
         }
@@ -327,6 +356,10 @@ if (dryRun) {
           const commandEnv = envWithResolvedNixBin(process.env);
           const zxWrapper = ensureNixStoreToolPathSync("zx-wrapper", commandEnv);
           const relLock = path.join(imp, "pnpm-lock.yaml");
+          if (postCloneReadOnlyInstall && imp === "viberoots") {
+            console.log("[install-deps] post-clone skipped pnpm-lock.yaml: source-owned importer");
+            continue;
+          }
           const freshness = await importerInstallFreshness({
             repoRoot,
             importer: imp,
@@ -338,6 +371,10 @@ if (dryRun) {
             } else {
               ui.ok("node_modules", `${imp} already fresh`);
             }
+            continue;
+          } else if (postCloneReadOnlyInstall) {
+            const lockRel = imp === "viberoots" ? "pnpm-lock.yaml" : relLock;
+            console.log(`[install-deps] post-clone skipped ${lockRel}: ${freshness.reason}`);
             continue;
           } else if (verbose) {
             console.log(
@@ -488,27 +525,33 @@ if (!skipGlue) {
 } else if (verbose) {
   console.log("[skip] node deps enforcement");
 }
-await prewarmUnifiedPnpmStore({ repoRoot, dryRun, verbose });
-await ensureInstallSecretReadiness({
-  repoRoot,
-  dryRun,
-  verbose,
-  flags: {
-    withoutSecrets,
-    yes,
-    machineLabel,
-    rotateBootstrapCredentials,
-    rotateDeploymentCredentials,
-    forceOverwriteLocalCredentials,
-    bootstrap,
-    infisicalLoginMode,
-    secretBackend,
-    infisicalProjectName,
-    selectInfisicalProject,
-    bootstrapKeychainServiceName,
-    keychainServiceName,
-  },
-});
+if (postCloneReadOnlyInstall) console.log("[install-deps] post-clone skipped unified pnpm prewarm");
+else {
+  await prewarmUnifiedPnpmStore({ repoRoot, dryRun, verbose });
+}
+if (postCloneReadOnlyInstall) console.log("[install-deps] post-clone skipped secret readiness");
+else {
+  await ensureInstallSecretReadiness({
+    repoRoot,
+    dryRun,
+    verbose,
+    flags: {
+      withoutSecrets,
+      yes,
+      machineLabel,
+      rotateBootstrapCredentials,
+      rotateDeploymentCredentials,
+      forceOverwriteLocalCredentials,
+      bootstrap,
+      infisicalLoginMode,
+      secretBackend,
+      infisicalProjectName,
+      selectInfisicalProject,
+      bootstrapKeychainServiceName,
+      keychainServiceName,
+    },
+  });
+}
 if (!dryRun && !readOnlyMetadata && shouldRunFinalWorkspaceLockRepair()) {
   await withExclusiveInstallLock(
     "workspace-lock-repair",

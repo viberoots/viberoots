@@ -144,6 +144,10 @@ async function inner() {
 
   if (materializeCommitted) {
     if (!currentHash || currentHash === PLACEHOLDER_PNPM_STORE_HASH) {
+      if (process.env.VBR_POST_CLONE_ALLOW_STALE_METADATA === "1") {
+        console.log(`pnpm-store: ${storeAttr} has no committed metadata; skipped post-clone`);
+        return;
+      }
       throw new Error(`pnpm hash metadata is stale for ${importer}; repair: run u`);
     }
     const materialized = await materializeCommittedPnpmStore({

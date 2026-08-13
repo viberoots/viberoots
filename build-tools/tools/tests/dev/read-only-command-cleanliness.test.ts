@@ -140,6 +140,7 @@ test("real i and post-clone preserve tracked state on current and stale metadata
       PATH: `${fakeBin}${path.delimiter}${commandEnv.PATH || ""}`,
       NO_DEV_SHELL: "1",
       VBR_RUN_INSTALL: "0",
+      VBR_RUN_IN_TEMP_REPO: "1",
       VBR_DIRENV_ALLOW: "0",
     };
     const args = [
@@ -153,6 +154,7 @@ test("real i and post-clone preserve tracked state on current and stale metadata
       "flake",
     ];
     await execFileAsync(bootstrap, [], { cwd: root, env: { ...env, VBR_WORKSPACE_ROOT: root } });
+    env.VBR_ARTIFACT_TOOLS_ROOT = canonicalArtifactToolsRoot(root);
     await commitSeedOverlay(root);
     await assertGitClean(root);
     await execFileAsync(command, args, { cwd: root, env });

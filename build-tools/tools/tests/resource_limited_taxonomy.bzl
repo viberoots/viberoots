@@ -85,6 +85,7 @@ RESOURCE_LIMITED_TESTS = {
     "build-tools/tools/tests/scaffolding/rust-submodule.scaffold-lifecycle.test.ts": True,
     "build-tools/tools/tests/scaffolding/scaf-go-test.cli.auto-wires.test.ts": True,
     "build-tools/tools/tests/scaffolding/scaf-go-test.lib.auto-wires.test.ts": True,
+    "build-tools/tools/tests/scaffolding/sparse-checkout.local-patch-build.test.ts": True,
     "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-multi-module-runtime-contract.test.ts": True,
     "build-tools/tools/tests/scaffolding/webapp-ssr-vite.runnable-contracts.test.ts": True,
     "build-tools/tools/tests/scaffolding/webapp-ssr.next-contracts.test.ts": True,

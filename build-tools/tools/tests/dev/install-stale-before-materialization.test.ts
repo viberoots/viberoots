@@ -52,6 +52,7 @@ test("stale install fails before Nix materialization and u remains available", a
     rootLockText: await fsp.readFile(path.join(root, "flake.lock"), "utf8"),
     workspaceFlakeDir: path.join(root, ".viberoots", "workspace"),
     localInputPath: immutableSource.storePath,
+    sourceLockText: await fsp.readFile(path.join(immutableSource.storePath, "flake.lock"), "utf8"),
   });
   await fsp.writeFile(
     path.join(root, ".viberoots", "workspace", "flake.lock"),

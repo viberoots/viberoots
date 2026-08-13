@@ -152,6 +152,7 @@ export async function createUpdateCommandFixture(name: string): Promise<string> 
     rootLockText,
     workspaceFlakeDir: path.join(root, ".viberoots/workspace"),
     localInputPath: immutableSource,
+    sourceLockText: await fsp.readFile(path.join(immutableSource, "flake.lock"), "utf8"),
   });
   await fsp.writeFile(
     path.join(root, ".viberoots/workspace/flake.lock"),

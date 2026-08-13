@@ -25,7 +25,20 @@ pkgs.writeShellScriptBin "viberoots" ''
   export NIX_BIN="$VBR_NIX_BIN"
   export GIT_BIN="${pkgs.git}/bin/git"
   ${pkgs.lib.optionalString (artifactToolsRoot != null) ''
-    export VBR_ARTIFACT_TOOLS_ROOT="${artifactToolsRoot}"
+    vbr_post_clone_init_consumer=0
+    if [ "''${1:-}" = "init-consumer" ]; then
+      for arg in "$@"; do
+        if [ "$arg" = "--post-clone" ]; then
+          vbr_post_clone_init_consumer=1
+        fi
+      done
+    fi
+    if [ "$vbr_post_clone_init_consumer" = "1" ] || { [ "''${1:-}" = "init-consumer" ] && { [ "''${VBR_POST_CLONE:-}" = "1" ] || [ "''${VIBEROOTS_POST_CLONE:-}" = "1" ]; }; }; then
+      export VBR_BOOTSTRAP_ARTIFACT_TOOLS_ROOT="''${VBR_BOOTSTRAP_ARTIFACT_TOOLS_ROOT:-${artifactToolsRoot}}"
+      unset VBR_ARTIFACT_TOOLS_ROOT
+    else
+      export VBR_ARTIFACT_TOOLS_ROOT="${artifactToolsRoot}"
+    fi
   ''}
   export SSL_CERT_FILE="''${SSL_CERT_FILE:-${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt}"
   export NIX_SSL_CERT_FILE="''${NIX_SSL_CERT_FILE:-$SSL_CERT_FILE}"

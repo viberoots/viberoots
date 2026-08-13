@@ -47,8 +47,15 @@ test("cold post-clone lock evaluates offline solely from preserved immutable nod
     path.join(repoRoot, "viberoots", "flake.nix"),
     path.join(filteredInput, "flake.nix"),
   );
+  await fsp.copyFile(
+    path.join(repoRoot, "viberoots", "flake.lock"),
+    path.join(filteredInput, "flake.lock"),
+  );
   const workspaceFlake = generatedWorkspaceFlake("./viberoots-flake-input");
   assert.match(workspaceFlake, /gomod2nix\.url = "github:nix-community\/gomod2nix";/);
+  assert.match(workspaceFlake, /rust-overlay\.url = "github:oxalica\/rust-overlay\//);
+  assert.match(workspaceFlake, /viberoots\.inputs\.rust-overlay\.follows = "rust-overlay";/);
+  assert.match(workspaceFlake, /wasmtime-nixpkgs\.url = "github:NixOS\/nixpkgs\//);
   assert.doesNotMatch(
     workspaceFlake,
     new RegExp(`path:${repoRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
@@ -63,7 +70,18 @@ test("cold post-clone lock evaluates offline solely from preserved immutable nod
   const derivedText = await fsp.readFile(lockFile, "utf8");
   const derived = JSON.parse(derivedText);
   for (const [name, node] of Object.entries(authoritative.nodes)) {
-    if (node !== viberootsNode) assert.deepEqual(derived.nodes[name], node);
+    if (name === authoritative.root) {
+      assert.deepEqual(derived.nodes[name], {
+        ...node,
+        inputs: {
+          ...((node as { inputs?: Record<string, unknown> }).inputs || {}),
+          "rust-overlay": "rust-overlay_2",
+          "wasmtime-nixpkgs": "wasmtime-nixpkgs",
+        },
+      });
+    } else if (node !== viberootsNode) {
+      assert.deepEqual(derived.nodes[name], node);
+    }
   }
   const { stdout } = await execManaged(
     nix,
@@ -77,6 +95,9 @@ test("cold post-clone lock evaluates offline solely from preserved immutable nod
     ],
     { cwd: root, env: blockedNetworkEnv },
   );
-  assert.match(stdout, /buck2,.*gomod2nix,.*nixpkgs,.*nixpkgs_23_11,.*viberoots/);
+  assert.match(
+    stdout,
+    /buck2,.*gomod2nix,.*nixpkgs,.*nixpkgs_23_11,.*rust-overlay,.*viberoots,.*wasmtime-nixpkgs/,
+  );
   assert.equal(await fsp.readFile(lockFile, "utf8"), derivedText);
 });

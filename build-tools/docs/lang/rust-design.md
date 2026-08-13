@@ -79,6 +79,8 @@ post-clone, devshell entry, and `b` are read-only and report `repair: run u` for
   policy, scaffolding, enforcement, and focused validation.
 - Support native builds, explicit C interop, `wasm32-unknown-unknown`, and `wasm32-wasip1` without
   ambient host tools.
+- Support importable Rust/PyO3 extension modules for the repository's pinned Pyodide runtime through
+  the same `kind:pyext_wasm` overlay contract used by C/C++ extension modules.
 
 ## Non-goals
 
@@ -88,6 +90,8 @@ post-clone, devshell entry, and `b` are read-only and report `repair: run u` for
 - Hiding unsupported Cargo sources, target triples, or workspace layouts behind fallback builds.
 - Preserving the placeholder output format after real compilation lands.
 - Adding compatibility aliases for unshipped Rust macro names.
+- Claiming Rust or C/C++ WASI dynamic-extension support before the shared Python WASI runtime can
+  load and execute extension modules through a reviewed ABI.
 
 ## Ownership And Source Layout
 
@@ -120,6 +124,12 @@ The public surface is:
 - `rust_wasm_component`: compiles a bare or preview1-reactor component whose public exports equal
   the selected package-local WIT world.
 - `rust_wasi_binary`: compiles `wasm32-wasip1` output and publishes a WASI runnable/test contract.
+- `rust_python_extension`: compiles a native PyO3-compatible `cdylib` and stages it under the
+  selected CPython runtime's import suffix.
+- `rust_python_wasm_extension`: compiles a PyO3-compatible PyEmscripten side module for the pinned
+  Pyodide runtime. `backend = "wasi"` remains an explicit unsupported request until the shared
+  Python WASI extension-loader contract exists.
+- `rust_node_addon`: compiles a Node-API addon for the selected pinned Node runtime.
 
 Native macros share these explicit inputs where applicable:
 
@@ -315,10 +325,55 @@ extension and rewritten to output-relative loader paths. Python overlays and Nod
 webapp, and deployment staging carry that directory with the extension, and service identity is
 calculated only after addons enter the deployable tree.
 
-The pinned Rust/Python toolchains do not currently provide an importable Pyodide or WASI dynamic
-extension ABI. `rust_python_wasm_extension` therefore fails at analysis with an actionable
-diagnostic and does not emit a raw-WASM placeholder. PR-9 browser packages and WIT components are
-separate first-class Rust WASM outcomes; they do not claim a Python extension ABI.
+At the current baseline, `rust_python_wasm_extension` supports the Pyodide backend and rejects the
+WASI backend at the shared Python loader boundary.
+
+The pinned Pyodide runtime already defines the repository's importable WebAssembly extension ABI.
+Its source-owned toolchain must expose one coherent PyEmscripten identity: Pyodide and CPython
+versions, Emscripten version, extension suffix, sysconfig data, Python headers, PyO3 cross-build
+configuration, and ABI-sensitive compiler and linker flags. Rust consumes that authority rather
+than deriving flags from the host or maintaining a second Pyodide configuration.
+
+`rust_python_wasm_extension` targets `wasm32-unknown-emscripten` and builds the reviewed Cargo
+package as a `cdylib` with pinned Cargo, rustc, and `emcc`. The build is locked and offline. The
+link step emits an Emscripten side module, exports only the required `PyInit_<leaf-module>`
+entrypoint,
+rejects pthreads and incompatible target features, and records the complete PyEmscripten ABI
+identity in the materialization manifest. The installed shape is
+`site/<dotted-module><PYODIDE_EXT_SUFFIX>`, identical to the existing C/C++ Pyodide extension
+contract. Python WASM applications discover Rust and C/C++ producers through the same transitive
+`kind:pyext_wasm` overlay route; downstream staging does not branch on producer language.
+When a Rust Pyodide extension declares `link_deps` or `header_deps`, the planner applies the same
+PyEmscripten static-link contract used by C/C++ Pyodide extensions: link producers must be
+`lang:cpp`, `kind:wasm`, and `wasm:static`, headers must be reviewed C/C++ header targets, and WASI
+static producers are rejected for Pyodide. The resolved C/C++ archives and include roots are
+declared Nix inputs and become part of Rust materialization evidence.
+
+Executable import is the acceptance boundary. A successful Cargo derivation or a syntactically
+valid `.wasm` file is insufficient. The pinned Pyodide runtime must import the installed dotted
+module and call a Rust/PyO3 function. Package-local Cargo patches, declared Python build
+dependencies, filtered source, cache materialization, and remote-prepared execution must preserve
+that same observed behavior and identity contract.
+
+Rust Pyodide extension patching uses the ordinary package-local Rust patch workflow. Declare
+`local_patch_dirs` inside the Cargo package, keep patches under that package, and rebuild the
+Python WASM consumer so the same `kind:pyext_wasm` overlay receives the patched output. Patch
+application is part of the locked Cargo source materialization; the expected check is baseline
+import behavior, `patch-pkg start/apply`, changed imported value plus output identity, then
+`patch-pkg remove` and exact restoration. Ambient Cargo replacement config is still rejected.
+ABI drift fails before publication: missing `PyInit_<leaf>`, unexpected public
+exports, pthread/atomic target features, Pyodide extension-suffix drift, or mismatched PyO3
+cross-build settings are reported as Rust Pyodide diagnostics rather than deferred to downstream
+application import.
+
+The pinned Python WASI runtime does not currently admit any `kind:pyext_wasm` dependency into a
+runnable application. `backend = "wasi"` therefore continues to fail during analysis with the
+shared loader limitation and never emits a raw-WASM placeholder. WASI support becomes eligible only
+after the language-neutral Python WASI path can build, stage, import, and execute a C/C++ extension
+through a reviewed dynamic-extension ABI. A later Rust implementation must reuse that authority
+with `wasm32-wasip1`; it may not introduce a Rust-only loader or claim parity from construction
+alone. PR-9 browser packages and WIT components remain separate first-class Rust WASM outcomes and
+do not claim a Python extension ABI.
 
 ## Native Linking And C/C++ Interop
 
@@ -529,6 +584,10 @@ Rust is first-class only when all of the following are demonstrated:
   and remote worker admission is proven separately before first-class remote Rust execution is
   claimed.
 - Native C interop, freestanding WASM, and WASI tests exercise produced artifacts.
+- Rust Pyodide extensions install through `kind:pyext_wasm`, import and execute in the pinned
+  Pyodide runtime, and retain exact Cargo, PyEmscripten, patch, cache, and source identities.
+- Rust WASI extension requests fail at the same shared Python loader boundary as C/C++ until an
+  executable language-neutral WASI extension contract exists.
 - Runnable commands resolve only reviewed Nix-store tools and artifacts.
 - Scaffolding, macro inventory, route policy, planner registry, docs, and verify selection remain in
   sync.
@@ -539,9 +598,12 @@ does not claim Linux support, credentialed release signing, notarization, indepe
 production remote execution, or release hermeticity. PR-12 registers the route with the canonical
 repository gates, but those claims remain withheld until their external evidence exists.
 
-PR-7 adds native Python and Node managed-runtime extension contracts and explicitly rejects the
-currently unavailable Python WASM ABI. PR-8 adds reviewed C/C++ interoperability without promoting
-the language beyond experimental status. Current references
+PR-7 adds native Python and Node managed-runtime extension contracts. PR-13 adds the pinned
+PyEmscripten build and executable Pyodide import contract, and PR-14 carries it through scaffolding,
+patching, remote/cache, reproducibility, and final assessment. WASI dynamic extensions remain
+withheld at the shared Python runtime boundary rather than being treated as a Rust-specific gap.
+PR-8 adds reviewed C/C++ interoperability without promoting the language beyond experimental
+status. Current references
 must still call Rust experimental rather than a complete first-class or release-hermetic toolchain.
 Repository-owned sandbox/network and publication admission are wired; this status records the
 remaining external evidence boundary rather than an alternate artifact path.

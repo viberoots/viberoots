@@ -2,6 +2,7 @@ import { execFile, spawn } from "node:child_process";
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import {
   initLocalSprinkleRefValues,
@@ -869,13 +870,12 @@ async function runOptionalDirenvAllow(
   }
 }
 
-async function runInstall(workspaceRoot: string, allowPnpmGenerate: boolean): Promise<void> {
-  await runInherited(
-    "direnv",
-    ["exec", workspaceRoot, "i"],
-    workspaceRoot,
-    maybePnpmGenerateEnv(allowPnpmGenerate),
-  );
+async function runInstall(
+  workspaceRoot: string,
+  allowPnpmGenerate: boolean,
+  env: NodeJS.ProcessEnv = maybePnpmGenerateEnv(allowPnpmGenerate),
+): Promise<void> {
+  await runInherited("direnv", ["exec", workspaceRoot, "i"], workspaceRoot, env);
 }
 
 async function runPostClonePnpmMaterialization(
@@ -889,28 +889,10 @@ async function runPostClonePnpmMaterialization(
     "dev",
     "post-clone-pnpm-materialize.ts",
   );
-  await runInherited(
-    "direnv",
-    ["exec", workspaceRoot, "zx-wrapper", script],
-    workspaceRoot,
-    process.env,
-  );
-}
-
-async function runPostCloneConsistency(workspaceRoot: string, sourcePath: string): Promise<void> {
-  const script = path.join(
-    sourcePath,
-    "build-tools",
-    "tools",
-    "dev",
-    "consumer-consistency-check.ts",
-  );
-  const artifactToolsRoot = canonicalArtifactToolsRoot(
-    workspaceRoot,
-    String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
-  );
+  const artifactToolsRoot = postCloneArtifactToolsRoot(workspaceRoot, sourcePath);
   const env = {
     ...buildCanonicalArtifactEnvironment(workspaceRoot, { artifactToolsRoot }),
+    VBR_POST_CLONE_ALLOW_STALE_METADATA: "1",
     VIBEROOTS_ROOT: sourcePath,
     VIBEROOTS_SOURCE_ROOT: sourcePath,
     WORKSPACE_ROOT: workspaceRoot,
@@ -921,6 +903,61 @@ async function runPostCloneConsistency(workspaceRoot: string, sourcePath: string
     workspaceRoot,
     env,
   );
+}
+
+async function runPostCloneConsistency(workspaceRoot: string, sourcePath: string): Promise<void> {
+  const script = path.join(
+    currentBootstrapSourcePath(),
+    "build-tools",
+    "tools",
+    "dev",
+    "consumer-consistency-check.ts",
+  );
+  const artifactToolsRoot = postCloneArtifactToolsRoot(workspaceRoot, sourcePath);
+  const env = {
+    ...buildCanonicalArtifactEnvironment(workspaceRoot, { artifactToolsRoot }),
+    VIBEROOTS_ROOT: sourcePath,
+    VIBEROOTS_SOURCE_ROOT: sourcePath,
+    WORKSPACE_ROOT: workspaceRoot,
+  };
+  await runInherited(
+    path.join(artifactToolsRoot, "bin", "zx-wrapper"),
+    [script, "--post-clone"],
+    workspaceRoot,
+    env,
+  );
+}
+
+async function runPostCloneInstall(
+  workspaceRoot: string,
+  sourcePath: string,
+  artifactToolsRoot: string,
+): Promise<void> {
+  await runInherited(path.join(sourcePath, "build-tools", "tools", "bin", "i"), [], workspaceRoot, {
+    ...buildCanonicalArtifactEnvironment(workspaceRoot, { artifactToolsRoot }),
+    NO_DEV_SHELL: "1",
+    VBR_POST_CLONE: "1",
+    VBR_POST_CLONE_ALLOW_STALE_METADATA: "1",
+    VIBEROOTS_ROOT: sourcePath,
+    VIBEROOTS_SOURCE_ROOT: sourcePath,
+    WORKSPACE_ROOT: workspaceRoot,
+  });
+}
+
+function postCloneArtifactToolsRoot(workspaceRoot: string, sourcePath: string): string {
+  for (const candidate of [
+    process.env.VBR_BOOTSTRAP_ARTIFACT_TOOLS_ROOT,
+    process.env.VIBEROOTS_BOOTSTRAP_ARTIFACT_TOOLS_ROOT,
+    process.env.VBR_ARTIFACT_TOOLS_ROOT,
+  ]) {
+    const asserted = String(candidate || "").trim();
+    if (asserted) return canonicalArtifactToolsRoot(workspaceRoot, asserted);
+  }
+  return canonicalArtifactToolsRoot(sourcePath || currentBootstrapSourcePath());
+}
+
+function currentBootstrapSourcePath(): string {
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 }
 
 async function runInherited(
@@ -1143,6 +1180,16 @@ Project and application source belongs here.
   if (isPostCloneBootstrap(opts)) {
     await runPostCloneConsistency(opts.workspaceRoot, activation.sourcePath);
   }
-  if (opts.runInstall) await runInstall(opts.workspaceRoot, allowPnpmGenerate);
+  if (opts.runInstall) {
+    if (isPostCloneBootstrap(opts)) {
+      const artifactToolsRoot = postCloneArtifactToolsRoot(
+        opts.workspaceRoot,
+        activation.sourcePath,
+      );
+      await runPostCloneInstall(opts.workspaceRoot, activation.sourcePath, artifactToolsRoot);
+    } else {
+      await runInstall(opts.workspaceRoot, allowPnpmGenerate);
+    }
+  }
   ui.ok("workspace initialized", opts.workspaceRoot);
 }

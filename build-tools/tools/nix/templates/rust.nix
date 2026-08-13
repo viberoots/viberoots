@@ -109,19 +109,20 @@ in {
         inherit pkgs wasmtimePkgs rustToolchain rustPlatform lib kind crate wasm behaviorProbe;
         publicCrate = validatedPublicCrate;
       };
+      pyemscriptenContract = import ./rust-pyemscripten.nix ({ inherit pkgs lib kind crate module targetDir buildPyDeps pythonWheelhouse; } // { wasmStaticLibs = nativeInputs.wasmStaticLibs or []; wasmStaticArchives = nativeInputs.wasmStaticArchives or []; });
       extensionRuntime = import ./rust-extension-runtime.nix { inherit pkgs lib kind;
         runtimePackages = if builtins.elem kind [ "pyext" "addon" ] then runtimePackages else []; };
       _pythonAuthority =
         if buildPyDeps != [] && pythonWheelhouse == null then builtins.throw
           "Rust Python extension build_py_deps require an importer-scoped uv.lock wheelhouse"
         else true;
-      extensionPackages = runtimePackages
-        ++ lib.optionals (kind == "pyext") ([ pkgs.python3 ]
-          ++ lib.optional (pythonWheelhouse != null) pythonWheelhouse)
-        ++ lib.optionals (kind == "addon") [ pkgs.nodejs_22 ];
+      extensionPackages = runtimePackages ++ lib.optionals (kind == "pyext") ([ pkgs.python3 ]
+        ++ lib.optional (pythonWheelhouse != null) pythonWheelhouse)
+        ++ pyemscriptenContract.buildInputs ++ lib.optionals (kind == "addon") [ pkgs.nodejs_22 ];
       extensionRustFlags = lib.optionals
         (pkgs.stdenv.isDarwin && builtins.elem kind [ "pyext" "addon" ])
-        [ "-C" "link-arg=-undefined" "-C" "link-arg=dynamic_lookup" ];
+        [ "-C" "link-arg=-undefined" "-C" "link-arg=dynamic_lookup" ]
+        ++ pyemscriptenContract.rustFlags;
       wasmRustFlags = import ./rust-wasm-rustflags.nix { inherit lib kind wasm; };
       nodeApiContract = import ./rust-node-api.nix {
         inherit pkgs lib kind nodeApiVersion targetDir crate dynamicExtension; };
@@ -147,10 +148,10 @@ in {
       isWasm = builtins.elem kind [
         "wasm" "wasi" "wasm_static" "wasi_static" "wasm_browser" "wasm_component"
       ];
-      installPhase = (if kind == "tauri" then tauriContract.installPhase else baseInstallPhase) + import ./rust-evidence-install.nix {
+      installPhase = (if kind == "pyext_wasm" then pyemscriptenContract.installPhase else if kind == "tauri" then tauriContract.installPhase else baseInstallPhase) + import ./rust-evidence-install.nix {
         inherit lib kind coverage interopContract wasmPostprocess compositionEvidence
           dependencyInventory extensionRuntime H name sourcePlan artifactNixRoot pkgs
-          producerLineage;
+          producerLineage pyemscriptenContract;
         inherit isWasm;
       } + lib.optionalString behaviorProbe (import ./rust-behavior-observer.nix {
         inherit pkgs lib rustToolchain kind crate crateType publicCrate targetName module tauri;
@@ -191,8 +192,7 @@ in {
       PYTHONPATH = if kind == "pyext" && pythonWheelhouse != null
         then "${pythonWheelhouse}/site"
         else "";
-      C_INCLUDE_PATH = lib.concatStringsSep ":" (nodeApiContract.includePaths
-        ++ lib.optional (nativePackages != []) (lib.makeSearchPath "include" nativePackages));
+      C_INCLUDE_PATH = lib.concatStringsSep ":" (pyemscriptenContract.includePaths ++ nodeApiContract.includePaths ++ lib.optional (nativePackages != []) (lib.makeSearchPath "include" nativePackages));
       LIBRARY_PATH = lib.makeLibraryPath nativeInputs.libraries;
       VIBEROOTS_RUST_LINK_LIBRARY_PATHS = lib.makeLibraryPath nativeInputs.libraries;
       VIBEROOTS_TAURI_SOURCE_ROOT =
@@ -207,7 +207,7 @@ in {
         inherit pkgs rustToolchain lib validatedTarget cargoProfile crate kindFlags
           featureFlags targetFlags;
       };
-      preBuild = tauriContract.preBuild + lib.optionalString (kind == "pyext" && buildPyDeps != []) ''
+      preBuild = tauriContract.preBuild + pyemscriptenContract.preBuild + lib.optionalString (kind == "pyext" && buildPyDeps != []) ''
         export PYTHONNOUSERSITE=1
         for package in ${lib.concatStringsSep " " (map lib.escapeShellArg buildPyDeps)}; do
           ${pkgs.python3}/bin/python -c 'import importlib, sys; importlib.import_module(sys.argv[1])' "$package" ||
@@ -222,11 +222,12 @@ in {
           pythonWheelhouse interopContract validatedPublicCrate validatedTarget
           defaultFeatures sourcePlan producerLineage cargoOutputHashes
           cargoFixedSources vendorAuthorities nativeInputs sourceComposition
-          runtimePackages wasm wasmPostprocess cargoLock;
+          runtimePackages wasm wasmPostprocess cargoLock pyemscriptenContract;
         inherit dependencyInventory;
       };
-    } // { nativeBuildInputs = [ rustc pkgs.pkg-config pkgs.jq pkgs.llvmPackages.lld ]
+    } // pyemscriptenContract.envAttrs // { nativeBuildInputs = [ rustc pkgs.pkg-config pkgs.jq pkgs.llvmPackages.lld ]
         ++ tauriContract.nativeBuildInputs
+        ++ pyemscriptenContract.nativeBuildInputs
         ++ lib.optionals (kind == "test") [ pkgs.viberootsCargoLlvmCov ]
         ++ lib.optionals (builtins.elem kind [ "wasm_static" "wasi_static" ]) [ pkgs.python3 pkgs.llvmPackages.llvm ]
         ++ nixpkgDeps ++ nativePackages ++ extensionPackages ++ interopContract.buildInputs ++ wasmPostprocess.buildInputs;

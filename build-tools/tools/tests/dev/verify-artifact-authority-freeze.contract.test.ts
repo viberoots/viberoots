@@ -46,7 +46,15 @@ test("read-only prebuild repair preserves verify's frozen authority", async () =
   );
   assert.match(
     toolchains,
-    /String\(opts\.frozenArtifactToolsRoot \|\| ""\)\.trim\(\) \|\|\s+\(await resolveToolchainOut/u,
+    /const goOut = await resolveToolchainOut\(repo, "toolchains\.go", toolchainFlakeRef\);/u,
+  );
+  assert.match(
+    toolchains,
+    /const frozenArtifactToolsRoot = String\(opts\.frozenArtifactToolsRoot \|\| ""\)\.trim\(\);/u,
+  );
+  assert.match(
+    toolchains,
+    /const artifactToolsRoot =\s+frozenArtifactToolsRoot \|\|\s+\(await resolveToolchainOut\(repo, "remote-worker-tools", opts\.artifactToolsFlakeRef\)\);/u,
   );
   assert.match(
     tempToolchains,

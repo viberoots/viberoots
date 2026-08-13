@@ -10,12 +10,12 @@ _ADDON_FIRST = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_"
 _ADDON_REST = _ADDON_FIRST + "0123456789-"
 SUPPORTED_NODE_API_VERSIONS = [8, 9, 10]
 _EXTENSION_FIELD_OWNERS = {
-    "addon_name": "addon",
-    "build_py_deps": "pyext",
-    "module": "pyext",
-    "node_api_version": "addon",
-    "platform": "addon",
-    "python_abi": "pyext",
+    "addon_name": ["addon"],
+    "build_py_deps": ["pyext", "pyext_wasm"],
+    "module": ["pyext", "pyext_wasm"],
+    "node_api_version": ["addon"],
+    "platform": ["addon"],
+    "python_abi": ["pyext"],
 }
 
 def validate_addon_name(value):
@@ -32,12 +32,12 @@ def validate_node_api_version(value):
 
 def validate_extension_kind_args(kind, kwargs):
     for field in sorted(_EXTENSION_FIELD_OWNERS.keys()):
-        owner = _EXTENSION_FIELD_OWNERS[field]
-        if field in kwargs and kind != owner:
+        owners = _EXTENSION_FIELD_OWNERS[field]
+        if field in kwargs and kind not in owners:
             fail("%s: %s is only supported by %s" % (
                 "rust_node_addon" if kind == "addon" else "rust_python_extension" if kind == "pyext" else "rust target kind " + kind,
                 field,
-                "rust_node_addon" if owner == "addon" else "rust_python_extension",
+                " or ".join(["rust_node_addon" if owner == "addon" else "rust_python_extension" if owner == "pyext" else "rust_python_wasm_extension" for owner in owners]),
             ))
 
 def prepare_python_build_wiring(kwargs, lockfile_label, build_py_deps):
@@ -48,7 +48,7 @@ def prepare_python_build_wiring(kwargs, lockfile_label, build_py_deps):
     resolved = apply_default_lockfile_label(
         lockfile_label,
         labels,
-        "rust_python_extension",
+        "rust_python_wasm_extension" if "backend:pyodide" in labels else "rust_python_extension",
     )
     lock_kw = {
         "labels": labels,

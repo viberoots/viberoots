@@ -79,6 +79,23 @@ async function defaultRunCommand(
   });
 }
 
+function bootstrapEnvironment(opts: LiveBootstrapOptions): NodeJS.ProcessEnv {
+  const env = {
+    ...process.env,
+    ...(opts.envOverrides || {}),
+  };
+  if (opts.command === "post-clone") {
+    delete env.VBR_ARTIFACT_TOOLS_ROOT;
+    delete env.VBR_DEVSHELL_USE_GENERATED_AUTHORITY;
+    for (const key of Object.keys(env)) {
+      if (key.startsWith("VBR_ARTIFACT_INGRESS_") || key.startsWith("VBR_DEVSHELL_ARTIFACT_")) {
+        delete env[key];
+      }
+    }
+  }
+  return env;
+}
+
 export async function runLiveBootstrap(opts: LiveBootstrapOptions): Promise<void> {
   const url =
     opts.bootstrapUrl ||
@@ -121,10 +138,7 @@ export async function runLiveBootstrap(opts: LiveBootstrapOptions): Promise<void
   try {
     await writeFile(scriptPath, script, { mode: 0o700 });
     await runCommand("bash", [scriptPath], {
-      env: {
-        ...process.env,
-        ...(opts.envOverrides || {}),
-      },
+      env: bootstrapEnvironment(opts),
     });
   } finally {
     await rm(dir, { recursive: true, force: true });

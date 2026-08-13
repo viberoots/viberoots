@@ -10,6 +10,7 @@ import {
   buildCanonicalArtifactEnvironment,
   canonicalArtifactToolsRoot,
 } from "../../lib/artifact-environment";
+import { derivePostCloneWorkspaceLock } from "../../lib/post-clone-workspace-lock";
 
 let immutableInputPromise: Promise<string> | undefined;
 const execFileAsync = promisify(execFile);
@@ -18,6 +19,8 @@ type FixtureFlakeLock = {
   nodes?: Record<string, Record<string, unknown>>;
   root?: string;
 };
+
+const sourceOwnedWorkspaceInputs = ["rust-overlay", "wasmtime-nixpkgs"] as const;
 
 export async function immutableViberootsInput(viberootsRoot: string): Promise<string> {
   immutableInputPromise ??= (async () => {
@@ -66,6 +69,7 @@ export async function seedWorkspaceLockFromCommittedAuthority(workspace: string)
     await fsp.readFile(path.join(repoRoot, "flake.lock"), "utf8"),
   ) as FixtureFlakeLock;
   const workspaceLockPath = path.join(workspace, ".viberoots", "workspace", "flake.lock");
+  const workspaceFlakeDir = path.dirname(workspaceLockPath);
   const workspaceLock = await fsp
     .readFile(workspaceLockPath, "utf8")
     .then((text) => JSON.parse(text) as FixtureFlakeLock)
@@ -74,8 +78,20 @@ export async function seedWorkspaceLockFromCommittedAuthority(workspace: string)
       throw error;
     });
   seedReviewedConsumerInputs(committedLock);
-  if (workspaceLock) preserveWorkspaceViberootsInput(committedLock, workspaceLock);
-  await fsp.writeFile(workspaceLockPath, `${JSON.stringify(committedLock, null, 2)}\n`, "utf8");
+  if (workspaceLock) {
+    preserveWorkspaceViberootsInput(committedLock, workspaceLock);
+    await fsp.writeFile(workspaceLockPath, `${JSON.stringify(committedLock, null, 2)}\n`, "utf8");
+    return;
+  }
+  const localInputPath = await declaredWorkspaceViberootsPath(workspaceFlakeDir);
+  const sourceLockText = await fsp.readFile(path.join(localInputPath, "flake.lock"), "utf8");
+  const derived = derivePostCloneWorkspaceLock({
+    rootLockText: JSON.stringify(committedLock),
+    workspaceFlakeDir,
+    localInputPath,
+    sourceLockText,
+  });
+  await fsp.writeFile(workspaceLockPath, `${JSON.stringify(derived, null, 2)}\n`, "utf8");
 }
 
 export async function writeFixtureFile(file: string, content: string): Promise<void> {
@@ -101,10 +117,30 @@ function preserveWorkspaceViberootsInput(
     ...((committedRoot.inputs || {}) as Record<string, unknown>),
     viberoots: viberootsRef,
   };
+  for (const input of sourceOwnedWorkspaceInputs) {
+    const inputRef = workspaceInputs[input];
+    if (typeof inputRef === "string") {
+      (committedRoot.inputs as Record<string, unknown>)[input] = inputRef;
+      for (const nodeName of reachableLockNodes(workspace, inputRef)) {
+        const node = workspace.nodes?.[nodeName];
+        if (node) committed.nodes![nodeName] = node;
+      }
+    }
+  }
   for (const nodeName of reachableLockNodes(workspace, viberootsRef)) {
     const node = workspace.nodes?.[nodeName];
     if (node) committed.nodes![nodeName] = node;
   }
+}
+
+async function declaredWorkspaceViberootsPath(workspaceFlakeDir: string): Promise<string> {
+  const text = await fsp.readFile(path.join(workspaceFlakeDir, "flake.nix"), "utf8");
+  const match = text.match(/\bviberoots\.url\s*=\s*"path:([^"]+)"/);
+  const value = match?.[1] || "";
+  if (!/^\/nix\/store\/[a-z0-9]{32}-source$/.test(value)) {
+    throw new Error(`workspace fixture lock has no immutable viberoots path input: ${value}`);
+  }
+  return value;
 }
 
 function reachableLockNodes(lock: FixtureFlakeLock, root: string): string[] {

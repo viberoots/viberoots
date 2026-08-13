@@ -86,6 +86,9 @@ let
       linkNames = lib.unique (lib.concatMap (input: input.linkNames) inputs);
       nativeLinks = lib.unique (lib.concatMap (input: input.nativeLinks) inputs);
     };
+  pyemscriptenInputsFor = import ./rust-pyemscripten-inputs.nix {
+    inherit lib P ctx nodeFor normalizeList sanitizeNativeLinkName LC byName;
+  };
   pathContract = import ./rust-path-contract.nix {
     inherit lib P ctx nodeFor packagePath sourcePath normalizeList Wasm;
   };
@@ -166,15 +169,22 @@ let
         wit = if wasmContractRaw.wit == null then null else
           builtins.toPath "${ctx.repoRootStr}/${sourcePath name wasmContractRaw.wit}";
       };
-      nativeInputs = if Wasm.isWasmKind kind
+      nativeInputs = if kind == "pyext_wasm"
+        then pyemscriptenInputsFor name
+        else if Wasm.isWasmKind kind
         then Wasm.inputsFor name kind
         else nativeInputsFor (map (root: root.label) sourceComposition.roots);
+      _pyextWasmCrateType =
+        if kind == "pyext_wasm" && crateType != "cdylib" then builtins.throw
+          "Rust Pyodide extension ${name} requires crate_type cdylib"
+        else true;
       tauri = if kind == "tauri"
         then Tauri.contractFor name sourcePlan.base_pkgs.stdenv.hostPlatform.system
         else {};
     in if missing != [] then builtins.throw
       "Rust planner unresolved nixpkg deps for ${name}: ${lib.concatStringsSep ", " (map (record: record.attr) missing)}"
-    else assert _nativeInputBoundary; assert _overrideClassification; template.rustPackage {
+    else assert _nativeInputBoundary; assert _overrideClassification;
+    assert _pyextWasmCrateType; template.rustPackage {
       inherit name kind cargoRoot cargoManifest cargoLock cargoOutputHashes cargoFixedSources sourcePlan sourceComposition;
       inherit nativeInputs;
       artifactNixRoot = ctx.declaredArtifactNixRoot or "";

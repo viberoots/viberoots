@@ -2,6 +2,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { getFlagBool, getFlagStr, getPositionals } from "../lib/cli";
 import { getArgvTokens } from "../lib/argv";
 import { findExtractionBlockers } from "../lib/extraction-blockers";
@@ -605,11 +606,32 @@ function liveBootstrapEnvOverrides(command: "bootstrap" | "update"): Record<stri
   return overrides;
 }
 
-function postCloneEnvOverrides(): Record<string, string> {
+function localBootstrapToolUrl(bootstrapUrl: string): string {
+  if (!bootstrapUrl) return "";
+  let bootstrapPath = "";
+  if (bootstrapUrl.startsWith("file://")) {
+    try {
+      bootstrapPath = fileURLToPath(bootstrapUrl);
+    } catch {
+      return "";
+    }
+  } else if (!/^[a-z][a-z0-9+.-]*:/i.test(bootstrapUrl)) {
+    bootstrapPath = path.resolve(bootstrapUrl);
+  }
+  if (!bootstrapPath || path.basename(bootstrapPath) !== "bootstrap") return "";
+  const sourceRoot = path.dirname(bootstrapPath);
+  if (!fs.existsSync(path.join(sourceRoot, "flake.nix"))) return "";
+  return `path:${sourceRoot}`;
+}
+
+function postCloneEnvOverrides(bootstrapUrl = "", artifactToolsRoot = ""): Record<string, string> {
   const overrides: Record<string, string> = {
     VBR_POST_CLONE: "1",
     VBR_WORKSPACE_ROOT: selectedWorkspaceRootForCommand(),
   };
+  const bootstrapToolUrl = localBootstrapToolUrl(bootstrapUrl);
+  if (bootstrapToolUrl) overrides.VBR_BOOTSTRAP_TOOL_URL = bootstrapToolUrl;
+  if (artifactToolsRoot) overrides.VBR_BOOTSTRAP_ARTIFACT_TOOLS_ROOT = artifactToolsRoot;
   if (getFlagBool("no-install") || getFlagBool("no-run-install")) overrides.VBR_RUN_INSTALL = "0";
   if (getFlagBool("run-install")) overrides.VBR_RUN_INSTALL = "1";
   if (getFlagBool("no-direnv-allow")) overrides.VBR_DIRENV_ALLOW = "0";
@@ -716,11 +738,20 @@ async function main() {
     return;
   }
   if (command === "post-clone") {
+    const bootstrapUrl = getFlagStr("bootstrap-url", "");
+    const artifactToolsRoot = String(process.env.VBR_ARTIFACT_TOOLS_ROOT || "").trim();
+    delete process.env.VBR_ARTIFACT_TOOLS_ROOT;
+    delete process.env.VBR_DEVSHELL_USE_GENERATED_AUTHORITY;
+    for (const key of Object.keys(process.env)) {
+      if (key.startsWith("VBR_ARTIFACT_INGRESS_") || key.startsWith("VBR_DEVSHELL_ARTIFACT_")) {
+        delete process.env[key];
+      }
+    }
     await runLiveBootstrap({
       command,
-      bootstrapUrl: getFlagStr("bootstrap-url", ""),
+      bootstrapUrl,
       trustBootstrapUrl: getFlagBool("trust-bootstrap-url"),
-      envOverrides: postCloneEnvOverrides(),
+      envOverrides: postCloneEnvOverrides(bootstrapUrl, artifactToolsRoot),
     });
     return;
   }

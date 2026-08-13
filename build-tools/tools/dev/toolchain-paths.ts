@@ -194,6 +194,7 @@ export async function ensureToolchainPathsFiles(
   opts: {
     refresh?: boolean;
     artifactToolsFlakeRef?: string;
+    toolchainFlakeRef?: string;
     frozenArtifactToolsRoot?: string;
   } = {},
 ): Promise<ToolchainPaths> {
@@ -202,11 +203,13 @@ export async function ensureToolchainPathsFiles(
     ? null
     : await readExistingToolchainPaths(repo, opts.frozenArtifactToolsRoot);
   if (existing) return existing;
-  const goOut = await resolveToolchainOut(repo, "toolchains.go");
-  const pyOut = await resolveToolchainOut(repo, "toolchains.python");
-  const zxWrapperOut = await resolveToolchainOut(repo, "zx-wrapper");
+  const toolchainFlakeRef = String(opts.toolchainFlakeRef || "").trim();
+  const frozenArtifactToolsRoot = String(opts.frozenArtifactToolsRoot || "").trim();
+  const goOut = await resolveToolchainOut(repo, "toolchains.go", toolchainFlakeRef);
+  const pyOut = await resolveToolchainOut(repo, "toolchains.python", toolchainFlakeRef);
+  const zxWrapperOut = await resolveToolchainOut(repo, "zx-wrapper", toolchainFlakeRef);
   const artifactToolsRoot =
-    String(opts.frozenArtifactToolsRoot || "").trim() ||
+    frozenArtifactToolsRoot ||
     (await resolveToolchainOut(repo, "remote-worker-tools", opts.artifactToolsFlakeRef));
   const goBin = path.join(goOut, "bin", "go");
   const pyBin = path.join(pyOut, "bin", "python3");

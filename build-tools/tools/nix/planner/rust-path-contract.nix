@@ -43,7 +43,10 @@ let
   validateKindTarget = name: kind: value:
     let
       target = if value == null then "" else builtins.toString value;
-      expected = if Wasm.isWasmKind kind then (Wasm.contractFor name kind).target else "";
+      expected =
+        if kind == "pyext_wasm" then "wasm32-unknown-emscripten"
+        else if Wasm.isWasmKind kind then (Wasm.contractFor name kind).target
+        else "";
     in if target == expected then target else builtins.throw
       "Rust planner target ${name} kind ${kind} requires target ${if expected == "" then "<empty>" else expected}; got ${if target == "" then "<empty>" else target}";
   validateNativeInputBoundary = name: kind:

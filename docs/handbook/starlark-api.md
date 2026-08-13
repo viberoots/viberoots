@@ -1590,8 +1590,7 @@ frontend WASM only after its path and digest match the package manifest.
 command, path, environment, or expected-value override and fails closed when the artifact lacks the
 reserved observation contract. Use it only for protected reproducibility and patch-lifecycle
 fixtures whose sources intentionally implement that contract; ordinary application and library
-targets must leave it disabled. `rust_python_wasm_extension` remains unsupported and produces no
-artifact to observe.
+targets must leave it disabled.
 
 ### `rust_library(name, **kwargs)`
 
@@ -1818,10 +1817,31 @@ lock's uv2nix wheelhouse. `runtime_deps`, `link_deps`, and `header_deps` remain 
 inputs. Recursive runtime packages and their dynamic-library closure are relocated beside the
 extension. Python consumers stage the result through the shared `kind:pyext` contract.
 
-### `rust_python_wasm_extension(name, backend, **kwargs)`
+### `rust_python_wasm_extension(name, backend, module, **kwargs)`
 
-This macro currently fails closed because the pinned toolchains do not provide an importable
-Pyodide or WASI Rust dynamic-extension ABI. It never substitutes a raw WebAssembly placeholder.
+Build a Cargo `cdylib` as a PyO3-compatible PyEmscripten side module for the pinned Pyodide
+runtime. `backend` must be `pyodide`; `backend = "wasi"` fails closed because the shared Python
+WASI runtime cannot load dynamic extension modules. `module` is the dotted Python import name, and
+the installed artifact uses the shared Python WASM layout:
+`site/<dotted-module><PYODIDE_EXT_SUFFIX>`.
+
+The macro fixes `target = "wasm32-unknown-emscripten"` and `crate_type = "cdylib"`, uses Nix-store
+Cargo, rustc, and `emcc`, keeps Cargo locked and offline, and records the PyEmscripten ABI identity
+in the Rust materialization evidence. Optional `build_py_deps` uses the same importer-scoped
+`uv.lock` authority as `rust_python_extension`.
+
+`link_deps` and `header_deps` are valid for this Pyodide backend. Link deps must be reviewed C/C++
+WASM static producers with `lang:cpp`, `kind:wasm`, and `wasm:static`; header deps must be C/C++
+header targets. The planner passes the resolved static archives and include roots to the Rust
+PyEmscripten build, matching the C/C++ Pyodide overlay contract.
+
+Use PyO3's cross-build environment (`PYO3_CROSS=1`, the pinned CPython minor, and the pinned
+Pyodide/Emscripten headers) rather than host Python discovery. Package-local Rust patches are
+declared with `local_patch_dirs`; rebuild the Python WASM app to validate the patched overlay and
+then remove the patch to restore the original artifact identity. Patch validation should observe
+the imported Pyodide value before patch, after patch, and after exact removal. Publication rejects
+ABI drift before staging, including a missing `PyInit_<leaf>` export, unexpected public exports,
+pthread or atomic target features, Pyodide extension-suffix drift, and PyO3 cross-build mismatches.
 
 ### `rust_node_addon(name, addon_name = None, node_api_version = 8, platform = "selected", **kwargs)`
 

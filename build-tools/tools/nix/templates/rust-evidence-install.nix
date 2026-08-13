@@ -14,6 +14,7 @@
   pkgs,
   producerLineage,
   isWasm,
+  pyemscriptenContract,
 }:
 lib.optionalString (kind == "test" && coverage) ''
   install -Dm644 .viberoots-rust-coverage.lcov "$out/coverage/lcov.info"
@@ -32,6 +33,7 @@ lib.optionalString (kind == "test" && coverage) ''
   ${builtins.toJSON (import ./rust-materialization.nix {
     inherit H name sourcePlan artifactNixRoot pkgs compositionEvidence
       producerLineage wasmPostprocess interopContract dependencyInventory;
+    inherit pyemscriptenContract;
   })}
   VIBEROOTS_RUST_MATERIALIZATION
   substituteInPlace "$evidenceRoot/share/viberoots-rust/materialization-manifest.json" \
@@ -39,5 +41,9 @@ lib.optionalString (kind == "test" && coverage) ''
     --replace-fail "__VIBEROOTS_RUST_IDENTITY__" "$(basename "$out")" \
     --replace-fail "__VIBEROOTS_RUST_PROVENANCE__" "$evidenceRoot" \
     --replace-fail "__VIBEROOTS_RUST_PROVENANCE_IDENTITY__" "$(basename "$evidenceRoot")"
+  ${lib.optionalString pyemscriptenContract.enabled ''
+    substituteInPlace "$evidenceRoot/share/viberoots-rust/materialization-manifest.json" \
+      --replace-fail "__VIBEROOTS_PYEXT_SUFFIX__" "$(cat ${pyemscriptenContract.installedShape.extensionSuffixFile})"
+  ''}
   ${extensionRuntime}
 ''

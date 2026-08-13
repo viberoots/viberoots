@@ -9,6 +9,7 @@
         then [ "wasm32-unknown-unknown" ]
         else if kind == "wasi" then "wasm32-wasip1"
         else if builtins.elem kind [ "wasi_static" "wasm_component" ] then [ target ]
+        else if kind == "pyext_wasm" then [ "wasm32-unknown-emscripten" ]
         else [ "" ];
       allowed = if builtins.isList expected then expected else [ expected ];
       rendered = lib.concatStringsSep " or " (map (value:
@@ -68,8 +69,10 @@
     selectedNodeApiVersion,
     system,
   }:
-    if kind == "pyext_wasm" then builtins.throw
-      "Rust Python WASM extensions are unavailable: the pinned toolchains do not provide an importable Pyodide or WASI dynamic-extension ABI"
+    if kind == "pyext_wasm"
+      && (module == "" || builtins.match
+        "[A-Za-z_][A-Za-z0-9_]*([.][A-Za-z_][A-Za-z0-9_]*)*" module == null)
+    then builtins.throw "Rust Python WASM extension module must be a dotted Python identifier"
     else if kind == "pyext"
       && (module == "" || builtins.match
         "[A-Za-z_][A-Za-z0-9_]*([.][A-Za-z_][A-Za-z0-9_]*)*" module == null)

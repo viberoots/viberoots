@@ -3,7 +3,8 @@ args:
 let
   lib = pkgs.lib;
   H = import ../../lib/lang-helpers.nix { inherit pkgs; };
-  Pyodide = import ../../toolchains/pyodide.nix { inherit pkgs; };
+  Abi = import ./pyemscripten-abi.nix { inherit pkgs lib; };
+  Pyodide = Abi.pyodide;
 
   name = args.name or "pyext-wasm-unnamed";
   module = args.module or "";
@@ -50,8 +51,8 @@ let
   compileSrcs = builtins.filter (p: isC p || isCxx p) srcList;
   sortedCompileSrcs = lib.sort (a: b: a < b) compileSrcs;
   py = pkgs.python3;
-  emcc = "${pkgs.emscripten}/bin/emcc";
-  empp = "${pkgs.emscripten}/bin/em++";
+  emcc = Abi.emcc;
+  empp = Abi.empp;
 
   moduleRel = lib.replaceStrings [ "." ] [ "/" ] module;
   libDirs = map (d: "${d}/lib") wasmStaticLibs;
@@ -67,6 +68,7 @@ pkgs.stdenv.mkDerivation {
   nativeBuildInputs = [ pkgs.emscripten pkgs.coreutils pkgs.which ];
   buildInputs = [ py ] ++ (if wheelhouse == null then [] else [ wheelhouse ]);
   passthru =
+    { pyemscriptenAbi = Abi.config; } //
     (if wheelhouse == null then {}
      else {
        wheelhouse = wheelhouse;
@@ -91,7 +93,7 @@ pkgs.stdenv.mkDerivation {
       echo "pyExtWasm: EXT_SUFFIX missing from pyodide toolchain" >&2
       exit 2
     fi
-    PYODIDE_INCLUDE="${Pyodide}/include"
+    PYODIDE_INCLUDE="${Abi.includeDir}"
     if [ ! -d "$PYODIDE_INCLUDE" ]; then
       echo "pyExtWasm: pyodide include dir missing at $PYODIDE_INCLUDE" >&2
       exit 2
@@ -203,7 +205,7 @@ PY
       fi
     done
 
-    ${emcc} -O2 -s SIDE_MODULE=1 -s WASM_BIGINT=1 ${ldPathFlags} ${lib.concatStringsSep " " (map lib.escapeShellArg ldflags)} $objs $extraArchives -o "build/site/$outRel"
+    ${emcc} -O2 ${lib.concatStringsSep " " (map lib.escapeShellArg Abi.sideModuleFlags)} ${ldPathFlags} ${lib.concatStringsSep " " (map lib.escapeShellArg ldflags)} $objs $extraArchives -o "build/site/$outRel"
   '';
 
   installPhase = ''

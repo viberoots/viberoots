@@ -69,7 +69,10 @@ test("cold flake-mode post-clone uses the explicit committed materialization pat
     consumerBootstrap,
     /opts\.sourceMode \|\| \(opts\.sourcePath \? "submodule" : "flake"\)/,
   );
-  assert.match(consumerBootstrap, /if \(opts\.runInstall\) await runInstall\(opts\.workspaceRoot/);
+  assert.match(
+    consumerBootstrap,
+    /if \(opts\.runInstall\) \{\n    if \(isPostCloneBootstrap\(opts\)\)/,
+  );
   assert.match(consumerBootstrap, /runPostClonePnpmMaterialization/);
   assert.match(consumerBootstrap, /\["exec", workspaceRoot, "i"\]/);
 

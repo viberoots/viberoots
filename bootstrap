@@ -1180,6 +1180,53 @@ run_writable_migrations() {
 
 run_nix_init_consumer_command() {
   local init_tool_url="$1"
+  local had_artifact_tools=0 had_bootstrap_artifact_tools=0 had_ingress_was_set=0 had_ingress_value=0 had_devshell_was_set=0 had_devshell_value=0 had_devshell_root=0 had_post_clone_env=0
+  local saved_artifact_tools=""
+  local saved_bootstrap_artifact_tools="" saved_ingress_was_set="" saved_ingress_value="" saved_devshell_was_set="" saved_devshell_value="" saved_devshell_root="" saved_post_clone_env=""
+  if [[ "${VBR_ARTIFACT_TOOLS_ROOT+x}" == "x" ]]; then
+    had_artifact_tools=1
+    saved_artifact_tools="${VBR_ARTIFACT_TOOLS_ROOT}"
+  fi
+  if [[ "${VBR_BOOTSTRAP_ARTIFACT_TOOLS_ROOT+x}" == "x" ]]; then
+    had_bootstrap_artifact_tools=1
+    saved_bootstrap_artifact_tools="${VBR_BOOTSTRAP_ARTIFACT_TOOLS_ROOT}"
+  fi
+  if [[ "${VBR_ARTIFACT_INGRESS_WAS_SET_VBR_ARTIFACT_TOOLS_ROOT+x}" == "x" ]]; then
+    had_ingress_was_set=1
+    saved_ingress_was_set="${VBR_ARTIFACT_INGRESS_WAS_SET_VBR_ARTIFACT_TOOLS_ROOT}"
+  fi
+  if [[ "${VBR_ARTIFACT_INGRESS_VALUE_VBR_ARTIFACT_TOOLS_ROOT+x}" == "x" ]]; then
+    had_ingress_value=1
+    saved_ingress_value="${VBR_ARTIFACT_INGRESS_VALUE_VBR_ARTIFACT_TOOLS_ROOT}"
+  fi
+  if [[ "${VBR_DEVSHELL_ARTIFACT_WAS_SET_VBR_ARTIFACT_TOOLS_ROOT+x}" == "x" ]]; then
+    had_devshell_was_set=1
+    saved_devshell_was_set="${VBR_DEVSHELL_ARTIFACT_WAS_SET_VBR_ARTIFACT_TOOLS_ROOT}"
+  fi
+  if [[ "${VBR_DEVSHELL_ARTIFACT_VALUE_VBR_ARTIFACT_TOOLS_ROOT+x}" == "x" ]]; then
+    had_devshell_value=1
+    saved_devshell_value="${VBR_DEVSHELL_ARTIFACT_VALUE_VBR_ARTIFACT_TOOLS_ROOT}"
+  fi
+  if [[ "${VBR_DEVSHELL_ARTIFACT_TOOLS_ROOT+x}" == "x" ]]; then
+    had_devshell_root=1
+    saved_devshell_root="${VBR_DEVSHELL_ARTIFACT_TOOLS_ROOT}"
+  fi
+  if [[ "${VBR_POST_CLONE+x}" == "x" ]]; then
+    had_post_clone_env=1
+    saved_post_clone_env="${VBR_POST_CLONE}"
+  fi
+  if [[ "${post_clone}" == "1" ]]; then
+    if [[ "${had_bootstrap_artifact_tools}" != "1" && "${had_artifact_tools}" == "1" ]]; then
+      export VBR_BOOTSTRAP_ARTIFACT_TOOLS_ROOT="${saved_artifact_tools}"
+    fi
+    unset VBR_ARTIFACT_TOOLS_ROOT
+    unset VBR_ARTIFACT_INGRESS_WAS_SET_VBR_ARTIFACT_TOOLS_ROOT
+    unset VBR_ARTIFACT_INGRESS_VALUE_VBR_ARTIFACT_TOOLS_ROOT
+    unset VBR_DEVSHELL_ARTIFACT_WAS_SET_VBR_ARTIFACT_TOOLS_ROOT
+    unset VBR_DEVSHELL_ARTIFACT_VALUE_VBR_ARTIFACT_TOOLS_ROOT
+    unset VBR_DEVSHELL_ARTIFACT_TOOLS_ROOT
+    export VBR_POST_CLONE=1
+  fi
   nix_cmd run --refresh --accept-flake-config "${init_tool_url}#viberoots" -- \
     init-consumer \
     --mode flake \
@@ -1206,6 +1253,36 @@ run_nix_init_consumer_command() {
         printf '%s\n' "${line}" >&2
       done
     )
+  local status=$?
+  if [[ "${had_artifact_tools}" == "1" ]]; then
+    export VBR_ARTIFACT_TOOLS_ROOT="${saved_artifact_tools}"
+  fi
+  if [[ "${had_bootstrap_artifact_tools}" == "1" ]]; then
+    export VBR_BOOTSTRAP_ARTIFACT_TOOLS_ROOT="${saved_bootstrap_artifact_tools}"
+  else
+    unset VBR_BOOTSTRAP_ARTIFACT_TOOLS_ROOT
+  fi
+  if [[ "${had_ingress_was_set}" == "1" ]]; then
+    export VBR_ARTIFACT_INGRESS_WAS_SET_VBR_ARTIFACT_TOOLS_ROOT="${saved_ingress_was_set}"
+  fi
+  if [[ "${had_ingress_value}" == "1" ]]; then
+    export VBR_ARTIFACT_INGRESS_VALUE_VBR_ARTIFACT_TOOLS_ROOT="${saved_ingress_value}"
+  fi
+  if [[ "${had_devshell_was_set}" == "1" ]]; then
+    export VBR_DEVSHELL_ARTIFACT_WAS_SET_VBR_ARTIFACT_TOOLS_ROOT="${saved_devshell_was_set}"
+  fi
+  if [[ "${had_devshell_value}" == "1" ]]; then
+    export VBR_DEVSHELL_ARTIFACT_VALUE_VBR_ARTIFACT_TOOLS_ROOT="${saved_devshell_value}"
+  fi
+  if [[ "${had_devshell_root}" == "1" ]]; then
+    export VBR_DEVSHELL_ARTIFACT_TOOLS_ROOT="${saved_devshell_root}"
+  fi
+  if [[ "${had_post_clone_env}" == "1" ]]; then
+    export VBR_POST_CLONE="${saved_post_clone_env}"
+  else
+    unset VBR_POST_CLONE
+  fi
+  return "${status}"
 }
 
 run_nix_init_consumer() {

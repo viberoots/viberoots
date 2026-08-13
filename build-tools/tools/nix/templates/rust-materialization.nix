@@ -1,6 +1,7 @@
 {
   H, name, sourcePlan, artifactNixRoot, pkgs, compositionEvidence,
   producerLineage, wasmPostprocess, interopContract, dependencyInventory,
+  pyemscriptenContract ? { enabled = false; config = {}; },
 }:
 {
   schemaVersion = "viberoots.nix-store-materialization.v1";
@@ -17,6 +18,10 @@
   tools = {
     nix = if artifactNixRoot == "" then builtins.toString pkgs.nix else artifactNixRoot;
     wasm = wasmPostprocess.passthru.toolIdentities;
+    pyemscripten = if pyemscriptenContract.enabled then pyemscriptenContract.config else {};
+  };
+  artifacts = {
+    pyemscripten = if pyemscriptenContract.enabled then pyemscriptenContract.installedShape else {};
   };
   storePaths = [{
     attr = H.sanitizeName name;
