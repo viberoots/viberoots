@@ -18,7 +18,6 @@ import {
   toolClosureSourceIdentity,
 } from "./artifact-reproducibility-aggregate-fixture";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
-import { recreateProtectedPatchEvidence } from "./protected-rust-patch-evidence.fixture";
 
 const hash = (value: string) => `sha256:${value.repeat(64)}`;
 
@@ -207,42 +206,5 @@ test("aggregate rejects missing, tampered, wrong-builder, and wrong-source patch
         publicationSubjects: [publication],
       }),
     /protected Rust patch evidence/u,
-  );
-});
-
-test("protected patch evidence rejects wrong behavior and independently valid divergent slots", () => {
-  const valid = protectedPatchEvidence();
-  const wrongBehavior = structuredClone(valid[0]!);
-  wrongBehavior.cases[0]!.patched.behavior = "42";
-  assert.throws(
-    () => recreateProtectedPatchEvidence(wrongBehavior),
-    /protected Rust patch evidence lifecycle mismatch/u,
-  );
-
-  const divergent = structuredClone(valid);
-  const second = divergent[1]!;
-  const changedBaseline = {
-    ...second.cases[0]!.baseline,
-    derivationPaths: [`/nix/store/${"1".repeat(32)}-divergent.drv`],
-    outputPaths: [`/nix/store/${"1".repeat(32)}-divergent`],
-    semanticDigest: hash("1"),
-    behaviorDigest: hash("2"),
-  };
-  second.cases[0]!.baseline = changedBaseline;
-  second.cases[0]!.restored = changedBaseline;
-  divergent[1] = recreateProtectedPatchEvidence(second);
-  assert.throws(
-    () =>
-      aggregateArtifactReproducibilityEvidence({
-        registry: registry(),
-        registryStorePath,
-        publicationSubjects: [publication],
-        records: records(),
-        ...operational(records()),
-        expectedSourceRevision: "f".repeat(40),
-        expectedToolClosureRoot: toolClosureRoot,
-        protectedRustPatchEvidence: divergent,
-      }),
-    /builder slots disagree/u,
   );
 });

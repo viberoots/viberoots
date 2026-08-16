@@ -1,0 +1,4 @@
+from {{ name | replace("-", "_") }} import answer
+
+
+print(f"RUST_PYODIDE_VALUE={answer()}")

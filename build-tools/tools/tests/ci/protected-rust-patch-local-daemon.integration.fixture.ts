@@ -51,6 +51,20 @@ export function registerProtectedRustPatchLocalDaemonIntegration(shardIndex: num
         ]}`;
         return { stdout: String(result.stdout), stderr: String(result.stderr) };
       };
+      const runWithRemoteStore = async (opts: {
+        command: string;
+        args?: string[];
+        cwd?: string;
+        timeoutMs?: number;
+      }) => {
+        const result = await $({
+          cwd: opts.cwd || root,
+          env: { ...process.env, NIX_REMOTE: "daemon" },
+          stdio: "pipe",
+          timeout: opts.timeoutMs,
+        })`${[opts.command, ...(opts.args || [])]}`;
+        return { stdout: String(result.stdout), stderr: String(result.stderr) };
+      };
       const tools = (
         await nix([
           "build",
@@ -90,7 +104,7 @@ export function registerProtectedRustPatchLocalDaemonIntegration(shardIndex: num
         `protected Rust patch local-daemon shard ${shardIndex + 1} is empty`,
       );
       const results = await runProtectedRustPatchCaseDrivers({
-        active: { runNix: nix },
+        active: { runNix: nix, runWithRemoteStore },
         remoteCiTools: tools,
         system,
         caseIds,

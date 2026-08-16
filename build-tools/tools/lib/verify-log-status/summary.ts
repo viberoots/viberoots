@@ -31,7 +31,8 @@ export function parseFinalSummary(lines: string[]): Omit<VerifyStatus, "logPath"
   // We've observed "Tests finished: ..." lines from nested zx/node test output while the overall
   // buck2 test run is still running; those are typically followed by "Waiting on ..." / "Remaining"
   // status lines for the still-running suite.
-  const inProgressAfterSummaryRe = /^(?:Loading targets\.|Remaining:?\s+\d+\b|Waiting on\b)/;
+  const inProgressAfterSummaryRe =
+    /^(?:Loading targets\.|Remaining:?\s+\d+\b|Waiting on\b|\s*test\s+\S+\s+\[[^\]]+\]\s+\d+\/\d+\s+running\b)/;
   for (let i = last.idx + 1; i < tailWindow.length; i++) {
     const { normalized, isComment } = parseLineFromBuckLogForMatching(tailWindow[i]);
     if (isComment) continue;

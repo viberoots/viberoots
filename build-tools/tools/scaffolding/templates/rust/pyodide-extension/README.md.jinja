@@ -1,0 +1,12 @@
+# {{ name }}
+
+This scaffold builds a Rust/PyO3 extension for the pinned Pyodide runtime and consumes it from a
+Python WASM application through the shared `kind:pyext_wasm` overlay.
+
+Run `u` after changing `Cargo.toml`, `pyproject.toml`, or dependency patches. Use `i`,
+`b //projects/apps/{{ name }}:{{ name }}`, and `p //projects/apps/{{ name }}:{{ name }}` to build
+and execute the Pyodide import path. Package-local Rust patches live under `patches/rust/` and use
+`patch-pkg start/apply/remove rust ... --target //projects/apps/{{ name }}:{{ name }}-ext`.
+
+WASI dynamic extension loading is intentionally unsupported until the shared Python WASI runtime has
+a reviewed executable extension ABI.

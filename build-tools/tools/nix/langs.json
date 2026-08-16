@@ -101,6 +101,7 @@
         "viberoots/build-tools/tools/nix/templates/rust-quality.nix",
         "viberoots/build-tools/tools/nix/templates/rust-dependency-inventory.nix",
         "viberoots/build-tools/tools/nix/templates/rust-evidence-install.nix",
+        "viberoots/build-tools/tools/nix/templates/rust-pyemscripten.nix",
         "viberoots/build-tools/tools/ci/admit-tauri-release.ts",
         "viberoots/build-tools/tools/ci/tauri-release-admission.ts",
         "viberoots/build-tools/tools/ci/tauri-release-evidence-reader.ts",
@@ -115,6 +116,7 @@
         "viberoots/build-tools/tools/scaffolding/templates/rust/lib/TARGETS.jinja",
         "viberoots/build-tools/tools/scaffolding/templates/rust/proc-macro/TARGETS.jinja",
         "viberoots/build-tools/tools/scaffolding/templates/rust/python-extension/TARGETS.jinja",
+        "viberoots/build-tools/tools/scaffolding/templates/rust/pyodide-extension/TARGETS.jinja",
         "viberoots/build-tools/tools/scaffolding/templates/rust/node-addon/TARGETS.jinja",
         "viberoots/build-tools/tools/scaffolding/templates/rust/cxx-bridge/TARGETS.jinja",
         "viberoots/build-tools/tools/scaffolding/templates/rust/cross-root/libs/{{ name }}-app/TARGETS.jinja",
@@ -122,8 +124,12 @@
         "viberoots/build-tools/tools/scaffolding/templates/rust/tauri-app/TARGETS.jinja"
       ],
       "optionalPaths": ["viberoots/build-tools/tools/tests/rust"],
-      "kinds": ["app", "bin", "lib", "test", "wasm", "wasi"],
+      "kinds": ["app", "bin", "lib", "test", "pyext_wasm", "wasm", "wasi"],
       "templatesDir": "viberoots/build-tools/tools/scaffolding/templates/rust",
+      "supportNotes": {
+        "remoteExecution": "repository remote snapshot, filtered-source, protected builder, and binary-cache materialization coverage is wired for the registered Rust matrix, including rust-pyodide-extension-pr14",
+        "publicationAdmission": "external release admission remains false until reviewed external signing/publication evidence is completed"
+      },
       "hermetic": {
         "status": "experimental",
         "sourceRoles": true,
@@ -132,7 +138,7 @@
         "storeQualifiedToolchain": true,
         "selectorTransport": true,
         "sandboxNetwork": true,
-        "remoteExecution": false,
+        "remoteExecution": true,
         "publicationAdmission": false,
         "reproducibilityMatrixIds": [
           "rust-pr5",
@@ -142,6 +148,7 @@
           "rust-cdylib-pr12",
           "rust-proc-macro-pr12",
           "rust-python-extension-pr12",
+          "rust-pyodide-extension-pr14",
           "rust-node-addon-pr12",
           "rust-c-ffi-pr12",
           "rust-cxx-bridge-pr12",

@@ -68,7 +68,9 @@ export function observeBuckCleanupChild(child: ChildProcess) {
 
 export async function waitForBuckCleanupChildReady(
   state: BuckCleanupChildState,
-  timeoutMs = 120_000,
+  timeoutMs = Number(
+    process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "600",
+  ) * 1000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while ((!state.tmp() || !state.ready()) && !state.closed() && Date.now() < deadline) {
@@ -80,7 +82,9 @@ export async function waitForBuckCleanupChildReady(
 
 export async function waitForBuckCleanupChildClose(
   state: BuckCleanupChildState,
-  timeoutMs = 60_000,
+  timeoutMs = Number(
+    process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "300",
+  ) * 1000,
 ): Promise<void> {
   if (state.closed()) return;
   await new Promise<void>((resolve, reject) => {
@@ -131,7 +135,9 @@ export async function killBuckCleanupChild(
 async function waitForBuckRepoQuiescent(
   repoRoot: string,
   $: any,
-  timeoutMs = 30_000,
+  timeoutMs = Number(
+    process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "300",
+  ) * 1000,
   quietMs = 1_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;

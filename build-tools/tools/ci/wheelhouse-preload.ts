@@ -65,7 +65,14 @@ export async function runWheelhousePreload(artifactToolsRoot: string): Promise<v
     }
     const refs = attrs.map((attr) => `${flakeBase}${attr.slice(1)}`);
     await runArtifactNix({
-      args: ["build", "--accept-flake-config", "--no-link", "--print-out-paths", ...refs],
+      args: [
+        "build",
+        "--accept-flake-config",
+        "--no-write-lock-file",
+        "--no-link",
+        "--print-out-paths",
+        ...refs,
+      ],
       workspaceRoot: process.cwd(),
       artifactToolsRoot,
     });
@@ -89,7 +96,13 @@ async function packageKeys(
   artifactToolsRoot: string,
 ): Promise<string[]> {
   const evalOut = await runArtifactNix({
-    args: ["eval", "--json", "--accept-flake-config", `${flakeBase}#packages.${system}`],
+    args: [
+      "eval",
+      "--json",
+      "--accept-flake-config",
+      "--no-write-lock-file",
+      `${flakeBase}#packages.${system}`,
+    ],
     workspaceRoot: process.cwd(),
     artifactToolsRoot,
   });

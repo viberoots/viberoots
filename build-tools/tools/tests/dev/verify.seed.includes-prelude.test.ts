@@ -50,6 +50,7 @@ test("verify test-seed uses immutable tool source and excludes generated Prelude
     ...artifactNixPolicyArgs(),
     source.flakeRef,
     "--accept-flake-config",
+    "--no-write-lock-file",
     "--no-link",
     "--print-out-paths",
   ];

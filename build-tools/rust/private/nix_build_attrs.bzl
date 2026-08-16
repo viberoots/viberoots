@@ -29,6 +29,7 @@ def rust_nix_build_attrs():
         "profile": attrs.string(default = "release"),
         "target": attrs.string(default = ""),
         "module": attrs.string(default = ""),
+        "pyemscripten_abi": attrs.string(default = ""),
         "build_py_deps": attrs.list(attrs.string(), default = []),
         "addon_name": attrs.string(default = ""),
         "node_api_version": attrs.int(default = 0),

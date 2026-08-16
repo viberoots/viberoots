@@ -4,7 +4,6 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-viberoots-input";
 import { makeFilteredFlakeRef } from "../../dev/filtered-flake";
-import { findRepoRoot } from "../../lib/repo";
 import { REVIEWED_CONSUMER_NIXPKGS_23_11_LOCK } from "../../ci/artifact-reproducibility-consumer-lock";
 import {
   buildCanonicalArtifactEnvironment,
@@ -56,7 +55,7 @@ export async function findViberootsRoot(): Promise<string> {
 }
 
 export async function seedWorkspaceLockFromCommittedAuthority(workspace: string): Promise<void> {
-  const repoRoot = await findRepoRoot(process.cwd());
+  const repoRoot = await findViberootsRoot();
   const { stdout } = await execFileAsync(
     "git",
     ["ls-files", "--error-unmatch", "--", "flake.lock"],
@@ -84,6 +83,8 @@ export async function seedWorkspaceLockFromCommittedAuthority(workspace: string)
     return;
   }
   const localInputPath = await declaredWorkspaceViberootsPath(workspaceFlakeDir);
+  ensureCommittedViberootsInput(committedLock);
+  await pinCommittedViberootsInput(committedLock, localInputPath);
   const sourceLockText = await fsp.readFile(path.join(localInputPath, "flake.lock"), "utf8");
   const derived = derivePostCloneWorkspaceLock({
     rootLockText: JSON.stringify(committedLock),
@@ -97,6 +98,27 @@ export async function seedWorkspaceLockFromCommittedAuthority(workspace: string)
 export async function writeFixtureFile(file: string, content: string): Promise<void> {
   await fsp.mkdir(path.dirname(file), { recursive: true });
   await fsp.writeFile(file, content, "utf8");
+}
+
+function ensureCommittedViberootsInput(committed: FixtureFlakeLock): void {
+  committed.nodes ??= {};
+  const rootName = String(committed.root || "root");
+  const root = committed.nodes?.[rootName];
+  if (!root) throw new Error("committed fixture lock is missing its root node");
+  const inputs = ((root.inputs || {}) as Record<string, unknown>) || {};
+  if (typeof inputs.viberoots === "string") return;
+  root.inputs = {
+    ...inputs,
+    viberoots: "viberoots",
+  };
+  committed.nodes!.viberoots = {
+    ...((committed.nodes?.viberoots || {}) as Record<string, unknown>),
+    inputs: {
+      buck2: ["buck2"],
+      gomod2nix: ["gomod2nix"],
+      nixpkgs: ["nixpkgs"],
+    },
+  };
 }
 
 function preserveWorkspaceViberootsInput(
@@ -131,6 +153,43 @@ function preserveWorkspaceViberootsInput(
     const node = workspace.nodes?.[nodeName];
     if (node) committed.nodes![nodeName] = node;
   }
+}
+
+async function pinCommittedViberootsInput(
+  committed: FixtureFlakeLock,
+  localInputPath: string,
+): Promise<void> {
+  ensureCommittedViberootsInput(committed);
+  const rootName = String(committed.root || "root");
+  const root = committed.nodes?.[rootName];
+  const inputs = root?.inputs as Record<string, unknown> | undefined;
+  const viberootsRef = inputs?.viberoots;
+  if (!root || typeof viberootsRef !== "string") {
+    throw new Error("committed fixture lock is missing its viberoots input reference");
+  }
+  if (!/^\/nix\/store\/[a-z0-9]{32}-source$/.test(localInputPath)) {
+    throw new Error(
+      `workspace fixture lock has no immutable viberoots path input: ${localInputPath}`,
+    );
+  }
+  const { stdout } = await execFileAsync("nix", ["path-info", "--json", localInputPath], {
+    maxBuffer: 1024 * 1024 * 4,
+  });
+  const parsed = JSON.parse(String(stdout || "{}")) as
+    | Array<{ narHash?: string }>
+    | Record<string, { narHash?: string }>;
+  const pathInfo = Array.isArray(parsed) ? parsed[0] : parsed[localInputPath];
+  const narHash = pathInfo?.narHash;
+  if (typeof narHash !== "string" || !narHash.startsWith("sha256-")) {
+    throw new Error(`immutable viberoots input has no Nix narHash: ${localInputPath}`);
+  }
+  const existing = committed.nodes?.[viberootsRef] || {};
+  committed.nodes![viberootsRef] = {
+    ...existing,
+    locked: { type: "path", path: localInputPath, narHash },
+    original: { type: "path", path: localInputPath },
+    parent: [],
+  };
 }
 
 async function declaredWorkspaceViberootsPath(workspaceFlakeDir: string): Promise<string> {

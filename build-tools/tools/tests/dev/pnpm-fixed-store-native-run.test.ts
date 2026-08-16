@@ -81,12 +81,16 @@ test("guarded command preserves the guard error after child shutdown", async () 
   try {
     await assert.rejects(
       runGuardedCommand(
-        "bash",
+        process.execPath,
         [
-          "--noprofile",
-          "--norc",
-          "-c",
-          `trap 'sleep 0.1; printf stopped > "${stoppedMarker}"; exit 0' TERM; dd if=/dev/zero of=guard-input bs=2048k count=1 2>/dev/null; while true; do sleep 10; done`,
+          "-e",
+          `const fs = require("node:fs");
+fs.writeFileSync("guard-input", Buffer.alloc(2048 * 1024));
+process.on("SIGTERM", () => {
+  fs.writeFileSync(${JSON.stringify(stoppedMarker)}, "stopped");
+  process.exit(0);
+});
+setInterval(() => {}, 1000);`,
         ],
         {
           cwd: root,

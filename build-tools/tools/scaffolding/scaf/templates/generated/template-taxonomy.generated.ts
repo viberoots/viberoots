@@ -28,6 +28,7 @@ export const TEMPLATE_TAXONOMY = {
     "lib",
     "node-addon",
     "proc-macro",
+    "pyodide-extension",
     "python-extension",
     "tauri-app",
     "wasm",

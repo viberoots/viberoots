@@ -27,6 +27,8 @@ export function isGeneratedFilteredViberootsInputPath(value: string): boolean {
   return (
     normalized === "viberoots-flake-input" ||
     normalized.startsWith("viberoots-flake-input/") ||
+    normalized === ".viberoots/workspace/viberoots-flake-input" ||
+    normalized.startsWith(".viberoots/workspace/viberoots-flake-input/") ||
     normalized.endsWith("/.viberoots/workspace/viberoots-flake-input") ||
     normalized.includes("/.viberoots/workspace/viberoots-flake-input/")
   );

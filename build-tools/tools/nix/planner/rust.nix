@@ -140,6 +140,7 @@ let
       publicCrateRaw = ctx.get node "public_crate";
       generatedOutputsRaw = ctx.get node "generated_outputs";
       module = ctx.get node "module";
+      pyemscriptenAbi = ctx.get node "pyemscripten_abi";
       runtimeDeps = normalizeList "runtime_deps" (ctx.get node "runtime_deps");
       addonName = ctx.get node "addon_name"; nodeApiVersion = ctx.get node "node_api_version";
       platform = ctx.get node "platform";
@@ -178,13 +179,19 @@ let
         if kind == "pyext_wasm" && crateType != "cdylib" then builtins.throw
           "Rust Pyodide extension ${name} requires crate_type cdylib"
         else true;
+      _pyextWasmAbi =
+        if kind == "pyext_wasm" && pyemscriptenAbi != "viberoots.pyemscripten-abi.v1" then builtins.throw
+          "Rust Pyodide extension ${name} requires pyemscripten_abi viberoots.pyemscripten-abi.v1"
+        else if kind != "pyext_wasm" && pyemscriptenAbi != null && pyemscriptenAbi != "" then builtins.throw
+          "Rust pyemscripten_abi is only valid for kind pyext_wasm"
+        else true;
       tauri = if kind == "tauri"
         then Tauri.contractFor name sourcePlan.base_pkgs.stdenv.hostPlatform.system
         else {};
     in if missing != [] then builtins.throw
       "Rust planner unresolved nixpkg deps for ${name}: ${lib.concatStringsSep ", " (map (record: record.attr) missing)}"
     else assert _nativeInputBoundary; assert _overrideClassification;
-    assert _pyextWasmCrateType; template.rustPackage {
+    assert _pyextWasmCrateType; assert _pyextWasmAbi; template.rustPackage {
       inherit name kind cargoRoot cargoManifest cargoLock cargoOutputHashes cargoFixedSources sourcePlan sourceComposition;
       inherit nativeInputs;
       artifactNixRoot = ctx.declaredArtifactNixRoot or "";

@@ -81,6 +81,7 @@ test("Nix store materialization renders remote-safe build commands without a sub
     "build",
     "/nix/store/source-snapshot#test-seed",
   ]);
+  assert.ok(command.includes("--no-write-lock-file"));
   assert.ok(command.includes("--no-link"));
   assert.ok(command.includes("--print-out-paths"));
 });
@@ -119,6 +120,7 @@ test("Nix store materialization realizes no-substituter manifests through nix bu
     "build",
     "/nix/store/source-snapshot#test-seed",
   ]);
+  assert.ok(commands[0]?.includes("--no-write-lock-file"));
 });
 
 test("Nix store materialization dry-run reports required remote worker and seed attrs", async () => {

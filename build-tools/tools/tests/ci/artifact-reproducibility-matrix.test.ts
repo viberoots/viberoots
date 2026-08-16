@@ -142,6 +142,22 @@ test("reproducibility matrix IDs are unique and cover every required family", as
       requiredLabels: ["lang:cpp", "kind:bin", "sidecar:reviewed"],
     },
   ]);
+  const rustPyodide = ARTIFACT_REPRODUCIBILITY_MATRIX.find(
+    ({ id }) => id === "rust-pyodide-extension-pr14",
+  )!;
+  assert.equal(
+    rustPyodide.graphSelection.target,
+    "//projects/apps/repro-rust-pyodide:repro-rust-pyodide",
+  );
+  assert.deepEqual(rustPyodide.graphSelection.ruleTypes, ["python_nix_wasm_build"]);
+  assert.deepEqual(rustPyodide.coverage.routeCapabilities, ["wasm", "addon", "mixed"]);
+  assert.deepEqual(rustPyodide.languageProofs, [
+    {
+      target: "//projects/apps/repro-rust-pyodide:repro-rust-pyodide-ext",
+      ruleTypes: ["rust_nix_build"],
+      requiredLabels: ["lang:rust", "kind:pyext_wasm", "backend:pyodide"],
+    },
+  ]);
   const mixedGoTargets = await fs.readFile(
     viberootsSourcePath(
       "build-tools/tools/scaffolding/templates/ts/go-cpp-lib/libs/{{ name }}-go/TARGETS.jinja",

@@ -50,6 +50,14 @@ function casePaths(
       targetName: `${matrixCase.scaffoldRecipe.name}-app`,
     };
   }
+  if (matrixCase.id === "rust-pyodide-extension-pr14") {
+    return {
+      cargoRoot: destination,
+      cargoPackage: matrixCase.scaffoldRecipe.name,
+      targetsFile: path.join(destination, "TARGETS"),
+      targetName: `${matrixCase.scaffoldRecipe.name}-ext`,
+    };
+  }
   return {
     cargoRoot: destination,
     cargoPackage: matrixCase.scaffoldRecipe.name,

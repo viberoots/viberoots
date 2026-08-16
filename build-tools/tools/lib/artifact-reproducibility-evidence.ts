@@ -57,6 +57,7 @@ export type ArtifactReproducibilityEvidence = {
   semanticManifest:
     | { kind: "not-applicable" }
     | { kind: "rust-materialization-manifest"; storePath: string; digest: string }
+    | { kind: "python-wasm-materialization-manifest"; storePath: string; digest: string }
     | { kind: "tauri-artifact-manifest"; storePath: string; digest: string };
   subjectAuthority: ArtifactReproducibilitySubjectAuthority;
   checkoutIdentity: string;

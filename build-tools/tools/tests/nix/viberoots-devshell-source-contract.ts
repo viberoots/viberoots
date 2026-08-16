@@ -45,17 +45,21 @@ export async function assertViberootsDevshellSourceContract(): Promise<void> {
   assert.doesNotMatch(devshell, /vbr_tools_bin="\$PWD\/viberoots\/build-tools\/tools\/bin"/);
   assert.doesNotMatch(devshell, /ln -s \.\.\/viberoots "\$PWD\/\.viberoots\/current"/);
 
-  const consumer = await fsp.readFile(
+  const consumerDirenv = await fsp.readFile(
     viberootsSourcePath("viberoots/build-tools/tools/lib/consumer-direnv.ts"),
     "utf8",
   );
-  assert.match(consumer, /__vbr_stage0_prune_workspace_flake_generated_roots\(\)/);
-  assert.match(consumer, /VBR_DEVSHELL_USE_GENERATED_AUTHORITY/);
+  const consumerInput = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/lib/consumer-direnv-viberoots-input.ts"),
+    "utf8",
+  );
+  assert.match(consumerInput, /__vbr_stage0_prune_workspace_flake_generated_roots\(\)/);
+  assert.match(consumerDirenv, /VBR_DEVSHELL_USE_GENERATED_AUTHORITY/);
   assert.match(
-    consumer,
+    consumerInput,
     /for rel in backups cache codex-test-logs install-cache nix-xdg-cache pr-logs xdg-cache/,
   );
-  assert.match(consumer, /rm -rf -- "\\\$\{root\}\/\\\$\{rel\}"/);
+  assert.match(consumerInput, /rm -rf -- "\\\$\{root\}\/\\\$\{rel\}"/);
   const activation = devshell.indexOf("viberoots init-workspace --shell-entry >/dev/null");
   const pathApply = devshell.indexOf("_vbr_prepare_tool_helpers\n      _vbr_apply_dev_path");
   assert.ok(activation >= 0 && pathApply >= 0 && activation < pathApply);

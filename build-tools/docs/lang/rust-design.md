@@ -6,10 +6,11 @@ is [`../rust-language-plan.md`](../rust-language-plan.md).
 
 ## Current Lifecycle
 
-The current Rust route compiles composed Cargo libraries, binaries, tests, native bridges, and the
-freestanding, WASI, static-linkable, browser-package, and component-model WASM families from
-checked-in manifests and locks. PR-12 wires each representative family, cross-root composition, and
-the Darwin Tauri package into canonical sandbox/network and protected qualification gates.
+The current Rust route compiles composed Cargo libraries, binaries, tests, native bridges, Pyodide
+extensions, and the freestanding, WASI, static-linkable, browser-package, and component-model WASM
+families from checked-in manifests and locks. PR-12 wires each original representative family,
+cross-root composition, and the Darwin Tauri package into canonical sandbox/network and protected
+qualification gates. PR-14 adds the Rust Pyodide extension family to that repository-owned matrix.
 Experimental manifests can produce signed candidate qualification but not release admission. The
 separate Tauri release-admission contract binds reviewed external signing/notarization, provenance,
 semantic-manifest, and SBOM evidence without treating its unit fixtures as product evidence.
@@ -25,7 +26,7 @@ before graduation or release claims.
 | Artifact             | One `buildRustPackage` authority uses the Nix-store Rust 1.88 closure with rust-analyzer, rustfmt, Clippy, rustdoc, llvm-cov, LLD, LLDB, and the reviewed native and WASM tools. Test construction applies formatting, lint, documentation, benchmark-compile, and optional coverage gates. It emits a stable dependency inventory next to materialization evidence.                                                                                                                                    | `build-tools/tools/nix/templates/rust.nix`, `build-tools/tools/nix/flake/packages/toolchains.nix`                                             |
 | Providers            | Rust has an explicit deterministic no-provider adapter. Package-local patches are direct target inputs, so provider and auto-map glue are not patch invalidation authorities.                                                                                                                                                                                                                                                                                                                           | `build-tools/tools/buck/providers/rust.ts`, `build-tools/tools/lib/lang-contracts.ts`                                                         |
 | Tests                | Cquery covers routing, exported Cargo fields, inputs, provider order, and unknown-field rejection. Native fixtures execute two binaries, prove source sensitivity, and cover fail-closed Cargo diagnostics.                                                                                                                                                                                                                                                                                             | `build-tools/tools/tests/rust/`, `build-tools/tools/tests/lang/rust.stub.provider-edges.deterministic.cquery.test.ts`                         |
-| Language registry    | Rust is enabled experimentally with binary, library, proc-macro, Python-extension, Node-addon, C++-bridge, and WASM scaffolds.                                                                                                                                                                                                                                                                                                                                                                          | `build-tools/tools/nix/langs.json`, `build-tools/tools/scaffolding/templates/rust/`                                                           |
+| Language registry    | Rust is enabled experimentally with binary, library, proc-macro, Python-extension, Pyodide-extension, Node-addon, C++-bridge, and WASM scaffolds.                                                                                                                                                                                                                                                                                                                                                       | `build-tools/tools/nix/langs.json`, `build-tools/tools/scaffolding/templates/rust/`                                                           |
 | Dependency ownership | Cargo participates in the shared language lifecycle: read-only consumers verify locked offline metadata, while explicit `u` and `u --upgrade` transactionally reconcile every affected `Cargo.lock`.                                                                                                                                                                                                                                                                                                    | `build-tools/docs/update-command-design.md`                                                                                                   |
 | Runtime and tests    | `rust_test` executes compiled Cargo harnesses through a bounded project-relative external runner. Its remote-ready runner is designed to perform the same selected build and harness execution from a validated declared snapshot; current evidence exercises that route locally and does not claim a production remote worker. Native and WASI binaries publish `run.prod`; libraries, tests, and freestanding WASM stay out of runnable summaries.                                                    | Rust macro, runner, planner, template, and manifest implementations                                                                           |
 | Source selection     | Native targets export `nixpkg_deps`, `nixpkgs_profile`, and `nixpkg_pins`. The shared source-plan resolver selects the Rust toolchain and declared build-script dependencies.                                                                                                                                                                                                                                                                                                                           | Rust macro, graph attrs, planner, and template                                                                                                |
@@ -533,8 +534,8 @@ disabled. Remote CSP origins, plugins, updater artifacts, credentialed signing, 
 remain outside this construction route and require later reviewed admission.
 
 Rust has an experimental enabled language-manifest entry backed by source-owned templates for CLI
-binaries, libraries, proc macros, Python extensions, Node addons, C++ bridges, raw/WASI WASM, and
-Tauri desktop applications.
+binaries, libraries, proc macros, Python extensions, Pyodide extensions, Node addons, C++ bridges,
+raw/WASI WASM, and Tauri desktop applications.
 Every scaffold creates checked-in Cargo metadata and deterministic locks without invoking host Rust
 tools. Shape-specific lifecycle checks compile or run the applicable binary, library and doc tests,
 proc macro expansion, CPython import, Node addon load, C++ bridge consumer, or raw/WASI module;
@@ -599,9 +600,10 @@ production remote execution, or release hermeticity. PR-12 registers the route w
 repository gates, but those claims remain withheld until their external evidence exists.
 
 PR-7 adds native Python and Node managed-runtime extension contracts. PR-13 adds the pinned
-PyEmscripten build and executable Pyodide import contract, and PR-14 carries it through scaffolding,
-patching, remote/cache, reproducibility, and final assessment. WASI dynamic extensions remain
-withheld at the shared Python runtime boundary rather than being treated as a Rust-specific gap.
+PyEmscripten build and executable Pyodide import contract. PR-14 carries that route through the
+source-owned Pyodide scaffold, protected-matrix registration, patch/cache/source identity tests,
+and final assessment. WASI dynamic extensions remain withheld at the shared Python runtime boundary
+rather than being treated as a Rust-specific gap.
 PR-8 adds reviewed C/C++ interoperability without promoting the language beyond experimental
 status. Current references
 must still call Rust experimental rather than a complete first-class or release-hermetic toolchain.

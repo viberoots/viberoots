@@ -48,10 +48,14 @@ test("Rust keeps external graduation gated after repository hermetic policy wiri
   const rust = manifest.languages.find((entry: { id?: string }) => entry.id === "rust");
   assert.ok(rust);
   assert.ok(manifest.enabled.includes("rust"));
-  assert.deepEqual(rust.kinds, ["app", "bin", "lib", "test", "wasm", "wasi"]);
+  assert.deepEqual(rust.kinds, ["app", "bin", "lib", "test", "pyext_wasm", "wasm", "wasi"]);
   assert.equal(rust.hermetic.status, "experimental");
   assert.equal(rust.hermetic.sandboxNetwork, true);
+  assert.equal(rust.hermetic.remoteExecution, true);
   assert.equal(rust.hermetic.publicationAdmission, false);
+  assert.match(rust.supportNotes.remoteExecution, /remote snapshot/);
+  assert.match(rust.supportNotes.remoteExecution, /rust-pyodide-extension-pr14/);
+  assert.match(rust.supportNotes.publicationAdmission, /external release admission remains false/);
   assert.deepEqual(
     rust.hermetic.reproducibilityMatrixIds,
     reproducibilityMatrixIdsForArtifactFamily("rust"),

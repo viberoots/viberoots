@@ -1,0 +1,12 @@
+use pyo3::prelude::*;
+
+#[pyfunction]
+fn answer() -> PyResult<i32> {
+    Ok(42)
+}
+
+#[pymodule]
+fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(answer, m)?)?;
+    Ok(())
+}

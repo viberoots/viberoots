@@ -66,6 +66,7 @@ let
       nativeModuleOverlays = nativeOverlays;
       backend = backend;
       trim = trimFor name;
+      artifactNixRoot = ctx.declaredArtifactNixRoot;
     })));
 
   mkWasmLib = name:

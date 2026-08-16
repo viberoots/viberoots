@@ -22,76 +22,114 @@ function count(arr: string[], s: string): number {
   return arr.filter((x) => x === s).length;
 }
 
-test("go macros: nix_go_test stamps lang:go and kind:test (including auto-wired tests)", async () => {
-  await runInTemp("go-macro-test-stamping", async (tmp, $) => {
-    const pkgDir = path.join(tmp, "projects", "apps", "demo");
-    await fsp.mkdir(path.join(pkgDir, "pkg", "api"), { recursive: true });
+const TEST_TIMEOUT_MS =
+  Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "600") * 1000;
 
-    await fsp.writeFile(
-      path.join(pkgDir, "pkg", "api", "api.go"),
-      "package api\nfunc X(){}\n",
-      "utf8",
-    );
-    await fsp.writeFile(
-      path.join(pkgDir, "pkg", "api", "api_test.go"),
-      'package api\nimport "testing"\nfunc TestX(t *testing.T){}\n',
-      "utf8",
-    );
-    await fsp.writeFile(
-      path.join(pkgDir, "pkg", "api", "explicit_test.go"),
-      'package api\nimport "testing"\nfunc TestExplicit(t *testing.T){}\n',
-      "utf8",
-    );
+async function retryBuckProbe<T>(fn: () => Promise<T>): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+    }
+  }
+  throw lastError;
+}
 
-    await fsp.writeFile(
-      path.join(pkgDir, "TARGETS"),
-      [
-        "",
-        "# test: go.macros.test-label-stamping.test.ts",
-        'load("@viberoots//build-tools/go:defs.bzl", "nix_go_library", "nix_go_test")',
-        "",
-        "nix_go_library(",
-        '  name = "lib",',
-        '  srcs = ["pkg/api/api.go"],',
-        ")",
-        "",
-        "nix_go_test(",
-        '  name = "explicit",',
-        '  srcs = ["pkg/api/explicit_test.go"],',
-        '  labels = ["lang:go", "kind:test", "custom:probe"],',
-        ")",
-        "",
-      ].join("\n"),
-      "utf8",
-    );
+test(
+  "go macros: nix_go_test stamps lang:go and kind:test (including auto-wired tests)",
+  { timeout: TEST_TIMEOUT_MS },
+  async () => {
+    await runInTemp("go-macro-test-stamping", async (tmp, $) => {
+      const pkgDir = path.join(tmp, "projects", "apps", "demo");
+      await fsp.mkdir(path.join(pkgDir, "pkg", "api"), { recursive: true });
 
-    const probeAuto = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      reject: false,
-      nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //projects/apps/demo:lib_test`;
-    if (probeAuto.exitCode !== 0) return; // skip when Buck/prelude/toolchains unavailable
+      await fsp.writeFile(
+        path.join(pkgDir, "pkg", "api", "api.go"),
+        "package api\nfunc X(){}\n",
+        "utf8",
+      );
+      await fsp.writeFile(
+        path.join(pkgDir, "pkg", "api", "api_test.go"),
+        'package api\nimport "testing"\nfunc TestX(t *testing.T){}\n',
+        "utf8",
+      );
+      await fsp.writeFile(
+        path.join(pkgDir, "pkg", "api", "explicit_test.go"),
+        'package api\nimport "testing"\nfunc TestExplicit(t *testing.T){}\n',
+        "utf8",
+      );
 
-    const auto = firstCqueryNode<{ labels?: string[] }>(JSON.parse(String(probeAuto.stdout || "")));
-    const autoLabels = auto?.labels || [];
-    assert.ok(autoLabels.includes("lang:go"), "expected auto-wired go test to include lang:go");
-    assert.ok(autoLabels.includes("kind:test"), "expected auto-wired go test to include kind:test");
-    assert.ok(autoLabels.includes("remote:local-only"), "expected go test to default local-only");
+      await fsp.writeFile(
+        path.join(pkgDir, "TARGETS"),
+        [
+          "",
+          "# test: go.macros.test-label-stamping.test.ts",
+          'load("@viberoots//build-tools/go:defs.bzl", "nix_go_library", "nix_go_test")',
+          "",
+          "nix_go_library(",
+          '  name = "lib",',
+          '  srcs = ["pkg/api/api.go"],',
+          ")",
+          "",
+          "nix_go_test(",
+          '  name = "explicit",',
+          '  srcs = ["pkg/api/explicit_test.go"],',
+          '  labels = ["lang:go", "kind:test", "custom:probe"],',
+          ")",
+          "",
+        ].join("\n"),
+        "utf8",
+      );
 
-    const probeExplicit = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      reject: false,
-      nothrow: true,
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //projects/apps/demo:explicit`;
-    const explicit = firstCqueryNode<{ labels?: string[] }>(
-      JSON.parse(String(probeExplicit.stdout || "")),
-    );
-    const explicitLabels = explicit?.labels || [];
-    assert.ok(explicitLabels.includes("custom:probe"), "expected custom label preserved");
-    assert.ok(explicitLabels.includes("remote:local-only"), "expected local-only label preserved");
-    assert.equal(count(explicitLabels, "lang:go"), 1, "expected lang:go stamped exactly once");
-    assert.equal(count(explicitLabels, "kind:test"), 1, "expected kind:test stamped exactly once");
-  });
-});
+      const probeAuto = await retryBuckProbe(
+        async () =>
+          await $({
+            cwd: tmp,
+            stdio: "pipe",
+            reject: false,
+            nothrow: true,
+          })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //projects/apps/demo:lib_test`,
+      );
+      if (probeAuto.exitCode !== 0) return; // skip when Buck/prelude/toolchains unavailable
+
+      const auto = firstCqueryNode<{ labels?: string[] }>(
+        JSON.parse(String(probeAuto.stdout || "")),
+      );
+      const autoLabels = auto?.labels || [];
+      assert.ok(autoLabels.includes("lang:go"), "expected auto-wired go test to include lang:go");
+      assert.ok(
+        autoLabels.includes("kind:test"),
+        "expected auto-wired go test to include kind:test",
+      );
+      assert.ok(autoLabels.includes("remote:local-only"), "expected go test to default local-only");
+
+      const probeExplicit = await retryBuckProbe(
+        async () =>
+          await $({
+            cwd: tmp,
+            stdio: "pipe",
+            reject: false,
+            nothrow: true,
+          })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute labels //projects/apps/demo:explicit`,
+      );
+      const explicit = firstCqueryNode<{ labels?: string[] }>(
+        JSON.parse(String(probeExplicit.stdout || "")),
+      );
+      const explicitLabels = explicit?.labels || [];
+      assert.ok(explicitLabels.includes("custom:probe"), "expected custom label preserved");
+      assert.ok(
+        explicitLabels.includes("remote:local-only"),
+        "expected local-only label preserved",
+      );
+      assert.equal(count(explicitLabels, "lang:go"), 1, "expected lang:go stamped exactly once");
+      assert.equal(
+        count(explicitLabels, "kind:test"),
+        1,
+        "expected kind:test stamped exactly once",
+      );
+    });
+  },
+);

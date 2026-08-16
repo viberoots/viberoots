@@ -23,9 +23,17 @@ async function write(root: string, rel: string, content = `${rel}\n`): Promise<v
 test("stale consumer locks acquire exact Rust and Wasmtime inputs without resolution", () => {
   const snapshotLock = {
     nodes: {
-      root: { inputs: { viberoots: "viberoots" } },
+      root: {
+        inputs: {
+          "rust-overlay": "rust-overlay",
+          viberoots: "viberoots",
+          "wasmtime-nixpkgs": "wasmtime-nixpkgs",
+        },
+      },
       viberoots: { inputs: { nixpkgs: "nixpkgs" } },
       nixpkgs: { locked: { rev: "consumer" } },
+      "rust-overlay": { locked: { rev: "reviewed-overlay" } },
+      "wasmtime-nixpkgs": { locked: { rev: "reviewed-wasmtime" } },
     },
     root: "root",
   };
@@ -52,23 +60,19 @@ test("stale consumer locks acquire exact Rust and Wasmtime inputs without resolu
     root: "root",
   };
   syncExactViberootsInputs(snapshotLock, sourceLock);
-  assert.equal(snapshotLock.nodes.viberoots.inputs["rust-overlay"], "rust-overlay");
-  assert.deepEqual(snapshotLock.nodes["rust-overlay"], {
-    ...sourceLock.nodes["rust-overlay"],
-    inputs: { nixpkgs: ["viberoots", "nixpkgs"] },
-  });
-  assert.equal(snapshotLock.nodes.viberoots.inputs["wasmtime-nixpkgs"], "wasmtime-nixpkgs");
-  assert.deepEqual(snapshotLock.nodes["wasmtime-nixpkgs"], sourceLock.nodes["wasmtime-nixpkgs"]);
+  assert.deepEqual(snapshotLock.nodes.viberoots.inputs["rust-overlay"], ["rust-overlay"]);
+  assert.deepEqual(snapshotLock.nodes.viberoots.inputs["wasmtime-nixpkgs"], ["wasmtime-nixpkgs"]);
+  assert.equal(snapshotLock.nodes["rust-overlay"].locked.rev, "reviewed-overlay");
+  assert.equal(snapshotLock.nodes["wasmtime-nixpkgs"].locked.rev, "reviewed-wasmtime");
   assert.equal(snapshotLock.nodes.nixpkgs.locked.rev, "consumer");
 
   snapshotLock.nodes["wasmtime-nixpkgs"] = { locked: { rev: "stale" } };
   snapshotLock.nodes["rust-overlay"] = { locked: { rev: "stale-overlay" } };
   syncExactViberootsInputs(snapshotLock, sourceLock);
-  assert.deepEqual(snapshotLock.nodes["rust-overlay"], {
-    ...sourceLock.nodes["rust-overlay"],
-    inputs: { nixpkgs: ["viberoots", "nixpkgs"] },
-  });
-  assert.deepEqual(snapshotLock.nodes["wasmtime-nixpkgs"], sourceLock.nodes["wasmtime-nixpkgs"]);
+  assert.deepEqual(snapshotLock.nodes.viberoots.inputs["rust-overlay"], ["rust-overlay"]);
+  assert.deepEqual(snapshotLock.nodes.viberoots.inputs["wasmtime-nixpkgs"], ["wasmtime-nixpkgs"]);
+  assert.equal(snapshotLock.nodes["rust-overlay"].locked.rev, "stale-overlay");
+  assert.equal(snapshotLock.nodes["wasmtime-nixpkgs"].locked.rev, "stale");
   assert.equal(snapshotLock.nodes.nixpkgs.locked.rev, "consumer");
 });
 

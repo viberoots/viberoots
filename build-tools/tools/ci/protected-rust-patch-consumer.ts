@@ -8,6 +8,7 @@ import {
   injectProtectedTargetSources,
   installProtectedConsumerSources,
 } from "./protected-rust-patch-consumer-sources";
+import { addLockedDependency } from "./protected-rust-patch-lock";
 
 export const PROTECTED_DEPENDENCY = {
   name: "viberoots-protected-behavior",
@@ -78,6 +79,7 @@ export async function prepareProtectedRustConsumer(
   await addLockedDependency(
     path.join(cargoRoot, "Cargo.lock"),
     definition.cargoPackage,
+    PROTECTED_DEPENDENCY,
     authority.checksum,
   );
   await installProtectedConsumerSources(workspaceRoot, definition, PROTECTED_DEPENDENCY.crate);
@@ -109,7 +111,7 @@ export async function prepareProtectedRustConsumer(
   );
   const args = [
     `cargo_fixed_sources = {${JSON.stringify(dependencyKey(authority.checksum))}: ${JSON.stringify(fixed)}},`,
-    "behavior_probe = True,",
+    ...(definition.id === "rust-pyodide-extension-pr14" ? [] : ["behavior_probe = True,"]),
   ];
   const targets = path.join(workspaceRoot, definition.targetsFile);
   let targetText = await fs.readFile(targets, "utf8");
@@ -125,27 +127,16 @@ export async function prepareProtectedRustConsumer(
     await addLockedDependency(
       path.join(appRoot, "Cargo.lock"),
       `${definition.matrixCase.scaffoldRecipe.name}-app`,
+      PROTECTED_DEPENDENCY,
       authority.checksum,
     );
     await addLockedDependency(
       path.join(appRoot, "Cargo.lock"),
       definition.cargoPackage,
+      PROTECTED_DEPENDENCY,
       authority.checksum,
     );
-    const coreTargets = path.join(cargoRoot, "TARGETS");
-    let coreText = await fs.readFile(coreTargets, "utf8");
-    coreText = injectProtectedTargetSources(
-      coreText,
-      definition.cargoPackage,
-      protectedBundledSourceFiles(
-        path.posix.join(definition.cargoRoot, "TARGETS"),
-        bundledDependency,
-      ),
-    );
-    await fs.writeFile(
-      coreTargets,
-      injectProtectedTargetArgs(coreText, definition.cargoPackage, [args[0]!]),
-    );
+    await injectCrossRootCoreTarget(workspaceRoot, definition, bundledDependency, args[0]!);
     targetText = injectProtectedTargetArgs(targetText, definition.targetName, [args[0]!]);
   }
   if (definition.id === "rust-tauri-darwin-pr12") {
@@ -162,6 +153,28 @@ export async function prepareProtectedRustConsumer(
     );
   }
   await fs.writeFile(targets, targetText);
+}
+
+async function injectCrossRootCoreTarget(
+  workspaceRoot: string,
+  definition: ProtectedRustPatchCaseDefinition,
+  bundledDependency: string,
+  fixedSourceArg: string,
+): Promise<void> {
+  const coreTargets = path.join(workspaceRoot, definition.cargoRoot, "TARGETS");
+  let coreText = await fs.readFile(coreTargets, "utf8");
+  coreText = injectProtectedTargetSources(
+    coreText,
+    definition.cargoPackage,
+    protectedBundledSourceFiles(
+      path.posix.join(definition.cargoRoot, "TARGETS"),
+      bundledDependency,
+    ),
+  );
+  await fs.writeFile(
+    coreTargets,
+    injectProtectedTargetArgs(coreText, definition.cargoPackage, [fixedSourceArg]),
+  );
 }
 
 function protectedBundledSourceFiles(targetsFile: string, bundledDependency: string): string[] {
@@ -189,59 +202,4 @@ async function addDependency(manifest: string): Promise<void> {
   else
     text = `${text.slice(0, index + heading.length)}\n${dependency}${text.slice(index + heading.length)}`;
   await fs.writeFile(manifest, text);
-}
-
-async function addLockedDependency(
-  lockfile: string,
-  packageName: string,
-  checksum: string,
-): Promise<void> {
-  let text = await fs.readFile(lockfile, "utf8");
-  const start = text.indexOf(`name = "${packageName}"`);
-  if (start < 0)
-    throw new Error(`protected dependency owner is absent from Cargo.lock: ${packageName}`);
-  const stanzaEnd = text.indexOf("\n[[package]]", start);
-  const end = stanzaEnd < 0 ? text.length : stanzaEnd;
-  let stanza = text.slice(start, end);
-  if (!stanza.includes(`"${PROTECTED_DEPENDENCY.name}"`)) {
-    const dependencyList = stanza.match(/dependencies = \[\n([\s\S]*?)\n\]/u);
-    if (dependencyList) {
-      stanza = stanza.replace(
-        dependencyList[0],
-        `dependencies = [\n${dependencyList[1]}\n "${PROTECTED_DEPENDENCY.name}",\n]`,
-      );
-    } else {
-      stanza += `\ndependencies = [\n "${PROTECTED_DEPENDENCY.name}",\n]\n`;
-    }
-    text = `${text.slice(0, start)}${stanza}${text.slice(end)}`;
-  }
-  const protectedPackage = [
-    "",
-    "[[package]]",
-    `name = "${PROTECTED_DEPENDENCY.name}"`,
-    `version = "${PROTECTED_DEPENDENCY.version}"`,
-    `source = "${PROTECTED_DEPENDENCY.source}"`,
-    `checksum = "${checksum}"`,
-    "",
-  ].join("\n");
-  const protectedStart = text.indexOf(`[[package]]\nname = "${PROTECTED_DEPENDENCY.name}"`);
-  if (protectedStart < 0) {
-    text += protectedPackage;
-  } else {
-    const protectedEnd = text.indexOf("\n[[package]]", protectedStart);
-    const protectedStanza = text.slice(
-      protectedStart,
-      protectedEnd < 0 ? text.length : protectedEnd,
-    );
-    for (const expected of [
-      `version = "${PROTECTED_DEPENDENCY.version}"`,
-      `source = "${PROTECTED_DEPENDENCY.source}"`,
-      `checksum = "${checksum}"`,
-    ]) {
-      if (!protectedStanza.includes(expected)) {
-        throw new Error(`protected dependency lock entry is inconsistent: ${expected}`);
-      }
-    }
-  }
-  await fs.writeFile(lockfile, text);
 }

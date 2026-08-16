@@ -1,0 +1,6 @@
+version: 1
+name: ""
+language: "rust"
+template: "pyodide-extension"
+description: "{{ name }} Rust Pyodide extension"
+_tasks: []

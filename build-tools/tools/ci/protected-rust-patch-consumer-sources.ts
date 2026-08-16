@@ -9,7 +9,24 @@ export async function installProtectedConsumerSources(
 ): Promise<void> {
   const owner = path.join(workspaceRoot, definition.cargoRoot);
   const library = path.join(owner, "src/lib.rs");
-  let source = await fs.readFile(library, "utf8");
+  let source = await fs.readFile(library, "utf8").catch((error: NodeJS.ErrnoException) => {
+    if (definition.id !== "rust-pyodide-extension-pr14" || error.code !== "ENOENT") throw error;
+    return [
+      "use pyo3::prelude::*;",
+      "",
+      "#[pyfunction]",
+      "fn answer() -> PyResult<i32> {",
+      "    Ok(42)",
+      "}",
+      "",
+      "#[pymodule]",
+      "fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {",
+      "    m.add_function(wrap_pyfunction!(answer, m)?)?;",
+      "    Ok(())",
+      "}",
+      "",
+    ].join("\n");
+  });
   if (definition.matrixCase.scaffoldRecipe.template === "proc-macro") {
     source += [
       "",
@@ -28,6 +45,15 @@ export async function installProtectedConsumerSources(
       "}",
       "",
     ].join("\n");
+  } else if (definition.id === "rust-pyodide-extension-pr14") {
+    const answer = /fn answer\(\) -> PyResult<i32> \{[\s\S]*?\n\}/u;
+    if (!answer.test(source)) {
+      throw new Error(`protected Rust Pyodide behavior route is absent: ${library}`);
+    }
+    source = source.replace(
+      answer,
+      `fn answer() -> PyResult<i32> {\n    Ok(${protectedCrate}::observed())\n}`,
+    );
   } else {
     source += [
       "",

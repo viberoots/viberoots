@@ -10,6 +10,7 @@ import { resolveArtifactReproducibilityMatrixBinding } from "./artifact-reproduc
 import { buildArtifactOutputPair } from "./artifact-reproducibility-output-selection";
 import { readArtifactSemanticManifest } from "./artifact-reproducibility-semantic-manifest";
 import type { ProtectedRustPatchCaseDefinition } from "./protected-rust-patch-case-definitions";
+import { pyodideProtectedPatchIdentity } from "./protected-rust-patch-pyodide-phase";
 
 export type ProtectedRustPatchPhase = {
   derivationPaths: string[];
@@ -17,6 +18,10 @@ export type ProtectedRustPatchPhase = {
   semanticDigest: string;
   behaviorDigest: string;
   behavior: string;
+  pyodideBehaviorDigest: string | null;
+  pyodideBehavior: string | null;
+  pyodideAbiDigest: string | null;
+  pyodideAbiIdentity: unknown | null;
   graphDigest: string;
   graphBindingDigest: string;
   matrixDigest: string;
@@ -29,7 +34,7 @@ export type ProtectedRustPatchPhase = {
   reachableNodesDigest: string;
 };
 
-type ExactNix = Pick<ActiveReviewedRemoteNix, "runNix">;
+type ExactNix = Pick<ActiveReviewedRemoteNix, "runNix" | "runWithRemoteStore">;
 
 export async function realizeProtectedRustPatchPhase(
   active: ExactNix,
@@ -109,6 +114,13 @@ export async function realizeProtectedRustPatchPhase(
   if (derivationPaths.length !== 1 || derivationPaths[0] !== evaluated.stdout.trim()) {
     throw new Error(`protected Rust patch derivation query mismatch: ${definition.id}`);
   }
+  const pyodide = await pyodideProtectedPatchIdentity(
+    active,
+    definition,
+    outputPath,
+    expectedBehavior,
+    opts,
+  );
   const semantic = await readArtifactSemanticManifest(
     outputPath,
     subjectAuthority,
@@ -118,11 +130,18 @@ export async function realizeProtectedRustPatchPhase(
   if (semantic.kind === "not-applicable") {
     throw new Error(`protected Rust patch lacks a semantic manifest: ${definition.id}`);
   }
-  const behaviorBytes = Buffer.from(
-    (await active.runNix(["store", "cat", `${outputPath}/share/viberoots-rust/observed-behavior`]))
-      .stdout,
-  );
-  const behavior = behaviorBytes.toString("utf8");
+  const behaviorBytes =
+    pyodide.behaviorBytes ??
+    Buffer.from(
+      (
+        await active.runNix([
+          "store",
+          "cat",
+          `${outputPath}/share/viberoots-rust/observed-behavior`,
+        ])
+      ).stdout,
+    );
+  const behavior = pyodide.behavior ?? behaviorBytes.toString("utf8");
   if (behavior !== expectedBehavior) {
     throw new Error(
       `protected Rust patch observed ${JSON.stringify(behavior)}, expected ${expectedBehavior}: ${definition.id}`,
@@ -134,6 +153,10 @@ export async function realizeProtectedRustPatchPhase(
     semanticDigest: semantic.digest,
     behaviorDigest: digest(behaviorBytes),
     behavior,
+    pyodideBehaviorDigest: pyodide.pyodideBehaviorDigest,
+    pyodideBehavior: pyodide.pyodideBehavior,
+    pyodideAbiDigest: pyodide.pyodideAbiDigest,
+    pyodideAbiIdentity: pyodide.pyodideAbiIdentity,
     graphDigest: digest(graphBytes),
     graphBindingDigest: binding.bindingDigest,
     matrixDigest: ARTIFACT_REPRODUCIBILITY_MATRIX_DIGEST,

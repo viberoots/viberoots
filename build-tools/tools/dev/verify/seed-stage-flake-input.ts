@@ -1,6 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import "zx/globals";
+import { syncExactViberootsInputs } from "../filtered-flake-lock-inputs";
 
 type PathFlakeMetadata = {
   lastModified?: number;
@@ -106,7 +107,12 @@ export async function rewriteStageViberootsInput(stageDir: string): Promise<stri
     if (node && typeof node === "object") {
       const lockedChanged = rewriteLocalPathLockEntry(node.locked, "./viberoots", metadata);
       const originalChanged = rewriteLocalPathLockEntry(node.original, "./viberoots");
-      if (lockedChanged || originalChanged) {
+      const beforeSync = JSON.stringify(lock);
+      const sourceLockText = await fsp
+        .readFile(path.join(stageDir, "viberoots", "flake.lock"), "utf8")
+        .catch(() => "");
+      if (sourceLockText) syncExactViberootsInputs(lock, JSON.parse(sourceLockText));
+      if (lockedChanged || originalChanged || beforeSync !== JSON.stringify(lock)) {
         await fsp.writeFile(lockPath, JSON.stringify(lock, null, 2) + "\n", "utf8");
         touched.push(path.join(".viberoots", "workspace", "flake.lock"));
       }

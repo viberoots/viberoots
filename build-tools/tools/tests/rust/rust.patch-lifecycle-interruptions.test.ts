@@ -14,8 +14,17 @@ type SessionChild = {
   workspace: Promise<string>;
 };
 
+const TEST_TIMEOUT_MS =
+  Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
+
 function waitForSession(child: ChildProcess, output: () => string): Promise<string> {
   return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => {
+        reject(new Error(`timed out waiting for Rust patch session attachment\n${output()}`));
+      },
+      Math.max(120_000, Math.floor(TEST_TIMEOUT_MS / 4)),
+    );
     const inspect = () => {
       const text = output();
       const workspace = text
@@ -23,6 +32,7 @@ function waitForSession(child: ChildProcess, output: () => string): Promise<stri
         .map((line) => line.trim())
         .find((line) => path.isAbsolute(line) && line.includes("viberoots-patch-rust"));
       if (workspace && text.includes("Attached. Ctrl-D to apply, Ctrl-C to reset.")) {
+        clearTimeout(timer);
         resolve(workspace);
       }
     };
@@ -30,6 +40,7 @@ function waitForSession(child: ChildProcess, output: () => string): Promise<stri
     child.stderr?.on("data", inspect);
     child.once("error", reject);
     child.once("exit", (code, signal) => {
+      clearTimeout(timer);
       reject(
         new Error(
           `Rust session exited before attachment: code=${String(code)} signal=${String(signal)}\n${output()}`,
@@ -75,94 +86,98 @@ async function rustSessions(tmp: string): Promise<Record<string, unknown>> {
   return store.sessions?.rust || {};
 }
 
-test("Rust patch-pkg session cleans up on terminal controls, signals, and hard owner death", async () => {
-  await runInTemp("rust-patch-lifecycle", async (tmp, $) => {
-    const cargoRelative = "projects/libs/demo";
-    const cargoRoot = path.join(tmp, cargoRelative);
-    const origin = path.join(tmp, "fixed-source");
-    const source = "registry+https://registry.example/index";
-    const key = `dep@1.0.0#${source}`;
-    await Promise.all(
-      [cargoRoot, origin].map((directory) => fsp.mkdir(directory, { recursive: true })),
-    );
-    await fsp.writeFile(path.join(tmp, "flake.nix"), "{}\n");
-    await fsp.writeFile(
-      path.join(cargoRoot, "Cargo.toml"),
-      '[package]\nname="demo"\nversion="0.1.0"\n[dependencies]\ndep="1"\n',
-    );
-    await fsp.writeFile(
-      path.join(cargoRoot, "Cargo.lock"),
-      `version=3\n[[package]]\nname="dep"\nversion="1.0.0"\nsource="${source}"\nchecksum="fixture"\n`,
-    );
-    await fsp.writeFile(path.join(origin, "lib.rs"), "pub fn value() -> u8 { 1 }\n");
-    await fsp.writeFile(
-      path.join(origin, ".cargo-checksum.json"),
-      JSON.stringify({ package: "fixture", files: {} }),
-    );
-    const env: NodeJS.ProcessEnv = {
-      ...process.env,
-      WORKSPACE_ROOT: tmp,
-      NIX_RUST_DEV_OVERRIDE_JSON: "{}",
-      NIX_RUST_TEST_RESOLVE_JSON: JSON.stringify({
-        [key]: {
-          originPath: origin,
-          source,
-          checksum: "fixture",
-          storePath: origin,
-          narHash: "sha256-fixture",
-          buildInput: {
+test(
+  "Rust patch-pkg session cleans up on terminal controls, signals, and hard owner death",
+  { timeout: TEST_TIMEOUT_MS },
+  async () => {
+    await runInTemp("rust-patch-lifecycle", async (tmp, $) => {
+      const cargoRelative = "projects/libs/demo";
+      const cargoRoot = path.join(tmp, cargoRelative);
+      const origin = path.join(tmp, "fixed-source");
+      const source = "registry+https://registry.example/index";
+      const key = `dep@1.0.0#${source}`;
+      await Promise.all(
+        [cargoRoot, origin].map((directory) => fsp.mkdir(directory, { recursive: true })),
+      );
+      await fsp.writeFile(path.join(tmp, "flake.nix"), "{}\n");
+      await fsp.writeFile(
+        path.join(cargoRoot, "Cargo.toml"),
+        '[package]\nname="demo"\nversion="0.1.0"\n[dependencies]\ndep="1"\n',
+      );
+      await fsp.writeFile(
+        path.join(cargoRoot, "Cargo.lock"),
+        `version=3\n[[package]]\nname="dep"\nversion="1.0.0"\nsource="${source}"\nchecksum="fixture"\n`,
+      );
+      await fsp.writeFile(path.join(origin, "lib.rs"), "pub fn value() -> u8 { 1 }\n");
+      await fsp.writeFile(
+        path.join(origin, ".cargo-checksum.json"),
+        JSON.stringify({ package: "fixture", files: {} }),
+      );
+      const env: NodeJS.ProcessEnv = {
+        ...process.env,
+        WORKSPACE_ROOT: tmp,
+        NIX_RUST_DEV_OVERRIDE_JSON: "{}",
+        NIX_RUST_TEST_RESOLVE_JSON: JSON.stringify({
+          [key]: {
+            originPath: origin,
             source,
             checksum: "fixture",
             storePath: origin,
             narHash: "sha256-fixture",
+            buildInput: {
+              source,
+              checksum: "fixture",
+              storePath: origin,
+              narHash: "sha256-fixture",
+            },
           },
-        },
-      }),
-    };
+        }),
+      };
 
-    const apply = startSession(tmp, env, cargoRelative);
-    const applyWorkspace = await apply.workspace;
-    await fsp.writeFile(path.join(applyWorkspace, "lib.rs"), "pub fn value() -> u8 { 2 }\n");
-    apply.child.stdin?.write("\u0004");
-    assert.deepEqual(await apply.completion, { code: 0, signal: null }, apply.output());
-    assert.deepEqual(await rustSessions(tmp), {});
-    await fsp.access(applyWorkspace);
-    await fsp.access(
-      path.join(cargoRoot, "patches/rust", rustPatchFilename("dep", "1.0.0", source)),
-    );
-
-    const reset = startSession(tmp, env, cargoRelative);
-    const resetWorkspace = await reset.workspace;
-    reset.child.stdin?.write("\u0003");
-    assert.deepEqual(await reset.completion, { code: 0, signal: null }, reset.output());
-    assert.deepEqual(await rustSessions(tmp), {});
-    await assert.rejects(fsp.access(resetWorkspace));
-
-    for (const signal of ["SIGINT", "SIGTERM"] as const) {
-      const interrupted = startSession(tmp, env, cargoRelative);
-      const interruptedWorkspace = await interrupted.workspace;
-      interrupted.child.kill(signal);
-      assert.deepEqual(
-        await interrupted.completion,
-        { code: 1, signal: null },
-        interrupted.output(),
-      );
+      const apply = startSession(tmp, env, cargoRelative);
+      const applyWorkspace = await apply.workspace;
+      await fsp.writeFile(path.join(applyWorkspace, "lib.rs"), "pub fn value() -> u8 { 2 }\n");
+      apply.child.stdin?.write("\u0004");
+      assert.deepEqual(await apply.completion, { code: 0, signal: null }, apply.output());
       assert.deepEqual(await rustSessions(tmp), {});
-      await fsp.access(interruptedWorkspace);
-    }
+      await fsp.access(applyWorkspace);
+      await fsp.access(
+        path.join(cargoRoot, "patches/rust", rustPatchFilename("dep", "1.0.0", source)),
+      );
 
-    const killed = startSession(tmp, env, cargoRelative);
-    const abandonedWorkspace = await killed.workspace;
-    killed.child.kill("SIGKILL");
-    const killedOutcome = await killed.completion;
-    assert.equal(killedOutcome.signal, "SIGKILL", killed.output());
-    assert.ok((await rustSessions(tmp))[key]);
+      const reset = startSession(tmp, env, cargoRelative);
+      const resetWorkspace = await reset.workspace;
+      reset.child.stdin?.write("\u0003");
+      assert.deepEqual(await reset.completion, { code: 0, signal: null }, reset.output());
+      assert.deepEqual(await rustSessions(tmp), {});
+      await assert.rejects(fsp.access(resetWorkspace));
 
-    const cli = "viberoots/build-tools/tools/bin/patch-pkg";
-    await $`chmod +x ${cli}`;
-    await $({ cwd: tmp, env })`${cli} start rust dep --importer ${cargoRelative}`;
-    const replacement = (await rustSessions(tmp))[key] as { workspacePath: string };
-    assert.notEqual(replacement.workspacePath, abandonedWorkspace);
-    await fsp.access(abandonedWorkspace);
-  });
-});
+      for (const signal of ["SIGINT", "SIGTERM"] as const) {
+        const interrupted = startSession(tmp, env, cargoRelative);
+        const interruptedWorkspace = await interrupted.workspace;
+        interrupted.child.kill(signal);
+        assert.deepEqual(
+          await interrupted.completion,
+          { code: 1, signal: null },
+          interrupted.output(),
+        );
+        assert.deepEqual(await rustSessions(tmp), {});
+        await fsp.access(interruptedWorkspace);
+      }
+
+      const killed = startSession(tmp, env, cargoRelative);
+      const abandonedWorkspace = await killed.workspace;
+      killed.child.kill("SIGKILL");
+      const killedOutcome = await killed.completion;
+      assert.equal(killedOutcome.signal, "SIGKILL", killed.output());
+      assert.ok((await rustSessions(tmp))[key]);
+
+      const cli = "viberoots/build-tools/tools/bin/patch-pkg";
+      await $`chmod +x ${cli}`;
+      await $({ cwd: tmp, env })`${cli} start rust dep --importer ${cargoRelative}`;
+      const replacement = (await rustSessions(tmp))[key] as { workspacePath: string };
+      assert.notEqual(replacement.workspacePath, abandonedWorkspace);
+      await fsp.access(abandonedWorkspace);
+    });
+  },
+);

@@ -92,7 +92,8 @@ test("Jenkins exposes only an explicitly enabled six-cell protected reproducibil
     /active\.runNix\(\["hash", "path", `\$\{bundleStorePath\}\/source`\]\)/,
   );
   assert.doesNotMatch(patchRunner, /productionBinding|compiled-probe|runCommand/);
-  assert.doesNotMatch(patchRunner, /runWithRemoteStore|canonicalArtifact|buck2|\bv\b/);
+  assert.doesNotMatch(patchRunner, /canonicalArtifact|buck2|\bv\b/);
+  assert.match(patchRunner, /runWithRemoteStore/);
   assert.match(patchProducer, /createProtectedRustPatchEvidence/);
   assert.match(jenkins, /public-rust-patch-\$\{SYSTEM\}-\$\{BUILDER_SLOT\}\.json/);
   assert.match(

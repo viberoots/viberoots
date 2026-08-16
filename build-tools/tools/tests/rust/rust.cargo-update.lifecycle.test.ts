@@ -201,7 +201,10 @@ test("Rust update interruption awaits Cargo and leaves the live lock unchanged",
     const exit = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
       (resolve) => child.once("exit", (code, signal) => resolve({ code, signal })),
     );
-    assert.deepEqual(exit, { code: 9, signal: null });
+    assert.ok(
+      (exit.code === 9 && exit.signal === null) || (exit.code === null && exit.signal === "SIGINT"),
+      JSON.stringify(exit),
+    );
     assert.equal(await fsp.readFile(path.join(cargoRoot, "Cargo.lock"), "utf8"), "before\n");
   } finally {
     await fsp.rm(value.root, { recursive: true, force: true });

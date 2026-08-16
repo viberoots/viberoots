@@ -64,6 +64,32 @@ export function rustReproducibilityMatrixCases(
       "kind:pyext",
       ["base", "addon", "mixed"],
     ),
+    {
+      id: "rust-pyodide-extension-pr14",
+      artifactFamily: "rust",
+      systems: releaseSystems,
+      systemEvidence: configuredRustSystemEvidence(),
+      scaffoldRecipe: recipe(
+        "rust",
+        "pyodide-extension",
+        "repro-rust-pyodide",
+        "projects/apps/repro-rust-pyodide",
+      ),
+      coverage: coverage(["wasm", "addon", "mixed"]),
+      graphSelection: selection(
+        ["python_nix_wasm_build"],
+        "//projects/apps/repro-rust-pyodide:repro-rust-pyodide",
+        "python-wasm-consumer",
+        ["lang:python", "kind:app", "backend:pyodide"],
+      ),
+      languageProofs: [
+        proof(["rust_nix_build"], "//projects/apps/repro-rust-pyodide:repro-rust-pyodide-ext", [
+          "lang:rust",
+          "kind:pyext_wasm",
+          "backend:pyodide",
+        ]),
+      ],
+    },
     rustCase(
       releaseSystems,
       "rust-node-addon-pr12",

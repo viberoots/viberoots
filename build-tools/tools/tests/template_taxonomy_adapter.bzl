@@ -24,6 +24,7 @@ CANONICAL_TEMPLATE_IDS = [
     "rust/lib",
     "rust/node-addon",
     "rust/proc-macro",
+    "rust/pyodide-extension",
     "rust/python-extension",
     "rust/tauri-app",
     "rust/wasm",

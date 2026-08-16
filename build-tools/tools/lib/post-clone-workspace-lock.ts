@@ -46,7 +46,13 @@ function parseAuthoritativeRootLock(text: string): PostCloneFlakeLock {
     const nodeName = rootInputs[input];
     const node = typeof nodeName === "string" ? parsed.nodes[nodeName] : null;
     const locked = isObject(node) && isObject(node.locked) ? node.locked : null;
-    if (!locked || typeof locked.type !== "string" || !isCanonicalSha256SRI(locked.narHash)) {
+    if (!locked || typeof locked.type !== "string") {
+      throw new Error(`post-clone committed root flake.lock has no locked ${input} input`);
+    }
+    const hasNarHash = isCanonicalSha256SRI(locked.narHash);
+    const isReplaceableLocalViberoots =
+      input === "viberoots" && locked.type === "path" && typeof locked.path === "string";
+    if (!hasNarHash && !isReplaceableLocalViberoots) {
       throw new Error(`post-clone committed root flake.lock has no locked ${input} input`);
     }
   }
@@ -99,9 +105,6 @@ export function derivePostCloneWorkspaceLock(opts: {
   const prior = cloned.nodes[viberootsName]!;
   const priorLocked = isObject(prior.locked) ? prior.locked : {};
   const storeNarHash = priorLocked.narHash;
-  if (opts.localInputPath.startsWith("/nix/store/") && !isCanonicalSha256SRI(storeNarHash)) {
-    throw new Error("post-clone committed root lock lacks the immutable viberoots narHash");
-  }
   cloned.nodes[viberootsName] = {
     ...(isObject(prior.inputs) ? { inputs: structuredClone(prior.inputs) } : {}),
     locked: {

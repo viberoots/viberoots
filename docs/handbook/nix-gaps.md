@@ -115,6 +115,9 @@ mature Python Pyodide extension path, while `header_deps` contribute reviewed C/
 ABI diagnostics reject missing `PyInit_<leaf>` exports, unexpected exports, pthread/atomic target
 features, extension suffix drift, and PyO3 cross-build mismatches before the Python WASM app
 publishes the overlay.
+The Rust `pyodide-extension` scaffold checks in Cargo and uv metadata, builds a PyO3 side module,
+and executes it through a Pyodide Python WASM consumer. The protected Rust matrix includes that
+consumer plus a reachable Rust `kind:pyext_wasm` proof without claiming external release evidence.
 `tauri_app` uses the shared `kind:app` contract with `app:tauri`, consumes a Buck-built
 `node_asset_stage` frontend with a locked module-based Tauri API, carries explicit resource and
 sidecar destinations plus command/window capabilities, and rejects hidden Tauri build/dev commands. Its current reviewed

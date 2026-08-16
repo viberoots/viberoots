@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import {
   createArtifactReproducibilityRunRecord,
   type ArtifactReproducibilityRunRecord,
@@ -20,10 +21,12 @@ import {
 import { createProtectedRustPatchEvidence } from "../../ci/protected-rust-patch-evidence";
 import { protectedRustPatchCaseDefinitions } from "../../ci/protected-rust-patch-case-driver";
 import { remoteCiToolsSourceIdentity } from "./remote-ci-tools-source-identity.fixture";
+import { protectedPyodideFixture } from "./protected-pyodide-fixture";
 import {
   tauriSemanticManifestBytes,
   tauriSemanticManifestDigest,
 } from "./tauri-semantic-manifest.fixture";
+import { semanticForMatrixCase } from "./artifact-semantic-fixture";
 export { tauriSemanticManifestBytes, tauriSemanticManifestDigest };
 export const registryStorePath = `/nix/store/${"9".repeat(32)}-registry/registry.json`;
 export const toolClosureRoot = `/nix/store/${"f".repeat(32)}-remote-ci-tools`;
@@ -145,12 +148,14 @@ function patchPhase(
     ruleType: proof.ruleTypes[0]!,
     kinds: proof.requiredLabels.filter((label) => label.startsWith("kind:")),
   }));
+  const pyodide = protectedPyodideFixture(testCase.id, state);
   return {
     derivationPaths: [`/nix/store/${storeHash}-${state}.drv`],
     outputPaths: [`/nix/store/${storeHash}-${state}`],
     semanticDigest: `sha256:${seed}`,
     behaviorDigest: `sha256:${seed}`,
     behavior: state === "patched" ? "43" : "42",
+    ...pyodide,
     graphDigest: patchHash(`${system}:${index}:${state}:graph`),
     graphBindingDigest: patchHash(`${system}:${index}:binding`),
     matrixDigest: ARTIFACT_REPRODUCIBILITY_MATRIX_DIGEST,
@@ -163,7 +168,6 @@ function patchPhase(
     reachableNodesDigest: hashJson(reachableNodes),
   };
 }
-
 function patchHash(value: string): string {
   return `sha256:${crypto.createHash("sha256").update(value).digest("hex")}`;
 }
@@ -189,29 +193,11 @@ export function records(): ArtifactReproducibilityRunRecord[] {
             },
             derivationPath: store(String.fromCharCode(97 + matrixIndex), "artifact.drv"),
             outputPath: store(String.fromCharCode(97 + matrixIndex), "artifact"),
-            ...(matrixCase.id === "rust-tauri-darwin-pr12"
-              ? {
-                  semanticManifest: {
-                    kind: "tauri-artifact-manifest" as const,
-                    storePath: `${store(
-                      String.fromCharCode(97 + matrixIndex),
-                      "artifact",
-                    )}/share/viberoots-tauri/artifact-manifest.json`,
-                    digest: tauriSemanticManifestDigest,
-                  },
-                }
-              : matrixCase.artifactFamily === "rust"
-                ? {
-                    semanticManifest: {
-                      kind: "rust-materialization-manifest" as const,
-                      storePath: `${store(
-                        String.fromCharCode(97 + matrixIndex),
-                        "artifact",
-                      )}/share/viberoots-rust/materialization-manifest.json`,
-                      digest: hash("8"),
-                    },
-                  }
-                : {}),
+            ...semanticForMatrixCase(
+              matrixCase,
+              store(String.fromCharCode(97 + matrixIndex), "artifact"),
+              matrixCase.id === "rust-tauri-darwin-pr12" ? tauriSemanticManifestDigest : hash("8"),
+            ),
             checkoutIdentity: hash(String.fromCharCode(103 + systemIndex * 2 + slotIndex)),
             builderAuthority: authority(system, slot),
             subjectAuthority: {
@@ -245,4 +231,3 @@ export function records(): ArtifactReproducibilityRunRecord[] {
   );
   return [...matrix, ...published];
 }
-import crypto from "node:crypto";

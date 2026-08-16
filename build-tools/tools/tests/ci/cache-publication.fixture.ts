@@ -24,6 +24,8 @@ import {
   graduatedLanguageManifestFixture,
   observationStorePath,
 } from "./artifact-reproducibility.fixture";
+import { protectedPyodideFixture } from "./protected-pyodide-fixture";
+import { semanticForSubject } from "./artifact-semantic-fixture";
 import { remoteCiToolsSourceIdentity } from "./remote-ci-tools-source-identity.fixture";
 
 const registryStorePath = `/nix/store/${"9".repeat(32)}-registry/registry.json`;
@@ -32,7 +34,6 @@ const digest = (value: string) =>
 const store = (value: string, name: string) =>
   `/nix/store/${crypto.createHash("sha256").update(value).digest("hex").slice(0, 32)}-${name}`;
 const toolClosureSourceIdentity = remoteCiToolsSourceIdentity("b".repeat(40));
-
 export const productionPublicationSubject: PublicationSubject = {
   kind: "publication",
   subjectSetDigest: digest("production-subjects"),
@@ -52,7 +53,6 @@ function authority(system: (typeof RELEASE_BUILDER_SYSTEMS)[number], slot: "a" |
     probeFlakeStorePath: store(`${system}-${slot}`, "builder-probes"),
   };
 }
-
 function registry() {
   return {
     schema: "viberoots.reviewed-remote-builders.v3" as const,
@@ -91,20 +91,7 @@ function evidence(
 ): ArtifactReproducibilityEvidence {
   const key = `${subject.kind}-${subject.kind === "matrix" ? subject.matrixId : subject.subjectId}-${system}`;
   const outputPath = store(key, key);
-  const semanticManifest =
-    subject.kind !== "matrix" || subject.artifactFamily !== "rust"
-      ? ({ kind: "not-applicable" } as const)
-      : subject.matrixId === "rust-tauri-darwin-pr12"
-        ? ({
-            kind: "tauri-artifact-manifest",
-            storePath: `${outputPath}/share/viberoots-tauri/artifact-manifest.json`,
-            digest: digest(`semantic-${key}`),
-          } as const)
-        : ({
-            kind: "rust-materialization-manifest",
-            storePath: `${outputPath}/share/viberoots-rust/materialization-manifest.json`,
-            digest: digest(`semantic-${key}`),
-          } as const);
+  const semanticManifest = semanticForSubject(subject, outputPath, digest(`semantic-${key}`));
   return {
     schema: "viberoots.artifact-reproducibility-evidence.v6",
     classification: "hermetic",
@@ -233,6 +220,7 @@ function protectedPatchPhase(
     semanticDigest: digest(`${outputPath}:semantic`),
     behaviorDigest: digest(`${outputPath}:behavior`),
     behavior: state === "patched" ? "43" : "42",
+    ...protectedPyodideFixture(testCase.id, state),
     graphDigest: digest(`${system}:${caseIndex}:${state}:graph`),
     graphBindingDigest: digest(`${system}:${caseIndex}:binding`),
     matrixDigest: ARTIFACT_REPRODUCIBILITY_MATRIX_DIGEST,

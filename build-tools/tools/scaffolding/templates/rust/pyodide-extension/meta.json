@@ -1,0 +1,15 @@
+{
+  "language": "rust",
+  "template": "pyodide-extension",
+  "description": "Experimental Rust Pyodide extension with a Python WASM consumer",
+  "resolverDestination": "projects/apps/{name}",
+  "help": {
+    "usage": "scaf new rust pyodide-extension <name> [--path=DEST]",
+    "notes": [
+      "Creates locked Cargo and uv metadata, a PyO3 extension, a Pyodide consumer, and package-local Rust patch storage.",
+      "The consumer target imports the Rust extension through the shared kind:pyext_wasm overlay.",
+      "WASI dynamic extension loading remains fail-closed."
+    ],
+    "examples": ["scaf new rust pyodide-extension demo --yes"]
+  }
+}

@@ -99,6 +99,7 @@ rust_python_wasm_extension(
       "profile",
       "target",
       "module",
+      "pyemscripten_abi",
       "build_py_deps",
       "local_patch_dirs",
       "link_deps",
@@ -123,6 +124,7 @@ rust_python_wasm_extension(
     assert.equal(node.profile, "release");
     assert.equal(node.target, "wasm32-unknown-emscripten");
     assert.equal(node.module, "demo._native");
+    assert.equal(node.pyemscripten_abi, "viberoots.pyemscripten-abi.v1");
     assert.deepEqual(node.build_py_deps, ["builddep"]);
     assert.deepEqual(node.local_patch_dirs, ["patches/rust-pyodide"]);
     assert.deepEqual(configured(node.link_deps), [

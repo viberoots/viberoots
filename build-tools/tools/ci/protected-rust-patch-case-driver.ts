@@ -35,7 +35,7 @@ export type ProtectedRustPatchCaseResult = {
   restored: ProtectedRustPatchPhase;
 };
 
-type ExactNix = Pick<ActiveReviewedRemoteNix, "runNix">;
+type ExactNix = Pick<ActiveReviewedRemoteNix, "runNix" | "runWithRemoteStore">;
 
 export async function runProtectedRustPatchCaseDrivers(opts: {
   active: ExactNix;

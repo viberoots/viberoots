@@ -18,6 +18,7 @@ export const attrList = Array.from(
     "health_path",
     "target_group",
     "module",
+    "pyemscripten_abi",
     "build_py_deps",
     "runtime_deps",
     "frontend_dist",

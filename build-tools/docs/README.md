@@ -72,7 +72,7 @@ viberoots pin.
 These docs describe active contracts or implementation models:
 
 - [`abstractions.md`](abstractions.md)
-- [`lang/rust-design.md`](lang/rust-design.md): current experimental native/C/WASM/WASI/scaffold
+- [`lang/rust-design.md`](lang/rust-design.md): current experimental native/C/Pyodide/WASM/WASI/scaffold
   baseline and remaining first-class language contract.
 - [`rust-language-plan.md`](rust-language-plan.md): implementation plan for first-class Rust
   support.

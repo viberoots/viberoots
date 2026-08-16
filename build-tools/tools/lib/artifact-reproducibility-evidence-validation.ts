@@ -105,6 +105,13 @@ export function assertArtifactReproducibilityEvidence(
       ) {
         throw new Error("Rust semantic manifest authority is invalid");
       }
+    } else if (semantic.kind === "python-wasm-materialization-manifest") {
+      if (
+        semantic.storePath !==
+        `${value.provenanceOutputPath}/share/viberoots-python-wasm/materialization-manifest.json`
+      ) {
+        throw new Error("Python WASM semantic manifest authority is invalid");
+      }
     } else {
       throw new Error("artifact semantic manifest kind is invalid");
     }
@@ -178,7 +185,9 @@ function assertSubjectAuthority(value: ArtifactReproducibilityEvidence): void {
       value.semanticManifest.kind !==
         (subject.matrixId === "rust-tauri-darwin-pr12"
           ? "tauri-artifact-manifest"
-          : "rust-materialization-manifest")
+          : subject.matrixId === "rust-pyodide-extension-pr14"
+            ? "python-wasm-materialization-manifest"
+            : "rust-materialization-manifest")
     ) {
       throw new Error("Rust matrix evidence requires its semantic artifact manifest");
     }

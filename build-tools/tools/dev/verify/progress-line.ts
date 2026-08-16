@@ -137,7 +137,7 @@ export function createVerifyProgressReporter(opts: {
   return {
     start: () => {
       if (!opts.enabled || !hasPasses || timer) return;
-      if (useCursorRedraw) write(true);
+      write(true);
       timer = setInterval(
         () => (useCursorRedraw ? write() : writeStaticRunningPasses()),
         useCursorRedraw ? 1000 : 30_000,

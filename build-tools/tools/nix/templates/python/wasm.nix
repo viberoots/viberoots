@@ -22,6 +22,7 @@ in {
     libOverlays ? [],
     nativeModuleOverlays ? [],
     trim ? "none", # none | safe | aggressive
+    artifactNixRoot ? "",
   }:
     let
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
@@ -114,15 +115,35 @@ in {
       fi
 
       if [ "${effBackend}" = "pyodide" ]; then
+        mkdir -p "$out/runtime"
+        cp -RL "${Pyodide}/runtime/." "$out/runtime/"
+        grep -Ilr "${Pyodide}" "$out/runtime" 2>/dev/null | while IFS= read -r runtime_file; do
+          substituteInPlace "$runtime_file" --replace "${Pyodide}/runtime" "$out/runtime"
+        done || true
         cat > "$out/bin/run.mjs" <<'EOF'
-${Runner.pyodideRunner { msg = msg; runtimeDir = "${Pyodide}/runtime"; }}
+${Runner.pyodideRunner { msg = msg; runtimeDir = "app-local"; }}
 EOF
       else
+        mkdir -p "$out/runtime"
+        cp -RL "${WasiPython}/runtime/." "$out/runtime/"
         cat > "$out/bin/run.mjs" <<'EOF'
-${Runner.wasiRunner { msg = msg; runtimeDir = "${WasiPython}/runtime"; }}
+${Runner.wasiRunner { msg = msg; runtimeDir = "app-local"; }}
 EOF
       fi
       chmod +x "$out/bin/run.mjs"
+      mkdir -p "$out/share/viberoots-python-wasm"
+      abi_count=0
+      for ov in ${lib.concatStringsSep " " (map (x: ''"${x}"'') nativeModuleOverlays)}; do
+        if [ -f "$ov/share/viberoots-rust/pyemscripten-abi.json" ]; then
+          cp "$ov/share/viberoots-rust/pyemscripten-abi.json" "$out/share/viberoots-python-wasm/pyemscripten-abi.json"
+          ${pkgs.perl}/bin/perl -0pi -e 's#/nix/store/[0-9a-z]{32}-#nix-store:#g' "$out/share/viberoots-python-wasm/pyemscripten-abi.json"
+          abi_count=$((abi_count + 1))
+        fi
+      done
+      if [ "$abi_count" -gt 1 ]; then
+        echo "python wasm app ${name}: multiple PyEmscripten ABI identities are unsupported" >&2
+        exit 2
+      fi
       cat > "$out/BUILD-INFO.json" <<JSON
       {
         "kind": "wasm-app",
@@ -134,6 +155,15 @@ EOF
         "nativeOverlays": ${builtins.toJSON nativeOverlaysCount},
         "trim": "${trim}"
       }
+JSON
+      cat > "$out/share/viberoots-python-wasm/sbom.spdx.json" <<JSON
+      {"spdxVersion":"SPDX-2.3","dataLicense":"CC0-1.0","SPDXID":"SPDXRef-DOCUMENT","name":"viberoots-python-wasm-${H.sanitizeName name}","documentNamespace":"https://viberoots.local/spdx/python-wasm/${H.sanitizeName name}","packages":[{"name":"${H.sanitizeName name}","SPDXID":"SPDXRef-Package-${H.sanitizeName name}","versionInfo":"0.1.0","filesAnalyzed":false,"downloadLocation":"NOASSERTION","licenseConcluded":"NOASSERTION","licenseDeclared":"NOASSERTION","copyrightText":"NOASSERTION","externalRefs":[{"referenceCategory":"PACKAGE-MANAGER","referenceType":"purl","referenceLocator":"pkg:viberoots/python-wasm/${H.sanitizeName name}@0.1.0?backend=${effBackend}"}]}]}
+JSON
+      cat > "$out/share/viberoots-python-wasm/provenance.json" <<JSON
+      {"schema":"viberoots.python-wasm-provenance.v1","artifact":{"name":"${H.sanitizeName name}","kind":"wasm-app","backend":"${effBackend}","subdir":"${subdir}"},"builder":{"pyodide":${builtins.toJSON (effBackend == "pyodide")},"nativeOverlays":${builtins.toJSON nativeOverlaysCount},"patchedKeys":${builtins.toJSON patchedKeys}},"authority":{"materializationManifest":"share/viberoots-python-wasm/materialization-manifest.json","pyemscriptenAbi":"share/viberoots-python-wasm/pyemscripten-abi.json","sbom":"share/viberoots-python-wasm/sbom.spdx.json"}}
+JSON
+      cat > "$out/share/viberoots-python-wasm/materialization-manifest.json" <<JSON
+      {"schemaVersion":"viberoots.nix-store-materialization.v1","sourceRevision":"python-wasm-local","sourceSnapshot":"${appSrc}","flakeLockFingerprint":"python-wasm-app:${effBackend}:${subdir}","substituter":{"endpointIdentity":"https://cache.home.kilty.io/main","trustedPublicKeys":["main:N7uIAritMCBWpa9cdZJxHJ7gWfsXCwAsbyIJqrSQnLY="]},"tools":{"nix":"${if artifactNixRoot == "" then builtins.toString pkgs.nix else artifactNixRoot}"},"evidence":{"provenance":{"path":"share/viberoots-python-wasm/provenance.json","schema":"viberoots.python-wasm-provenance.v1"},"sbom":{"path":"share/viberoots-python-wasm/sbom.spdx.json","format":"spdx-json"},"pyemscriptenAbi":{"path":"share/viberoots-python-wasm/pyemscripten-abi.json"}},"storePaths":[{"attr":"${H.sanitizeName name}","path":"$out","expectedOutputIdentity":"$(basename "$out")"}]}
 JSON
     '';
 
@@ -199,4 +229,3 @@ JSON
       fi
     '';
 }
-

@@ -1,7 +1,10 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { processTableLines } from "../../lib/process-inspection";
 import { workspaceRoot } from "./paths";
 import { pidAlive } from "./process-liveness";
+import { bestActiveUnmanagedAgentLog } from "./agent-log";
+import { resolvePidFromRoots } from "./resolve-pid";
 
 export { pidAlive, pidAliveWithSignature, pidStartSignature } from "./process-liveness";
 
@@ -25,6 +28,7 @@ function lockLogPaths(root: string): string[] {
 }
 function logsDirsFor(root: string): string[] {
   return [
+    path.join(root, ".viberoots", "buck", "verify-logs"),
     path.join(root, ".viberoots", "workspace", "buck", "verify-logs"),
     path.join(root, ".viberoots", "workspace", "buck", "test-logs"),
     path.join(root, "buck-out", "tmp", "verify-logs"),
@@ -32,6 +36,13 @@ function logsDirsFor(root: string): string[] {
 }
 function latestSymlinksFor(root: string): string[] {
   return logsDirsFor(root).map((dir) => path.join(dir, "latest.log"));
+}
+function unmanagedLogsDirsFor(root: string): string[] {
+  return [
+    path.join(root, ".viberoots", "buck", "agent-test-logs"),
+    path.join(root, ".viberoots", "workspace", "buck", "agent-test-logs"),
+    path.join(root, "viberoots", ".viberoots", "workspace", "buck", "agent-test-logs"),
+  ];
 }
 
 async function worktreeRoots(): Promise<string[]> {
@@ -125,6 +136,66 @@ async function bestLiveLock(
   return { pid: best.pid, logPath: best.logPath };
 }
 
+function parseProcessLine(line: string): { pid: number; command: string } | null {
+  const match = line.match(/^\s*(\d+)\s+(.*)$/s);
+  if (!match) return null;
+  const pid = Number(match[1]);
+  const command = String(match[2] || "");
+  if (!Number.isInteger(pid) || pid <= 1 || !command) return null;
+  return { pid, command };
+}
+
+function shellUnquote(value: string): string {
+  return value.replace(/\\(["\\$`])/g, "$1");
+}
+
+function extractLogPath(command: string): string {
+  const quoted = command.match(/\blog=(["'])(.*?)\1/s);
+  if (quoted?.[2]) return shellUnquote(quoted[2]);
+  const bare = command.match(/\blog=([^\s;]+\.log)\b/s);
+  return bare?.[1] ? shellUnquote(bare[1]) : "";
+}
+
+function isUnmanagedVerifyCommand(command: string, root: string): boolean {
+  if (!command.includes(root)) return false;
+  if (command.includes("tail-log --status")) return false;
+  if (!/\bi\s*&&\s*b\s*&&\s*v\b/.test(command) && !command.includes("viberoots verify")) {
+    return false;
+  }
+  return true;
+}
+
+async function bestUnmanagedLiveVerify(
+  dependencies: ResolveLatestDependencies = {},
+): Promise<{ pid: number; logPath: string } | null> {
+  const resolveCandidateRoots = dependencies.candidateRoots ?? candidateRoots;
+  const isPidAlive = dependencies.pidAlive ?? pidAlive;
+  const roots = await resolveCandidateRoots();
+  let best: { pid: number; logPath: string; mtime: number } | null = null;
+  const lines = await processTableLines({
+    psArgs: ["-A", "-ww", "-o", "pid=,command="],
+    timeoutMs: 2000,
+    pgrepPattern: "agent-test-logs|viberoots verify|i && b && v",
+  });
+  for (const line of lines) {
+    const parsed = parseProcessLine(line);
+    if (!parsed) continue;
+    const root = roots.find((candidate) => isUnmanagedVerifyCommand(parsed.command, candidate));
+    if (!root) continue;
+    const logPath = extractLogPath(parsed.command);
+    if (!logPath || !path.isAbsolute(logPath) || !logPath.startsWith(root + path.sep)) continue;
+    if (!(await isPidAlive(parsed.pid))) continue;
+    const st = await fs.stat(logPath).catch(() => null);
+    if (!st?.isFile()) continue;
+    if (!best || st.mtimeMs > best.mtime) {
+      const lp = await fs.realpath(logPath).catch(() => logPath);
+      best = { pid: parsed.pid, logPath: lp, mtime: st.mtimeMs };
+    }
+  }
+  if (!best) return null;
+  return { pid: best.pid, logPath: best.logPath };
+}
+
 async function bestLatestSymlink(
   resolveCandidateRoots: () => Promise<string[]> = candidateRoots,
 ): Promise<string | null> {
@@ -147,6 +218,16 @@ export async function resolveLatest(
   const resolveCandidateRoots = dependencies.candidateRoots ?? candidateRoots;
   const live = await bestLiveLock(dependencies);
   if (live) return { pid: live.pid, logPath: live.logPath, active: true };
+  const unmanaged = await bestUnmanagedLiveVerify(dependencies);
+  if (unmanaged) return { pid: unmanaged.pid, logPath: unmanaged.logPath, active: true };
+  const activeAgentLog = await bestActiveUnmanagedAgentLog({
+    resolveCandidateRoots,
+    logsDirsFor,
+    unmanagedLogsDirsFor,
+  });
+  if (activeAgentLog) {
+    return { pid: activeAgentLog.pid, logPath: activeAgentLog.logPath, active: true };
+  }
 
   const sym = await bestLatestSymlink(resolveCandidateRoots);
   if (sym) return { pid: 0, logPath: sym, active: false };
@@ -157,26 +238,13 @@ export async function resolveLatest(
 }
 
 export async function resolvePid(pid: number): Promise<Resolution> {
-  const active = await pidAlive(pid);
-  for (const root of await candidateRoots()) {
-    const pidFiles = lockPidPaths(root);
-    const logFiles = lockLogPaths(root);
-    for (let i = 0; i < pidFiles.length; i += 1) {
-      const lockedPidRaw = await readText(pidFiles[i]!);
-      const lockedLogRaw = await readText(logFiles[i]!);
-      if (lockedPidRaw && lockedLogRaw && lockedPidRaw === String(pid)) {
-        const lp = await fs.realpath(lockedLogRaw).catch(() => lockedLogRaw);
-        return { pid, logPath: lp, active };
-      }
-    }
-    for (const dir of logsDirsFor(root)) {
-      const byPid = path.join(dir, "by-pid", `${pid}.log`);
-      const lp = await fs.realpath(byPid).catch(() => null);
-      if (lp) return { pid, logPath: lp, active };
-      const legacy = path.join(dir, `verify-${pid}.log`);
-      const lp2 = await fs.realpath(legacy).catch(() => null);
-      if (lp2) return { pid, logPath: lp2, active };
-    }
-  }
-  return { pid, logPath: null, error: `log file not found for pid ${pid}`, active };
+  return resolvePidFromRoots({
+    pid,
+    candidateRoots,
+    lockPidPaths,
+    lockLogPaths,
+    logsDirsFor,
+    pidAlive,
+    readText,
+  });
 }

@@ -18,6 +18,9 @@ await fs.access(mainPath);
 
 const runtimeDirRaw = "${runtimeDir}";
 const runtimeDir = (() => {
+  if (runtimeDirRaw === "app-local") {
+    return path.resolve(here, "..", "runtime");
+  }
   const marker = runtimeDirRaw.indexOf("file:");
   if (marker !== -1) {
     return fileURLToPath(runtimeDirRaw.slice(marker));
@@ -79,7 +82,8 @@ const appDir = path.resolve(here, "..", "app");
 const mainPath = path.join(appDir, "bin", "__main__.py");
 await fs.access(mainPath);
 
-const runtimeDir = "${runtimeDir}";
+const runtimeDir =
+  "${runtimeDir}" === "app-local" ? path.resolve(here, "..", "runtime") : "${runtimeDir}";
 const wasmPath = path.join(runtimeDir, "bin", "python.wasm");
 const args = ["python", "/app/bin/__main__.py"];
 const env = {

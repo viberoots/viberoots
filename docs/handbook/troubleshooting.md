@@ -35,6 +35,34 @@ start with [Rust WebAssembly Operations](rust-wasm-operations.md#troubleshooting
 - A failed, timed-out, or interrupted update leaves every affected lock at its prior bytes or prior
   absence. Preserve the failure output and fix the unsupported or unavailable dependency source.
 
+## Rust Pyodide extension diagnostics
+
+- Scaffold selection: use `scaf new rust pyodide-extension <name> --yes`. If a template does not
+  contain both `Cargo.lock` and `uv.lock`, regenerate the scaffold rather than hand-copying lock
+  metadata.
+- Import failure from `bin/run.mjs`: build and run the Python WASM consumer output, not the Rust
+  extension output alone. The consumer owns `site/`, `app/`, `bin/run.mjs`, `BUILD-INFO.json`, and
+  `share/viberoots-python-wasm/materialization-manifest.json`.
+- ABI gate failure: Pyodide extensions must expose `PyInit_<module>`, target
+  `wasm32-unknown-emscripten`, use the pinned Pyodide/Emscripten toolchains, and keep pthreads and
+  atomics disabled. Unexpected public Rust exports are rejected; protected behavior checks route
+  through the Python consumer function instead of adding a second exported symbol.
+- Cache/materialization failure: inspect the consumer materialization manifest under
+  `share/viberoots-python-wasm/`. Cache-restored proof must materialize the consumer output from a
+  reviewed Nix cache handoff; copying a dereferenced local output is only a local inspection aid.
+- WASI boundary: Rust Pyodide success does not mean WASI dynamic extensions work. WASI extension
+  support remains fail-closed until the Python WASM runtime publishes an executable dynamic-loader
+  ABI and matching extension scaffold.
+- External release boundary: repository tests can prove selected, filtered, remote-prepared, and
+  cache-restored Pyodide behavior. Release admission still needs reviewed external builder,
+  provenance, SBOM, semantic-manifest, and signing evidence; do not replace that with local
+  developer output.
+- Backout: remove the `pyodide-extension` Python WASM consumer and Rust extension targets, run `u`
+  to reconcile Cargo and Python metadata, then run `i && b && v <affected selectors>`. Preserve
+  failed protected evidence for audit, regenerate semantic manifest/provenance/SBOM evidence
+  through the normal publication path, and do not hand-edit materialization manifests or
+  PyEmscripten ABI files to hide stale paths.
+
 ## Bootstrap-safe glue
 
 - Glue and CI entrypoints are bootstrap-safe and do not depend on `fs-extra`. They can run before `node_modules` exists.

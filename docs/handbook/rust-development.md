@@ -59,11 +59,32 @@ artifacts or claim independent sandbox certification.
 
 ## Starting a package
 
-`scaf new rust` supports `cli`, `lib`, `proc-macro`, `python-extension`, `node-addon`,
-`cxx-bridge`, and `wasm`. The CLI is the native binary starter; the WASM starter includes
-bare-WASM and WASI targets. Extension and bridge templates are dependency-light, buildable ABI
-starting points with smoke checks. Each generated README lists the supported lifecycle commands
-and identifies library targets that cannot be run with `p` or `d`.
+`scaf new rust` supports `cli`, `lib`, `proc-macro`, `python-extension`, `pyodide-extension`,
+`node-addon`, `cxx-bridge`, and `wasm`. The CLI is the native binary starter; the WASM starter
+includes bare-WASM and WASI targets. Extension and bridge templates are dependency-light,
+buildable ABI starting points with smoke checks. Each generated README lists the supported
+lifecycle commands and identifies library targets that cannot be run with `p` or `d`.
+
+Use `scaf new rust pyodide-extension <name> --yes` when a PyO3 module must run inside the pinned
+Pyodide runtime. The scaffold creates a Rust `cdylib`, package-local `Cargo.lock`, `uv.lock`,
+Python WASM consumer, `TARGETS` wiring, and `patches/rust/` directory. Run `u` after dependency
+or patch edits; `i`, devshell entry, and `b` are read-only checks. The selected Python WASM
+consumer is the executable surface: build it with the normal selected target flow and run
+`bin/run.mjs` from the output to prove import and function execution.
+
+Rust Pyodide extensions use the PyEmscripten ABI only. The output is a Pyodide side module with a
+`PyInit_*` export, no pthreads/atomics, pinned Pyodide and Emscripten toolchains, and a consumer
+materialization manifest under `share/viberoots-python-wasm/`. WASI Python extension loading is
+not implied by Pyodide support; WASI remains unsupported until the shared Python WASM runtime owns
+an executable dynamic-extension ABI.
+
+Backout: remove the Python WASM consumer target first, then run `u` so
+Cargo and Python metadata drop stale lock entries together. Remove the
+`rust_python_wasm_extension` target, package files, and any local Rust patch entries for that
+package, then run `u` again followed by `i && b && v <affected selectors>`. If the extension had
+protected or cache-publication evidence, preserve the rejected evidence records for review and
+regenerate the protected aggregate after removal; do not hand-edit materialization manifests,
+semantic manifests, SBOMs, provenance, or PyEmscripten ABI evidence.
 
 If a build unexpectedly reaches the network, first run `u` and inspect fixed-source inputs.
 If an editor chooses a host tool, inspect the generated editor record. If coverage is absent,

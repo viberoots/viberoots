@@ -48,11 +48,13 @@ test("generated .envrc delegates to stable stage-0 helper before nix-direnv use 
   const restoreHostPath = stage0.indexOf(
     '"${__vbr_host_path}" > "${PWD}/.viberoots/workspace/host-path"',
   );
+  const emptyHostPath = stage0.indexOf(': > "${PWD}/.viberoots/workspace/host-path"');
   assert.ok(pruneHostPath >= 0, "stage-0 prunes runtime leaves before Nix acquisition");
-  assert.ok(acquireWorkspaceFlake > pruneHostPath, "workspace flake is acquired after pruning");
+  assert.ok(restoreHostPath > pruneHostPath, "host PATH is restored after pruning");
+  assert.ok(emptyHostPath > pruneHostPath, "empty host PATH fallback is restored after pruning");
   assert.ok(
-    restoreHostPath > acquireWorkspaceFlake,
-    "host PATH is restored only after shell entry",
+    acquireWorkspaceFlake > restoreHostPath,
+    "workspace flake is acquired after host PATH restoration",
   );
   assert.match(stage0, /if \[\[ "\$\{NIX_PNPM_ALLOW_GENERATE:-\}" == "1" \]\]/);
   assert.match(stage0, /__vbr_flake_args\+=\(--impure\)/);

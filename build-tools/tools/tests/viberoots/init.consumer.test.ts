@@ -13,7 +13,7 @@ import {
   initConsumer,
   type ConsumerSourceMode,
 } from "../../lib/consumer-bootstrap";
-import { envrc } from "../../lib/consumer-direnv";
+import { direnvStage0, envrc } from "../../lib/consumer-direnv";
 import { consumerGitignoreEntries } from "../../lib/consumer-tracked-inputs";
 import { renderGlobalNixInputTargets } from "../../lib/global-nix-input-targets";
 import {
@@ -94,9 +94,98 @@ async function assertDirenvBootstrap(workspace: string): Promise<void> {
     assert.match(stage0, new RegExp(excluded.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
   assert.match(stage0, /__vbr_stage0_apply_nix_cache_health \|\| return 1/);
+  assert.match(stage0, /\$\{PWD\}\/\.viberoots\/current/);
   assert.match(stage0, /error: viberoots workspace flake is missing\./);
   assert.match(stage0, /run: viberoots bootstrap-check --repair-if-needed/);
 }
+
+test("direnv stage0 resolves flattened Nix cache provenance through .viberoots/current", async () => {
+  const workspace = await fsp.realpath(
+    await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-stage0-current-provenance-")),
+  );
+  try {
+    const viberootsRoot = await findViberootsRoot();
+    const fakeBin = path.join(workspace, ".fake-bin");
+    const helper = path.join(
+      workspace,
+      ".viberoots",
+      "current",
+      "build-tools",
+      "tools",
+      "dev",
+      "nix-cache-role-provenance.ts",
+    );
+    await fsp.mkdir(fakeBin, { recursive: true });
+    await fsp.mkdir(path.join(workspace, ".viberoots", "bootstrap"), { recursive: true });
+    await fsp.mkdir(path.join(workspace, ".viberoots", "workspace"), { recursive: true });
+    await fsp.writeFile(path.join(workspace, "flake.nix"), "\n");
+    await fsp.writeFile(path.join(workspace, ".viberoots", "workspace", "flake.nix"), "\n");
+    await fsp.symlink(viberootsRoot, path.join(workspace, ".viberoots", "current"));
+    await fsp.writeFile(
+      path.join(fakeBin, "nix"),
+      [
+        "#!/usr/bin/env bash",
+        'if [[ "${1:-}" == "config" && "${2:-}" == "show" ]]; then',
+        '  printf "%s\\n" "substituters = https://cache.nixos.org/ https://install.determinate.systems"',
+        "  exit 0",
+        "fi",
+        "exit 0",
+        "",
+      ].join("\n"),
+      { mode: 0o755 },
+    );
+    await fsp.writeFile(
+      path.join(fakeBin, "node"),
+      [
+        "#!/usr/bin/env bash",
+        'helper="${@: -2:1}"',
+        `expected=${JSON.stringify(helper)}`,
+        'if [[ "${helper}" != "${expected}" ]]; then',
+        '  printf "unexpected provenance helper: %s\\n" "${helper}" >&2',
+        "  exit 42",
+        "fi",
+        'printf "%s\\n%s\\n" "https://cache.nixos.org/" "https://install.determinate.systems"',
+        "",
+      ].join("\n"),
+      { mode: 0o755 },
+    );
+    await fsp.writeFile(path.join(fakeBin, "i"), "#!/usr/bin/env bash\nexit 0\n", { mode: 0o755 });
+    await fsp.writeFile(
+      path.join(workspace, ".viberoots", "bootstrap", "direnv-stage0.sh"),
+      direnvStage0(),
+    );
+    await fsp.writeFile(
+      path.join(workspace, "stage0-smoke.sh"),
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "use() {",
+        '  if [[ "${1:-}" != "flake" ]]; then return 2; fi',
+        "}",
+        "unset VIBEROOTS_SOURCE_ROOT VIBEROOTS_ROOT",
+        'export PATH="${1}:${PATH:-}"',
+        'export NIX_CONFIG="substituters = https://cache.nixos.org/ https://install.determinate.systems"',
+        'source ".viberoots/bootstrap/direnv-stage0.sh"',
+        "command -v i >/dev/null",
+        "",
+      ].join("\n"),
+      { mode: 0o755 },
+    );
+
+    const result = await execFileAsync("bash", ["stage0-smoke.sh", fakeBin], {
+      cwd: workspace,
+      env: envWithFakeNix(fakeBin, {
+        VBR_NIX_CACHE_POLICY: "force",
+      }),
+    });
+    assert.doesNotMatch(
+      `${String(result.stdout)}\n${String(result.stderr)}`,
+      /flattened Nix substituters require reviewed source-role provenance/,
+    );
+  } finally {
+    await fsp.rm(workspace, { recursive: true, force: true });
+  }
+});
 
 function assertConsumerFlakeAllowsPnpmProvisioningEnv(flake: string): void {
   for (const name of [

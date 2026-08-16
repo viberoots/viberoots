@@ -1257,7 +1257,7 @@ test("all cache-health renderers share the reviewed curl transport status set", 
   for (const rel of [
     "build-tools/lang/nix_cache_health.bzl",
     "build-tools/tools/bin/devshell-cache-health.sh",
-    "build-tools/tools/lib/consumer-direnv.ts",
+    "build-tools/tools/lib/consumer-direnv-cache-health.ts",
   ]) {
     assert.match(
       await fsp.readFile(sourceFile(rel), "utf8"),

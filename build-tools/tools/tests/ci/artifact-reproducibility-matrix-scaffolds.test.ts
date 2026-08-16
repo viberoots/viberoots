@@ -55,6 +55,12 @@ test("every matrix recipe binds the target emitted by its actual scaffold templa
       "repro-rust-python",
     ],
     [
+      "rust-pyodide-extension-pr14",
+      "rust/pyodide-extension/TARGETS.jinja",
+      "projects/apps/repro-rust-pyodide",
+      "repro-rust-pyodide",
+    ],
+    [
       "rust-node-addon-pr12",
       "rust/node-addon/TARGETS.jinja",
       "projects/libs/repro-rust-node",

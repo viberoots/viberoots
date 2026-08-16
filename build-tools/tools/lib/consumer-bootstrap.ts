@@ -227,10 +227,14 @@ function pathHasExternalAgentTool(hostPath: string, workspaceRoot: string): bool
 
 async function writeHostPathIfUseful(workspaceRoot: string): Promise<void> {
   const hostPath = filterCapturedHostPath(process.env.VBR_HOST_PATH || process.env.PATH || "");
-  if (!hostPath) return;
   const file = path.join(workspaceRoot, ".viberoots", "workspace", "host-path");
-  if (process.env.VBR_HOST_PATH || pathHasExternalAgentTool(hostPath, workspaceRoot)) {
+  if (
+    hostPath &&
+    (process.env.VBR_HOST_PATH || pathHasExternalAgentTool(hostPath, workspaceRoot))
+  ) {
     await writeIfChanged(file, `${hostPath}\n`);
+  } else {
+    await writeIfChanged(file, "");
   }
 }
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import fsp from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
@@ -62,11 +63,28 @@ test("graph planner packages use the workspace source under delegated flakes", a
 
 test("nix develop activates live local submodule workflow path", async () => {
   const markerText = `live-edit-${Date.now()}`;
-  const marker = path.join("viberoots", ".live-edit-marker");
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-root-flake-delegation-"));
+  const source = path.resolve("viberoots");
+  const workspace = path.join(tmp, ".viberoots", "workspace");
+  const marker = path.join(tmp, "viberoots", ".live-edit-marker");
+  await fsp.mkdir(workspace, { recursive: true });
+  await fsp.symlink(source, path.join(tmp, "viberoots"));
+  await fsp.symlink("../viberoots", path.join(tmp, ".viberoots", "current"));
+  for (const rel of ["flake.nix", "flake.lock", "toolchain-paths.json"]) {
+    await fsp.copyFile(path.join(".viberoots", "workspace", rel), path.join(workspace, rel));
+  }
+  await fsp.cp(
+    path.join(".viberoots", "workspace", "toolchains"),
+    path.join(workspace, "toolchains"),
+    {
+      recursive: true,
+    },
+  );
+  await fsp.writeFile(path.join(workspace, "host-path"), "", "utf8");
   const script = `
 set -euo pipefail
 actual_current="$(realpath .viberoots/current)"
-expected_current="$(pwd -P)/viberoots"
+expected_current="${source}"
 if [ "$actual_current" != "$expected_current" ]; then
   echo "expected .viberoots/current to resolve to $expected_current"
   echo "actual: $actual_current"
@@ -81,18 +99,20 @@ printf '%s\\n' "$status_json" | jq -e '.sourceMode == "local" and .currentPoints
 `;
   try {
     const result = await $({
+      cwd: tmp,
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`nix develop --impure --accept-flake-config --no-write-lock-file ${`path:${path.resolve(".viberoots", "workspace")}#default`} -c bash --noprofile --norc -c ${script}`;
+    })`nix develop --impure --accept-flake-config --no-write-lock-file ${`path:${workspace}#default`} -c bash --noprofile --norc -c ${script}`;
 
     assert.equal(
       result.exitCode,
       0,
       `expected nix develop to activate live local submodule workspace\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
     );
-    assert.equal(await fsp.realpath(path.join(".viberoots", "current")), path.resolve("viberoots"));
+    assert.equal(await fsp.realpath(path.join(tmp, ".viberoots", "current")), source);
   } finally {
     await fsp.rm(marker, { force: true });
+    await fsp.rm(tmp, { recursive: true, force: true });
   }
 });

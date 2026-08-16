@@ -25,7 +25,8 @@ export function emptyNdjson(pid: number, error: string): string {
 }
 
 export async function computeStatusFromLogPath(logPath: string, pid: number, active: boolean) {
-  const text = await fsp.readFile(logPath, "utf8");
+  const text = await readTextWithStatusPlan(logPath);
+  const startedAtSec = await readSidecarStartSec(logPath);
   const stoppedAtSec = active
     ? undefined
     : await fsp
@@ -36,7 +37,33 @@ export async function computeStatusFromLogPath(logPath: string, pid: number, act
     logPath,
     pid: pid || undefined,
     text,
+    startedAtSec,
     stoppedAtSec,
     stopReason: active ? undefined : pid > 0 ? "process-exited" : "no-active-verify",
   });
+}
+
+async function readSidecarStartSec(logPath: string): Promise<number | undefined> {
+  if (!logPath.endsWith(".log")) return undefined;
+  const raw = await readFirstExistingText([`${logPath.slice(0, -4)}.start`, `${logPath}.start`]);
+  const trimmed = raw.trim();
+  const parsed = Number(trimmed);
+  if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  const parsedDate = Date.parse(trimmed);
+  return Number.isFinite(parsedDate) && parsedDate > 0 ? Math.floor(parsedDate / 1000) : undefined;
+}
+
+async function readFirstExistingText(paths: string[]): Promise<string> {
+  for (const p of paths) {
+    const text = await fsp.readFile(p, "utf8").catch(() => "");
+    if (text) return text;
+  }
+  return "";
+}
+
+async function readTextWithStatusPlan(logPath: string): Promise<string> {
+  const text = await fsp.readFile(logPath, "utf8");
+  if (!logPath.endsWith(".log")) return text;
+  const plan = await fsp.readFile(`${logPath.slice(0, -4)}.status-plan`, "utf8").catch(() => "");
+  return plan.trim() ? `${plan.trim()}\n${text}` : text;
 }

@@ -176,3 +176,23 @@ test("combined production transaction restores files, modes, source link, and cr
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+test("combined Rust Pyodide update reconciliation stays transactional with Python metadata", async () => {
+  const source = await fs.readFile(
+    new URL("../../dev/update-command/run.ts", import.meta.url),
+    "utf8",
+  );
+  const fixture = await fs.readFile(
+    new URL("./update-command-combined-rollback.test.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /projectLanguageSurfaces/);
+  assert.match(source, /operations\.languageUpdates\[surface\.id\]/);
+  assert.match(source, /withFileRollback/);
+  assert.match(source, /repairGeneratedMetadata/);
+  assert.match(fixture, /projects\/apps\/combined\/uv\.lock/);
+  assert.match(fixture, /projects\/apps\/combined\/Cargo\.lock/);
+  assert.match(fixture, /source-before/);
+  assert.match(fixture, /source-after/);
+  assert.match(fixture, /gomod2nix\.toml/);
+});

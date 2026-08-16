@@ -87,6 +87,7 @@ async function assertDirenvBootstrap(workspace: string): Promise<void> {
   assert.match(stage0, /--exclude \/node_modules/);
   assert.match(stage0, /"\$\{__vbr_current_real\}" == "\$\{__vbr_local_real\}"/);
   assert.match(stage0, /__vbr_stage0_apply_nix_cache_health \|\| return 1/);
+  assert.match(stage0, /\$\{PWD\}\/\.viberoots\/current/);
 }
 
 async function writeFakeGit(

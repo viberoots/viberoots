@@ -145,6 +145,7 @@ test("Rust scaffold inventory covers the supported PR-10 shapes", async () => {
     "lib",
     "node-addon",
     "proc-macro",
+    "pyodide-extension",
     "python-extension",
     "tauri-app",
     "wasm",

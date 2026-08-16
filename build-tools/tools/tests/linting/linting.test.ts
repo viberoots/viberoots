@@ -20,72 +20,79 @@ function isTransientNixStoreError(err: unknown): boolean {
 
 async function retryTransientNixStoreError<T>(fn: () => Promise<T>): Promise<T> {
   let lastErr: unknown;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
     try {
       return await fn();
     } catch (err) {
       lastErr = err;
-      if (!isTransientNixStoreError(err) || attempt > 0) throw err;
-      await new Promise((resolve) => setTimeout(resolve, 750));
+      if (!isTransientNixStoreError(err) || attempt >= 4) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 750 * (attempt + 1)));
     }
   }
   throw lastErr;
 }
 
 describe("pre-commit hook (lint-staged with Prettier + ESLint)", () => {
-  test("blocks commit on lint/format errors and allows commit when fixed", async () => {
-    await runInTemp("linting", async (tmp, $) => {
-      const eslintBin = ensureNixStoreToolPathSync("eslint", process.env);
-      const toolNodeModules = await fsp.realpath(path.dirname(path.dirname(eslintBin)));
-      const nestedRoot = path.join(tmp, "viberoots");
-      const fixture$ = $({
-        cwd: nestedRoot,
-        env: {
-          ...process.env,
-          NODE_PATH: [toolNodeModules, process.env.NODE_PATH || ""]
-            .filter(Boolean)
-            .join(path.delimiter),
-        },
+  const TEST_TIMEOUT_MS =
+    Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "600") * 1000;
+
+  test(
+    "blocks commit on lint/format errors and allows commit when fixed",
+    { timeout: TEST_TIMEOUT_MS },
+    async () => {
+      await runInTemp("linting", async (tmp, $) => {
+        const eslintBin = ensureNixStoreToolPathSync("eslint", process.env);
+        const toolNodeModules = await fsp.realpath(path.dirname(path.dirname(eslintBin)));
+        const nestedRoot = path.join(tmp, "viberoots");
+        const fixture$ = $({
+          cwd: nestedRoot,
+          env: {
+            ...process.env,
+            NODE_PATH: [toolNodeModules, process.env.NODE_PATH || ""]
+              .filter(Boolean)
+              .join(path.delimiter),
+          },
+        });
+        await fixture$`git config user.email tester@example.com`;
+        await fixture$`git config user.name Tester`;
+        await fixture$`git config core.hooksPath .husky`;
+
+        const badFile = path.join(tmp, "viberoots", "build-tools", "tools", "dev", "bad.ts");
+        await fsp.mkdir(path.dirname(badFile), { recursive: true });
+        await fsp.writeFile(badFile, `const x = ;\n`, "utf8");
+        await stageTempRepoPaths({
+          tmp,
+          _$: $,
+          explicitPaths: [path.relative(tmp, badFile)],
+        });
+
+        let blocked = false;
+        try {
+          await fixture$({ stdio: "pipe" })`git commit -m "feat: add bad file"`;
+        } catch {
+          blocked = true;
+        }
+        if (!blocked) {
+          console.error("commit unexpectedly succeeded");
+          process.exit(2);
+        }
+
+        await fsp.writeFile(badFile, `if (true) { console.log('ok'); }\n`, "utf8");
+        await stageTempRepoPaths({
+          tmp,
+          _$: $,
+          explicitPaths: [path.relative(tmp, badFile)],
+        });
+        await retryTransientNixStoreError(
+          async () => await fixture$`git commit -m "style: fix lint issues"`,
+        );
+
+        const fixed = await fsp.readFile(badFile, "utf8");
+        if (!/if\s*\(\s*true\s*\)\s*\{[\s\S]*?console\.log\((['"])ok\1\);[\s\S]*?\}/m.test(fixed)) {
+          console.error("file missing braces/log pattern");
+          process.exit(2);
+        }
       });
-      await fixture$`git config user.email tester@example.com`;
-      await fixture$`git config user.name Tester`;
-      await fixture$`git config core.hooksPath .husky`;
-
-      const badFile = path.join(tmp, "viberoots", "build-tools", "tools", "dev", "bad.ts");
-      await fsp.mkdir(path.dirname(badFile), { recursive: true });
-      await fsp.writeFile(badFile, `const x = ;\n`, "utf8");
-      await stageTempRepoPaths({
-        tmp,
-        _$: $,
-        explicitPaths: [path.relative(tmp, badFile)],
-      });
-
-      let blocked = false;
-      try {
-        await fixture$({ stdio: "pipe" })`git commit -m "feat: add bad file"`;
-      } catch {
-        blocked = true;
-      }
-      if (!blocked) {
-        console.error("commit unexpectedly succeeded");
-        process.exit(2);
-      }
-
-      await fsp.writeFile(badFile, `if (true) { console.log('ok'); }\n`, "utf8");
-      await stageTempRepoPaths({
-        tmp,
-        _$: $,
-        explicitPaths: [path.relative(tmp, badFile)],
-      });
-      await retryTransientNixStoreError(
-        async () => await fixture$`git commit -m "style: fix lint issues"`,
-      );
-
-      const fixed = await fsp.readFile(badFile, "utf8");
-      if (!/if\s*\(\s*true\s*\)\s*\{[\s\S]*?console\.log\((['"])ok\1\);[\s\S]*?\}/m.test(fixed)) {
-        console.error("file missing braces/log pattern");
-        process.exit(2);
-      }
-    });
-  });
+    },
+  );
 });

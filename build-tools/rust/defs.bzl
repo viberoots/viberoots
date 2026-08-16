@@ -157,6 +157,7 @@ def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, inte
         attrs.update({
             "link_mode": link_mode,
             "module": module,
+            "pyemscripten_abi": "viberoots.pyemscripten-abi.v1" if kind == "pyext_wasm" else "",
             "build_py_deps": build_py_deps,
             "runtime_deps": runtime_deps,
             "addon_name": addon_name,

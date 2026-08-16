@@ -29,6 +29,148 @@ function formatProjectedEndTime(epochSec: number): string {
 
 const MIN_GROUP_ELAPSED_SECONDS_FOR_AVG_PROJECTION = 30;
 
+function parseProgressDurationSeconds(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  if (value.endsWith("s")) {
+    const seconds = Number(value.slice(0, -1));
+    return Number.isFinite(seconds) ? seconds : undefined;
+  }
+  const parts = value.split(":").map((part) => Number(part));
+  if (parts.length === 2 && parts.every(Number.isFinite)) {
+    return parts[0] * 60 + parts[1];
+  }
+  if (parts.length === 3 && parts.every(Number.isFinite)) {
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  }
+  return undefined;
+}
+
+function consoleTimingFromProgressLines(
+  lines: string[],
+  elapsedSeconds: number | undefined,
+): {
+  completionRateRecentPerMinute?: number;
+  projectedDuration?: string;
+  projectedEndTime?: string;
+} {
+  const re =
+    /^\s*test\s+\S+\s+\[[^\]]+\]\s+(\d+)\/(\d+)(?:\s+fail\s+\d+)?\s+(pending|running|done|failed)\s+(\S+)(?:\s+\/\s+~(\S+))?\b/;
+  let latest:
+    | {
+        completed: number;
+        elapsedSeconds?: number;
+        projectedGroupSeconds?: number;
+        state: string;
+      }
+    | undefined;
+  for (const raw of lines) {
+    const line = stripAnsiAndCrs(raw);
+    const m = re.exec(line);
+    if (!m) continue;
+    latest = {
+      completed: Number(m[1]),
+      elapsedSeconds: parseProgressDurationSeconds(m[4]),
+      projectedGroupSeconds: parseProgressDurationSeconds(m[5]),
+      state: m[3] || "",
+    };
+  }
+  if (!latest) return {};
+  const completionRateRecentPerMinute =
+    latest.elapsedSeconds !== undefined &&
+    latest.elapsedSeconds > 0 &&
+    Number.isFinite(latest.completed) &&
+    latest.completed > 0
+      ? latest.completed / (latest.elapsedSeconds / 60)
+      : undefined;
+  if (
+    latest.state !== "running" ||
+    elapsedSeconds === undefined ||
+    latest.elapsedSeconds === undefined ||
+    latest.projectedGroupSeconds === undefined ||
+    latest.projectedGroupSeconds <= latest.elapsedSeconds
+  ) {
+    return { completionRateRecentPerMinute };
+  }
+  const remainingSeconds = latest.projectedGroupSeconds - latest.elapsedSeconds;
+  return {
+    completionRateRecentPerMinute,
+    projectedDuration: formatElapsed(elapsedSeconds + remainingSeconds),
+    projectedEndTime: formatProjectedEndTime(Date.now() / 1000 + remainingSeconds),
+  };
+}
+
+function progressStatusFromConsoleLines(lines: string[]): Omit<VerifyStatus, "logPath"> | null {
+  const re =
+    /^\s*test\s+(\S+)\s+\[[^\]]+\]\s+(\d+)\/(\d+)(?:\s+fail\s+(\d+))?\s+(pending|running|done|failed)\s+(\S+)(?:\s+\/\s+~(\S+))?\b/;
+  const groups = new Map<string, VerifyPassGroupStatus>();
+  const order: string[] = [];
+  let sawPending = false;
+  for (const raw of lines) {
+    const line = stripAnsiAndCrs(raw);
+    const m = re.exec(line);
+    if (!m) continue;
+    const name = m[1] || "";
+    const completed = Number(m[2]);
+    const total = Number(m[3]);
+    const fail = m[4] ? Number(m[4]) : 0;
+    const state = m[5] || "";
+    if (state === "pending") sawPending = true;
+    const elapsedSeconds = parseProgressDurationSeconds(m[6]);
+    if (!name || !Number.isFinite(completed) || !Number.isFinite(total)) continue;
+    if (!groups.has(name)) order.push(name);
+    groups.set(name, {
+      name,
+      index: order.indexOf(name) + 1,
+      total: 0,
+      completed,
+      targetCount: total,
+      pass: Math.max(0, completed - fail),
+      fail: Number.isFinite(fail) ? fail : 0,
+      fatal: 0,
+      skip: 0,
+      buildFailure: 0,
+      completionRateAvgPerMinute:
+        elapsedSeconds !== undefined && elapsedSeconds > 0 && completed > 0
+          ? completed / (elapsedSeconds / 60)
+          : undefined,
+      done: state === "done" || state === "failed",
+      active: state === "running",
+    });
+  }
+  if (groups.size === 0) return null;
+  const passGroups = order.flatMap((name, idx) => {
+    const group = groups.get(name);
+    return group ? [{ ...group, index: idx + 1, total: order.length }] : [];
+  });
+  const pass = passGroups.reduce((sum, group) => sum + group.pass, 0);
+  const fail = passGroups.reduce((sum, group) => sum + group.fail, 0);
+  const completed = passGroups.reduce((sum, group) => sum + (group.completed || 0), 0);
+  const targetTotal = passGroups.reduce((sum, group) => sum + (group.targetCount || 0), 0);
+  const latest = [...passGroups].reverse().find((group) => group.active) || passGroups.at(-1);
+  const done = passGroups.length > 0 && passGroups.every((group) => group.done);
+  const hasPendingPassEvidence = passGroups.some((group) => !group.done && !group.active);
+  return {
+    pass,
+    fail,
+    fatal: 0,
+    skip: 0,
+    buildFailure: 0,
+    remaining:
+      done || hasPendingPassEvidence || sawPending
+        ? Math.max(0, targetTotal - completed)
+        : undefined,
+    failed: collectFailedLabels(lines),
+    done,
+    source: "derived",
+    passName: latest?.name,
+    passIndex: latest?.index,
+    passTotal: latest?.total,
+    groupCompleted: latest?.completed,
+    groupTotal: latest?.targetCount,
+    passGroups,
+  };
+}
+
 function passExitCompletedForProgress(
   exit: { status: number; pass: number; fail: number; completions?: number },
   targetCount: number | undefined,
@@ -240,6 +382,7 @@ export function computeVerifyStatusFromLogText(opts: {
   logPath: string;
   pid?: number;
   text: string;
+  startedAtSec?: number;
   stoppedAtSec?: number;
   stopReason?: string;
 }): VerifyStatus {
@@ -251,7 +394,7 @@ export function computeVerifyStatusFromLogText(opts: {
 
   const exitMarker = parseBuck2ExitMarker(window);
   const stoppedMarker = parseVerifyStoppedMarker(window);
-  const beginSec = parseVerifyBeginEpochSec(window);
+  const beginSec = opts.startedAtSec ?? parseVerifyBeginEpochSec(window);
   const gcDetected = parseGcDetected(window);
 
   // Prefer summary *for the current run window* when present.
@@ -259,7 +402,34 @@ export function computeVerifyStatusFromLogText(opts: {
   // if it appears to be followed by still-running-suite status lines (e.g., "Waiting on ...").
   const fromSummary = parseFinalSummary(window);
   const unaggregatedBase = fromSummary ?? deriveInProgressCounts(window);
-  const base = aggregateVerifyPassStatus(window, unaggregatedBase);
+  let base = aggregateVerifyPassStatus(window, unaggregatedBase);
+  const consoleProgressBase = progressStatusFromConsoleLines(window);
+  if (
+    base.pass === 0 &&
+    base.fail === 0 &&
+    base.fatal === 0 &&
+    base.skip === 0 &&
+    base.buildFailure === 0 &&
+    (!base.passGroups || base.passGroups.length === 0)
+  ) {
+    base = consoleProgressBase ?? base;
+  } else if (
+    consoleProgressBase &&
+    (!base.passGroups || base.passGroups.length === 0) &&
+    (consoleProgressBase.passGroups?.length || 0) > 0 &&
+    consoleProgressBase.pass +
+      consoleProgressBase.fail +
+      consoleProgressBase.fatal +
+      consoleProgressBase.skip >
+      base.pass + base.fail + base.fatal + base.skip
+  ) {
+    base = {
+      ...consoleProgressBase,
+      failed: base.failed.length > 0 ? base.failed : consoleProgressBase.failed,
+      stopped: base.stopped,
+      stopReason: base.stopReason,
+    };
+  }
 
   // Elapsed policy:
   // - Prefer an explicit "Time elapsed:" line from buck output if present (base.elapsed).
@@ -301,9 +471,13 @@ export function computeVerifyStatusFromLogText(opts: {
           : undefined;
   const recentCompletions =
     recentEndSec === undefined ? undefined : countRecentCompletions(window, recentEndSec);
+  const hasStructuredPassMarkers = parsePassBegins(window).length > 0;
+  const consoleTiming = hasStructuredPassMarkers
+    ? {}
+    : consoleTimingFromProgressLines(window, elapsedSeconds);
   const completionRateRecentPerMinute =
     recentCompletions === undefined
-      ? undefined
+      ? consoleTiming.completionRateRecentPerMinute
       : recentCompletions / (RECENT_COMPLETION_WINDOW_SECONDS / 60);
   const nowSec =
     done && exitMarker.endSec !== undefined
@@ -390,8 +564,8 @@ export function computeVerifyStatusFromLogText(opts: {
     elapsed,
     completionRateAvgPerMinute,
     completionRateRecentPerMinute,
-    projectedDuration: projection.projectedDuration,
-    projectedEndTime: projection.projectedEndTime,
+    projectedDuration: projection.projectedDuration ?? consoleTiming.projectedDuration,
+    projectedEndTime: projection.projectedEndTime ?? consoleTiming.projectedEndTime,
     gcDetected,
   };
 }

@@ -30,8 +30,10 @@ test("Rust repository policy is wired without claiming external graduation", () 
   const rust = rustManifest();
   assert.equal(rust.hermetic.status, "experimental");
   assert.equal(rust.hermetic.sandboxNetwork, true);
-  assert.equal(rust.hermetic.remoteExecution, false);
+  assert.equal(rust.hermetic.remoteExecution, true);
   assert.equal(rust.hermetic.publicationAdmission, false);
+  assert.match(rust.supportNotes.remoteExecution, /rust-pyodide-extension-pr14/);
+  assert.match(rust.supportNotes.publicationAdmission, /external release admission remains false/);
   assert.deepEqual(languageEnablementGaps(rust.hermetic), []);
   assert.deepEqual(
     rust.hermetic.reproducibilityMatrixIds,
@@ -79,10 +81,9 @@ test("actual experimental manifest emits candidate qualification without publica
   );
 });
 
-test("graduation becomes release-admitted only in the immutable graduated manifest", () => {
+test("graduation becomes release-admitted only after publication admission is true", () => {
   const rust = structuredClone(rustManifest());
   rust.hermetic.status = "graduated";
-  rust.hermetic.remoteExecution = true;
   rust.hermetic.publicationAdmission = true;
   const proof = proveLanguageQualification(
     { enabled: ["rust"], languages: [rust] },

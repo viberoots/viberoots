@@ -56,6 +56,7 @@ export interface Node {
   target?: string;
   local_patch_dirs?: string[];
   module?: string;
+  pyemscripten_abi?: string;
   build_py_deps?: string[];
   runtime_deps?: string[];
   frontend_dist?: string;

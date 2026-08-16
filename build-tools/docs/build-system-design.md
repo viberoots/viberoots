@@ -113,8 +113,13 @@ to watch the importer worktree rather than an evaluation bundle.
   Extension and bridge outputs publish Nix-store materialization evidence. Bridge validation covers
   immutable filtered source replay, generated ABI compilation, patch invalidation, and panic-abort
   behavior on the selected current host; unavailable systems retain structural matrix coverage
-  without an execution claim. Python WASM extensions fail closed until the pinned toolchains provide
-  an importable ABI. PR-9 adds Rust bare/WASI static archives, web-target wasm-bindgen packages,
+  without an execution claim. Rust Pyodide extensions now use the pinned PyEmscripten ABI through
+  the Python WASM consumer route: scaffolded `pyodide-extension` packages import and execute in
+  pinned Pyodide, carry PyEmscripten identity, provenance, SBOM, and materialization evidence, and
+  are exercised across selected, filtered/remote-prepared, exported-cache, and cold imported-cache
+  repository paths. Rust WASI dynamic Python extensions remain fail-closed until the shared Python
+  WASM runtime owns an executable dynamic-extension ABI. PR-9 adds Rust bare/WASI static archives,
+  web-target wasm-bindgen packages,
   explicit WIT components, typed WASM link authority, and declared Node asset edges. Positive WASI
   execution still requires a compatible cached toolchain or builder on hosts that cannot construct
   the cross standard library inside their sandbox. PR-10 adds a Nix-owned analyzer/formatter/lint/
@@ -127,8 +132,9 @@ to watch the importer worktree rather than an evaluation bundle.
   explicit production/development runnable contracts, and a deterministic scaffold. Linux Tauri
   promotion and credentialed signing/notarization remain external evidence. PR-12 registers the
   native, extension, bridge, WASM, and Darwin Tauri families with the canonical sandbox/network and
-  protected reproducibility/publication authorities. The language manifest records those gates as
-  wired without claiming that the required Linux builders, independent-builder records, or
+  protected reproducibility/publication authorities. The language manifest records remote/cache
+  materialization as wired for repository Rust matrix evidence, including Rust Pyodide, while still
+  withholding external publication admission until the required reviewed builder records and
   external signing evidence have run.
 - Artifact-producing public macro builds are migrated to Nix-backed paths using dynamic derivations.
 - Planner-visible probes/stubs are allowed only when explicitly documented as non-build exceptions.

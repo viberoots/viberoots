@@ -13,6 +13,10 @@ export function syncExactViberootsInputs(
   const sourceInputs = sourceLock.nodes?.[sourceRoot]?.inputs as
     | Record<string, unknown>
     | undefined;
+  const snapshotRoot = String(snapshotLock.root || "root");
+  const snapshotRootInputs = snapshotLock.nodes?.[snapshotRoot]?.inputs as
+    | Record<string, unknown>
+    | undefined;
   const snapshotNode = snapshotLock.nodes?.viberoots;
   if (!snapshotNode) throw new Error("[filtered-flake] snapshot viberoots lock node is absent");
   const targetInputs = { ...((snapshotNode.inputs || {}) as Record<string, unknown>) };
@@ -21,6 +25,10 @@ export function syncExactViberootsInputs(
     const sourceRef = sourceInputs?.[input];
     if (sourceRef == null) {
       throw new Error(`[filtered-flake] immutable source lock input ${input} is absent`);
+    }
+    if (snapshotRootInputs?.[input] === input) {
+      targetInputs[input] = [input];
+      continue;
     }
     if (Array.isArray(sourceRef)) {
       targetInputs[input] = rebaseFollowPath(sourceRef);

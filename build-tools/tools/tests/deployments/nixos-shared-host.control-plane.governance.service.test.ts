@@ -44,116 +44,127 @@ async function deployWithChecks(opts: {
   return JSON.parse(String(result.stdout));
 }
 
-test("service-backed shared-host deploy synthesizes service-owned governance evidence", async () => {
-  await runInTemp("nixos-service-owned-governance", async (tmp, $) => {
-    const deploymentLabel = "//sandbox/deployments/demo-dev:deploy";
-    const artifactDir = path.join(tmp, "artifact");
-    const paths = {
-      statePath: path.join(tmp, "platform-state.json"),
-      hostRoot: path.join(tmp, "host"),
-      recordsRoot: path.join(tmp, "records"),
-    };
-    await writeTempListedDeploymentWorkspace(tmp);
-    await writeDemoArtifact(artifactDir);
-    const deployment = await resolveDeploymentFromTarget(tmp, deploymentLabel);
-    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
-    const server = await startNixosSharedHostPublicServer({
-      deployment: deployment as any,
-      hostRoot: paths.hostRoot,
-    });
-    const controlPlane = await startNixosSharedHostControlPlaneServer({
-      workspaceRoot: tmp,
-      paths,
-      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
-      localFixture: true,
-      env: {
-        ...process.env,
-        VBR_DEPLOY_GITHUB_GOVERNANCE_FIXTURE_JSON: JSON.stringify(governanceSnapshot(deployment)),
-      } as NodeJS.ProcessEnv,
-    });
-    const worker = startNixosSharedHostControlPlaneWorkerLoop({
-      workspaceRoot: tmp,
-      recordsRoot: paths.recordsRoot,
-      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
-    });
-    try {
-      const summary = await deployWithChecks({
-        tmp,
-        $,
-        deploymentLabel,
-        artifactDir,
-        controlPlaneUrl: controlPlane.url,
-        serverPort: server.port,
-      });
-      const record = await waitFor(async () => {
-        try {
-          return await readRecord(controlPlane.url, summary.deployRunId);
-        } catch {
-          return null;
-        }
-      }, "timed out waiting for deploy record");
-      assert.equal(
-        record.admittedContext.policyEvaluation.laneGovernance.verificationSource,
-        "service_verified",
-      );
-    } finally {
-      await worker.close();
-      await controlPlane.close();
-      await server.close();
-    }
-  });
-});
+const TEST_TIMEOUT_MS =
+  Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
 
-test("service-backed shared-host deploy fails closed when automatic governance drifts", async () => {
-  await runInTemp("nixos-service-owned-governance-drift", async (tmp, $) => {
-    const deploymentLabel = "//sandbox/deployments/demo-dev:deploy";
-    const artifactDir = path.join(tmp, "artifact");
-    const paths = {
-      statePath: path.join(tmp, "platform-state.json"),
-      hostRoot: path.join(tmp, "host"),
-      recordsRoot: path.join(tmp, "records"),
-    };
-    await writeTempListedDeploymentWorkspace(tmp);
-    await writeDemoArtifact(artifactDir);
-    const deployment = await resolveDeploymentFromTarget(tmp, deploymentLabel);
-    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
-    const server = await startNixosSharedHostPublicServer({
-      deployment: deployment as any,
-      hostRoot: paths.hostRoot,
-    });
-    const controlPlane = await startNixosSharedHostControlPlaneServer({
-      workspaceRoot: tmp,
-      paths,
-      backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
-      localFixture: true,
-      env: {
-        ...process.env,
-        VBR_DEPLOY_GITHUB_GOVERNANCE_FIXTURE_JSON: JSON.stringify({
-          ...governanceSnapshot(deployment),
-          sourceRefPolicies: deployment.lanePolicy.governance.sourceRefPolicies.map((entry) =>
-            entry.stage === "dev" ? { ...entry, requiredChecks: [] } : entry,
-          ),
-        }),
-      } as NodeJS.ProcessEnv,
-    });
-    try {
-      const rejected = await deployWithChecks({
-        tmp,
-        $,
-        deploymentLabel,
-        artifactDir,
-        controlPlaneUrl: controlPlane.url,
-        serverPort: server.port,
-        nothrow: true,
+test(
+  "service-backed shared-host deploy synthesizes service-owned governance evidence",
+  { timeout: TEST_TIMEOUT_MS },
+  async () => {
+    await runInTemp("nixos-service-owned-governance", async (tmp, $) => {
+      const deploymentLabel = "//sandbox/deployments/demo-dev:deploy";
+      const artifactDir = path.join(tmp, "artifact");
+      const paths = {
+        statePath: path.join(tmp, "platform-state.json"),
+        hostRoot: path.join(tmp, "host"),
+        recordsRoot: path.join(tmp, "records"),
+      };
+      await writeTempListedDeploymentWorkspace(tmp);
+      await writeDemoArtifact(artifactDir);
+      const deployment = await resolveDeploymentFromTarget(tmp, deploymentLabel);
+      await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
+      const server = await startNixosSharedHostPublicServer({
+        deployment: deployment as any,
+        hostRoot: paths.hostRoot,
       });
-      assert.notEqual(rejected.exitCode, 0);
-      assert.match(
-        `${String(rejected.stderr || "")}\n${String(rejected.stdout || "")}`,
-        /lane governance verification failed[\s\S]*required checks drift/,
-      );
-    } finally {
-      await controlPlane.close();
-      await server.close();
-    }
-  });
-});
+      const controlPlane = await startNixosSharedHostControlPlaneServer({
+        workspaceRoot: tmp,
+        paths,
+        backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
+        localFixture: true,
+        env: {
+          ...process.env,
+          VBR_DEPLOY_GITHUB_GOVERNANCE_FIXTURE_JSON: JSON.stringify(governanceSnapshot(deployment)),
+        } as NodeJS.ProcessEnv,
+      });
+      const worker = startNixosSharedHostControlPlaneWorkerLoop({
+        workspaceRoot: tmp,
+        recordsRoot: paths.recordsRoot,
+        backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
+      });
+      try {
+        const summary = await deployWithChecks({
+          tmp,
+          $,
+          deploymentLabel,
+          artifactDir,
+          controlPlaneUrl: controlPlane.url,
+          serverPort: server.port,
+        });
+        const record = await waitFor(async () => {
+          try {
+            return await readRecord(controlPlane.url, summary.deployRunId);
+          } catch {
+            return null;
+          }
+        }, "timed out waiting for deploy record");
+        assert.equal(
+          record.admittedContext.policyEvaluation.laneGovernance.verificationSource,
+          "service_verified",
+        );
+      } finally {
+        await worker.close();
+        await controlPlane.close();
+        await server.close();
+      }
+    });
+  },
+);
+
+test(
+  "service-backed shared-host deploy fails closed when automatic governance drifts",
+  { timeout: TEST_TIMEOUT_MS },
+  async () => {
+    await runInTemp("nixos-service-owned-governance-drift", async (tmp, $) => {
+      const deploymentLabel = "//sandbox/deployments/demo-dev:deploy";
+      const artifactDir = path.join(tmp, "artifact");
+      const paths = {
+        statePath: path.join(tmp, "platform-state.json"),
+        hostRoot: path.join(tmp, "host"),
+        recordsRoot: path.join(tmp, "records"),
+      };
+      await writeTempListedDeploymentWorkspace(tmp);
+      await writeDemoArtifact(artifactDir);
+      const deployment = await resolveDeploymentFromTarget(tmp, deploymentLabel);
+      await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment as any);
+      const server = await startNixosSharedHostPublicServer({
+        deployment: deployment as any,
+        hostRoot: paths.hostRoot,
+      });
+      const controlPlane = await startNixosSharedHostControlPlaneServer({
+        workspaceRoot: tmp,
+        paths,
+        backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(paths.recordsRoot),
+        localFixture: true,
+        env: {
+          ...process.env,
+          VBR_DEPLOY_GITHUB_GOVERNANCE_FIXTURE_JSON: JSON.stringify({
+            ...governanceSnapshot(deployment),
+            sourceRefPolicies: deployment.lanePolicy.governance.sourceRefPolicies.map((entry) =>
+              entry.stage === "dev" ? { ...entry, requiredChecks: [] } : entry,
+            ),
+          }),
+        } as NodeJS.ProcessEnv,
+      });
+      try {
+        const rejected = await deployWithChecks({
+          tmp,
+          $,
+          deploymentLabel,
+          artifactDir,
+          controlPlaneUrl: controlPlane.url,
+          serverPort: server.port,
+          nothrow: true,
+        });
+        assert.notEqual(rejected.exitCode, 0);
+        assert.match(
+          `${String(rejected.stderr || "")}\n${String(rejected.stdout || "")}`,
+          /lane governance verification failed[\s\S]*required checks drift/,
+        );
+      } finally {
+        await controlPlane.close();
+        await server.close();
+      }
+    });
+  },
+);

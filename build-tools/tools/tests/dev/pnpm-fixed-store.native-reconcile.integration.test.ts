@@ -28,7 +28,8 @@ import {
 } from "./pnpm-fixed-store-native-source";
 
 const MAX_KIB = 500 * 1024;
-const TEST_TIMEOUT_MS = 18 * 60 * 1000;
+const TEST_TIMEOUT_MS =
+  Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "2400") * 1000;
 
 test(
   "native fixed pnpm reconciliation is deterministic and offline-consumable",

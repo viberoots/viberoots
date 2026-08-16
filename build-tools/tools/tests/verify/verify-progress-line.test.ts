@@ -219,8 +219,8 @@ test("verify progress reporter only prints changed passes for non-tty output", (
   reporter.stop({ clear: false });
 
   const output = writes.join("");
+  assert.match(output, /shared\s+\[░{24}\] 0\/1494 pending/);
   assert.match(output, /isolated\s+\[░{24}\] 0\/9 running 0s/);
   assert.match(output, /enforcement \[█{24}\] 45\/45 done 0s/);
-  assert.doesNotMatch(output, /shared\s+\[░{24}\] 0\/1494 pending/);
-  assert.equal(output.match(/^  test/gm)?.length, 2);
+  assert.equal(output.match(/^  test/gm)?.length, 5);
 });

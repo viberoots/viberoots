@@ -1,0 +1,21 @@
+load("@viberoots//build-tools/python:defs.bzl", "nix_python_wasm_app")
+load("@viberoots//build-tools/rust:defs.bzl", "rust_python_wasm_extension")
+
+rust_python_wasm_extension(
+    name = "{{ name }}-ext",
+    backend = "pyodide",
+    module = "{{ name | replace("-", "_") }}._native",
+    crate = "{{ name }}",
+    srcs = ["src/lib.rs"],
+    lockfile_label = "lockfile:projects/apps/{{ name }}/uv.lock#projects/apps/{{ name }}",
+    local_patch_dirs = ["patches/rust"],
+)
+
+nix_python_wasm_app(
+    name = "{{ name }}",
+    labels = ["lang:python", "kind:app", "backend:pyodide"],
+    lockfile_label = "lockfile:projects/apps/{{ name }}/uv.lock#projects/apps/{{ name }}",
+    srcs = glob(["**/*.py"]),
+    deps = [":{{ name }}-ext"],
+    visibility = ["PUBLIC"],
+)

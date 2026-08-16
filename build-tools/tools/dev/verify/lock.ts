@@ -56,11 +56,27 @@ export async function acquireVerifyLock(opts: {
   allowConcurrent: boolean;
 }): Promise<{ lockDir: string | null; logFile: string | null }> {
   const isCI = process.env.CI === "true";
-  if (isCI || opts.allowConcurrent) return { lockDir: null, logFile: null };
-
   const workspaceBuckDir = path.join(opts.root, ".viberoots", "workspace", "buck");
-  const lockDir = path.join(workspaceBuckDir, "verify-lock");
   await mkdirIfMissing(workspaceBuckDir);
+  const logDir = path.join(workspaceBuckDir, "verify-logs");
+
+  if (isCI || opts.allowConcurrent) {
+    const logFile = await mkUniqueLogFile(logDir);
+    const byPid = path.join(logDir, "by-pid");
+    await mkdirIfMissing(byPid);
+    await fsp.symlink(logFile, path.join(byPid, `${process.pid}.log`)).catch(async () => {
+      await fsp.unlink(path.join(byPid, `${process.pid}.log`)).catch(() => {});
+      await fsp.symlink(logFile, path.join(byPid, `${process.pid}.log`)).catch(() => {});
+    });
+    await fsp.symlink(logFile, path.join(logDir, "latest.log")).catch(async () => {
+      await fsp.unlink(path.join(logDir, "latest.log")).catch(() => {});
+      await fsp.symlink(logFile, path.join(logDir, "latest.log")).catch(() => {});
+    });
+    process.env.VBR_VERIFY_LOG_FILE = logFile;
+    return { lockDir: null, logFile };
+  }
+
+  const lockDir = path.join(workspaceBuckDir, "verify-lock");
 
   const pidFile = path.join(lockDir, "pid");
   const sigFile = path.join(lockDir, "lstart");
@@ -111,7 +127,6 @@ export async function acquireVerifyLock(opts: {
   await writeText(pidFile, String(process.pid));
   await writeText(sigFile, sig);
 
-  const logDir = path.join(workspaceBuckDir, "verify-logs");
   const existing = await readText(logFileRef);
   const logFile = existing || (await mkUniqueLogFile(logDir));
   await writeText(logFileRef, logFile);

@@ -16,6 +16,7 @@ import {
   createProtectedRustPatchEvidenceSchema,
   type ProtectedRustPatchEvidence,
 } from "./protected-rust-patch-evidence-schema";
+import { assertProtectedRustPatchPyodideIdentity } from "./protected-rust-patch-pyodide-evidence";
 export type { ProtectedRustPatchEvidence } from "./protected-rust-patch-evidence-schema";
 
 export function createProtectedRustPatchEvidence(
@@ -160,6 +161,10 @@ function assertCanonicalCases(
         "matrixDigest",
         "outputPaths",
         "patchDigest",
+        "pyodideAbiDigest",
+        "pyodideAbiIdentity",
+        "pyodideBehavior",
+        "pyodideBehaviorDigest",
         "reachableNodes",
         "reachableNodesDigest",
         "semanticDigest",
@@ -201,6 +206,7 @@ function assertCanonicalCases(
           `protected Rust patch evidence has invalid reachable nodes: ${entry.caseId}`,
         );
       }
+      assertProtectedRustPatchPyodideIdentity(definition.id, phase);
     }
     if (
       entry.baseline.consumerCommit === entry.patched.consumerCommit ||

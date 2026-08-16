@@ -35,12 +35,26 @@ test("protected patch cases are the complete production Rust matrix for each sys
       assert.match(definition.targetsFile, /TARGETS$/u);
     }
   }
+  const pyodide = protectedRustPatchCaseDefinitions("aarch64-darwin").find(
+    ({ id }) => id === "rust-pyodide-extension-pr14",
+  )!;
+  assert.equal(pyodide.targetName, "repro-rust-pyodide-ext");
+  assert.equal(
+    pyodide.matrixCase.graphSelection.target,
+    "//projects/apps/repro-rust-pyodide:repro-rust-pyodide",
+  );
 });
 
 test("protected patch driver uses production workflow, immutable bundles, and observed store bytes", () => {
+  const driverSource = fs.readFileSync(
+    viberootsSourcePath("build-tools/tools/ci/protected-rust-patch-case-driver.ts"),
+    "utf8",
+  );
   const source = [
     "protected-rust-patch-case-driver.ts",
+    "protected-rust-patch-consumer.ts",
     "protected-rust-patch-phase.ts",
+    "protected-rust-patch-pyodide-phase.ts",
     "protected-rust-patch-workflow.ts",
   ]
     .map((name) => fs.readFileSync(viberootsSourcePath(`build-tools/tools/ci/${name}`), "utf8"))
@@ -53,6 +67,13 @@ test("protected patch driver uses production workflow, immutable bundles, and ob
   assert.match(source, /graph-generator-selected/u);
   assert.match(source, /readArtifactSemanticManifest/u);
   assert.match(source, /observed-behavior/u);
+  assert.match(driverSource, /Pick<ActiveReviewedRemoteNix, "runNix" \| "runWithRemoteStore">/u);
+  assert.match(source, /runWithRemoteStore/u);
+  assert.match(source, /bin", "run\.mjs"/u);
+  assert.match(
+    source,
+    /definition\.id === "rust-pyodide-extension-pr14"[\s\S]*\? \[\][\s\S]*: \["behavior_probe = True,"\]/u,
+  );
   assert.match(source, /evaluationBundleDigest/u);
   assert.match(source, /patchDigest/u);
   assert.doesNotMatch(source, /behavior:\s*expectedBehavior|replaceExact|runCommand|localSource/u);

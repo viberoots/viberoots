@@ -26,7 +26,7 @@ test("stage-0 excludes runtime leaves from workspace flake acquisition", async (
       `watch_file() { :; }
 use() {
   test "$1" = flake
-  test ! -e "$PWD/.viberoots/workspace/host-path"
+  test "$(cat "$PWD/.viberoots/workspace/host-path")" = "$VBR_HOST_PATH"
   test ! -e "$PWD/.viberoots/workspace/exact-env-smoke.out"
   printf '%s\\n' clean > "$PWD/acquisition-state"
 }
@@ -41,7 +41,7 @@ use() {
       "/bin/bash",
       [
         "-c",
-        'watch_file() { :; }; use() { test "$1" = flake; test ! -e "$PWD/.viberoots/workspace/host-path"; test ! -e "$PWD/.viberoots/workspace/exact-env-smoke.out"; printf "%s\\n" clean > "$PWD/acquisition-state"; }; source "$1"',
+        'watch_file() { :; }; use() { test "$1" = flake; test "$(cat "$PWD/.viberoots/workspace/host-path")" = "$VBR_HOST_PATH"; test ! -e "$PWD/.viberoots/workspace/exact-env-smoke.out"; printf "%s\\n" clean > "$PWD/acquisition-state"; }; source "$1"',
         "stage0-runtime-test",
         stage0,
       ],

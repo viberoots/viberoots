@@ -42,6 +42,17 @@ export function assertProtectedRustPatchLifecycle(
   requireInvariant("baseline-behavior-42", baseline.behavior === "42");
   requireInvariant("patched-behavior-43", patched.behavior === "43");
   requireInvariant(
+    "pyodide-baseline-patched-behavior-distinct",
+    baseline.pyodideBehaviorDigest === null ||
+      baseline.pyodideBehaviorDigest !== patched.pyodideBehaviorDigest,
+  );
+  requireInvariant(
+    "pyodide-abi-stable",
+    baseline.pyodideAbiDigest === null ||
+      (baseline.pyodideAbiDigest === patched.pyodideAbiDigest &&
+        baseline.pyodideAbiDigest === restored.pyodideAbiDigest),
+  );
+  requireInvariant(
     "baseline-restored-phase-equal-except-commit",
     JSON.stringify(withoutCommit(baseline)) === JSON.stringify(withoutCommit(restored)),
   );

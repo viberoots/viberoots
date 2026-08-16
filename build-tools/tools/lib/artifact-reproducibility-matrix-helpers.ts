@@ -18,6 +18,7 @@ export type ReproducibilityMatrixCase = {
       | "go-cpp-lib"
       | "proc-macro"
       | "python-extension"
+      | "pyodide-extension"
       | "node-addon"
       | "cxx-bridge"
       | "cross-root"

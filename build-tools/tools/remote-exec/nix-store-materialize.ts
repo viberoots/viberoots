@@ -66,6 +66,7 @@ export function renderMaterializationCommand(
         : manifest.sourceSnapshot
     }#${entry.attr}`,
     ...artifactNixIndependentPolicyArgs("reviewed"),
+    "--no-write-lock-file",
     "--no-link",
     "--print-out-paths",
   ];

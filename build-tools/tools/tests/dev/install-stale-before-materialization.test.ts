@@ -141,7 +141,7 @@ test("stale install fails before Nix materialization and u remains available", a
       const output = `${error.message}\n${error.stderr || ""}`;
       assert.match(
         output,
-        /tracked metadata is stale: (?:\.viberoots\/current\/)?build-tools\/(?:tools\/nix\/langs\.json|lang\/auto_map\.bzl)/,
+        /tracked metadata is stale: (?:(?:\.viberoots\/current\/)?build-tools\/(?:tools\/nix\/langs\.json|lang\/auto_map\.bzl)|\.viberoots\/workspace\/flake\.lock)/,
       );
       assert.match(output, /no tracked files were modified/);
       assert.match(output, /repair: run u/);

@@ -126,7 +126,7 @@ test("only cache-health renderers construct substituter configuration", () => {
       "build-tools/tools/dev/verify/nix-cache-health.ts",
       "build-tools/tools/dev/verify/nix-cache-health-config.ts",
       "build-tools/tools/dev/verify/nix-cache-health-result.ts",
-      "build-tools/tools/lib/consumer-direnv.ts",
+      "build-tools/tools/lib/consumer-direnv-cache-health.ts",
     ].map(viberootsSourcePath),
   );
   const directConstruction = /--option\s+(?:extra-)?substituters|["'`](?:extra-)?substituters\s*=/u;

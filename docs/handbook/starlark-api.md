@@ -1842,6 +1842,9 @@ then remove the patch to restore the original artifact identity. Patch validatio
 the imported Pyodide value before patch, after patch, and after exact removal. Publication rejects
 ABI drift before staging, including a missing `PyInit_<leaf>` export, unexpected public exports,
 pthread or atomic target features, Pyodide extension-suffix drift, and PyO3 cross-build mismatches.
+Use `scaf new rust pyodide-extension <name> --yes` for the source-owned scaffold that includes
+locked Cargo metadata, a Python WASM consumer, package-local Rust patch storage, and Pyodide import
+guidance.
 
 ### `rust_node_addon(name, addon_name = None, node_api_version = 8, platform = "selected", **kwargs)`
 

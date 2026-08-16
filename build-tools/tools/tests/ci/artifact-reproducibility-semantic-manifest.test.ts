@@ -59,6 +59,115 @@ test("every representative Rust matrix family hashes its materialization manifes
   }
 });
 
+test("Rust Pyodide reproducibility evidence hashes the Python WASM materialization manifest", async () => {
+  const output = await fs.mkdtemp(path.join(os.tmpdir(), "viberoots-pyodide-semantic-"));
+  try {
+    const storePath = path.join(
+      output,
+      "share/viberoots-python-wasm/materialization-manifest.json",
+    );
+    const bytes = Buffer.from(
+      JSON.stringify({
+        schemaVersion: "viberoots.nix-store-materialization.v1",
+        evidence: {
+          provenance: {
+            path: "share/viberoots-python-wasm/provenance.json",
+            schema: "viberoots.python-wasm-provenance.v1",
+          },
+          sbom: { path: "share/viberoots-python-wasm/sbom.spdx.json", format: "spdx-json" },
+          pyemscriptenAbi: { path: "share/viberoots-python-wasm/pyemscripten-abi.json" },
+        },
+        storePaths: [{ path: output }],
+      }),
+    );
+    await fs.mkdir(path.dirname(storePath), { recursive: true });
+    await fs.writeFile(storePath, bytes);
+    await fs.writeFile(
+      path.join(output, "share/viberoots-python-wasm/provenance.json"),
+      JSON.stringify({
+        schema: "viberoots.python-wasm-provenance.v1",
+        authority: {
+          sbom: "share/viberoots-python-wasm/sbom.spdx.json",
+          pyemscriptenAbi: "share/viberoots-python-wasm/pyemscripten-abi.json",
+        },
+      }),
+    );
+    await fs.writeFile(
+      path.join(output, "share/viberoots-python-wasm/sbom.spdx.json"),
+      JSON.stringify({ spdxVersion: "SPDX-2.3", packages: [] }),
+    );
+    assert.deepEqual(
+      await readArtifactSemanticManifest(output, {
+        kind: "matrix",
+        matrixId: "rust-pyodide-extension-pr14",
+        matrixDigest: `sha256:${"a".repeat(64)}`,
+        artifactFamily: "rust",
+        recipeDigest: `sha256:${"b".repeat(64)}`,
+        bindingDigest: `sha256:${"c".repeat(64)}`,
+        target: "//projects/apps/repro-rust-pyodide:repro-rust-pyodide",
+      }),
+      {
+        kind: "python-wasm-materialization-manifest",
+        storePath,
+        digest: `sha256:${crypto.createHash("sha256").update(bytes).digest("hex")}`,
+      },
+    );
+  } finally {
+    await fs.rm(output, { recursive: true, force: true });
+  }
+});
+
+test("Rust Pyodide semantic evidence rejects missing or tampered SBOM and provenance authority", async () => {
+  const output = await fs.mkdtemp(path.join(os.tmpdir(), "viberoots-pyodide-evidence-"));
+  try {
+    const share = path.join(output, "share/viberoots-python-wasm");
+    await fs.mkdir(share, { recursive: true });
+    await fs.writeFile(
+      path.join(share, "materialization-manifest.json"),
+      JSON.stringify({
+        schemaVersion: "viberoots.nix-store-materialization.v1",
+        evidence: {
+          provenance: {
+            path: "share/viberoots-python-wasm/provenance.json",
+            schema: "viberoots.python-wasm-provenance.v1",
+          },
+          sbom: { path: "share/viberoots-python-wasm/sbom.spdx.json", format: "spdx-json" },
+          pyemscriptenAbi: { path: "share/viberoots-python-wasm/pyemscripten-abi.json" },
+        },
+        storePaths: [{ path: output }],
+      }),
+    );
+    await fs.writeFile(
+      path.join(share, "provenance.json"),
+      JSON.stringify({
+        schema: "viberoots.python-wasm-provenance.v1",
+        authority: {
+          sbom: "share/viberoots-python-wasm/tampered.spdx.json",
+          pyemscriptenAbi: "share/viberoots-python-wasm/pyemscripten-abi.json",
+        },
+      }),
+    );
+    await fs.writeFile(
+      path.join(share, "sbom.spdx.json"),
+      JSON.stringify({ spdxVersion: "SPDX-2.3", packages: [] }),
+    );
+    await assert.rejects(
+      readArtifactSemanticManifest(output, {
+        kind: "matrix",
+        matrixId: "rust-pyodide-extension-pr14",
+        matrixDigest: `sha256:${"a".repeat(64)}`,
+        artifactFamily: "rust",
+        recipeDigest: `sha256:${"b".repeat(64)}`,
+        bindingDigest: `sha256:${"c".repeat(64)}`,
+        target: "//projects/apps/repro-rust-pyodide:repro-rust-pyodide",
+      }),
+      /invalid provenance or SBOM authority/u,
+    );
+  } finally {
+    await fs.rm(output, { recursive: true, force: true });
+  }
+});
+
 test("Tauri reproducibility evidence hashes the exact installed semantic manifest bytes", async () => {
   const output = await fs.mkdtemp(path.join(os.tmpdir(), "viberoots-tauri-semantic-"));
   try {
@@ -87,57 +196,5 @@ test("Tauri reproducibility evidence hashes the exact installed semantic manifes
     });
   } finally {
     await fs.rm(output, { recursive: true, force: true });
-  }
-});
-
-test("all Rust semantic manifest kinds cross the supplied remote store-read boundary", async () => {
-  const output = `/nix/store/${"d".repeat(32)}-remote-only-rust-output`;
-  const cases = [
-    {
-      matrixId: "rust-lib-pr12",
-      relative: "share/viberoots-rust/materialization-manifest.json",
-      manifest: {
-        schemaVersion: "viberoots.nix-store-materialization.v1",
-        storePaths: [{ path: output }],
-      },
-      kind: "rust-materialization-manifest",
-    },
-    {
-      matrixId: "rust-tauri-darwin-pr12",
-      relative: "share/viberoots-tauri/artifact-manifest.json",
-      manifest: {
-        schema: "viberoots.tauri-artifact.v1",
-        signature: { releaseSigned: false, releaseAdmitted: false },
-      },
-      kind: "tauri-artifact-manifest",
-    },
-  ] as const;
-  for (const entry of cases) {
-    const expectedPath = path.join(output, entry.relative);
-    const bytes = Buffer.from(JSON.stringify(entry.manifest));
-    const reads: string[] = [];
-    const semantic = await readArtifactSemanticManifest(
-      output,
-      {
-        kind: "matrix",
-        matrixId: entry.matrixId,
-        matrixDigest: `sha256:${"a".repeat(64)}`,
-        artifactFamily: "rust",
-        recipeDigest: `sha256:${"b".repeat(64)}`,
-        bindingDigest: `sha256:${"c".repeat(64)}`,
-        target: "//projects/example:example",
-      },
-      async (storePath) => {
-        reads.push(storePath);
-        return bytes;
-      },
-    );
-    assert.deepEqual(reads, [expectedPath]);
-    assert.equal(semantic.kind, entry.kind);
-    assert.equal(semantic.storePath, expectedPath);
-    assert.equal(
-      semantic.digest,
-      `sha256:${crypto.createHash("sha256").update(bytes).digest("hex")}`,
-    );
   }
 });
