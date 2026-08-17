@@ -5,6 +5,10 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { ensureProjectEnforcementRegistration } from "../../lib/project-enforcement-registration";
+import {
+  PROJECT_ENFORCEMENT_PER_TEST_TIMEOUT_SECS,
+  PROJECT_ENFORCEMENT_WARM_PASS_BUDGET_SECS,
+} from "../../lib/project-enforcement-timeouts";
 import { processTableLines } from "../../lib/process-inspection";
 import { runInTemp } from "../lib/test-helpers";
 
@@ -20,7 +24,10 @@ async function runBuck($: TempShell, target: string, envOverrides: NodeJS.Proces
     VBR_NIX_CACHE_POLICY: "off",
     ...envOverrides,
   };
-  const timeoutSeconds = target === allTargets ? 60 : 30;
+  const timeoutSeconds =
+    target === allTargets
+      ? PROJECT_ENFORCEMENT_WARM_PASS_BUDGET_SECS
+      : PROJECT_ENFORCEMENT_PER_TEST_TIMEOUT_SECS;
   return await $({
     env,
     nothrow: true,
@@ -218,7 +225,10 @@ test("complete generated pass rejects scanner fixtures and stays bounded when wa
     const warm = await runBuck($, allTargets);
     const elapsedMs = performance.now() - started;
     assert.equal(warm.exitCode, 0, String(warm.stderr || warm.stdout));
-    assert.ok(elapsedMs <= 60_000, `warm project-enforcement pass took ${elapsedMs.toFixed(0)}ms`);
+    assert.ok(
+      elapsedMs <= PROJECT_ENFORCEMENT_WARM_PASS_BUDGET_SECS * 1000,
+      `warm project-enforcement pass took ${elapsedMs.toFixed(0)}ms`,
+    );
     const rootsAfter = await boundedRoots(root);
     const growth = Object.fromEntries(
       Object.keys(rootsBefore).map((key) => [key, rootsAfter[key]! - rootsBefore[key]!]),

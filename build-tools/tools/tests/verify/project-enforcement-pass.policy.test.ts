@@ -11,6 +11,11 @@ import {
   executionPolicyForVerifyPass,
   parseVerifyExecutionPolicy,
 } from "../../dev/verify/remote-policy";
+import {
+  PROJECT_ENFORCEMENT_OVERALL_TIMEOUT_SECS,
+  PROJECT_ENFORCEMENT_PER_TEST_TIMEOUT_SECS,
+  exactTimeoutsForVerifyPass,
+} from "../../dev/verify/project-enforcement-execution-policy";
 
 test("project enforcement is an earliest local cache-disabled sidecar", () => {
   const passes = planVerifyTargetPasses([
@@ -46,6 +51,10 @@ test("project enforcement is an earliest local cache-disabled sidecar", () => {
     "--local-only",
     "--no-remote-cache",
   ]);
+  assert.deepEqual(exactTimeoutsForVerifyPass("project-enforcement"), {
+    perTest: PROJECT_ENFORCEMENT_PER_TEST_TIMEOUT_SECS,
+    overall: PROJECT_ENFORCEMENT_OVERALL_TIMEOUT_SECS,
+  });
   assert.equal(executionPolicyForVerifyPass(remote, "shared"), remote);
   assert.throws(
     () =>

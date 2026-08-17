@@ -318,8 +318,10 @@ inputs, and is selected for both sides of committed project renames.
 
 ### 2. Scope of changes
 
-- Keep the canonical 30-second project-enforcement runner cap independent of broader verify and Nix
-  timeout environment variables. Preserve the existing timeout behavior for all other test lanes.
+- Keep the canonical 30-second project-enforcement runner performance budget independent of broader
+  verify and Nix timeout environment variables, while giving the local Buck/Node wrapper enough
+  wall-clock slack to survive temporary host CPU starvation. Preserve the existing timeout behavior
+  for all other test lanes.
 - Extend admission across the complete admitted import graph to reject filesystem mutation
   capabilities, including file, directory, permission, stream, copy, link, and rename operations.
   Reuse one reviewed read-only capability authority rather than maintaining runner-specific lists.
@@ -339,7 +341,7 @@ PR-3 must be complete. No new external tools, caches, services, or source snapsh
 ### 4. Tests to be added
 
 - An argv/runtime contract that sets the normal broad verify timeout environment and proves a
-  generated project-enforcement runner still terminates at its fixed 30-second cap.
+  generated project-enforcement runner still uses the project-enforcement-owned timeout envelope.
 - Structural admission fixtures covering every prohibited filesystem mutation class through direct
   and imported helpers, plus positive fixtures for the read-only filesystem operations scanners need.
 - Committed Git fixtures for renames into and out of `projects/` that assert both paths reach the
@@ -363,8 +365,8 @@ evidence collection.
 
 ### 6. Acceptance criteria
 
-- Normal `v` cannot raise a project-enforcement runner above its canonical 30-second cap, while
-  non-project test timeout behavior remains unchanged.
+- Normal `v` cannot raise a project-enforcement runner above its project-enforcement-owned timeout
+  envelope, while non-project test timeout behavior remains unchanged.
 - Admission rejects filesystem mutation through the full admitted import graph, and generated
   runners retain only the read capabilities required by their scanners.
 - Committed renames crossing the `projects/` boundary preserve both paths and cannot omit the pass.

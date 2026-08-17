@@ -6,6 +6,7 @@ import { mkdirWithMacosMetadataExclusion } from "./macos-metadata";
 import { WORKSPACE_BUCK_STATE_DIR } from "./workspace-state-paths";
 import { resolveWorkspaceRootsSync } from "./workspace-roots";
 import { assertProjectEnforcementRunnerAdmission } from "./project-enforcement-admission";
+import { PROJECT_ENFORCEMENT_PER_TEST_TIMEOUT_SECS } from "./project-enforcement-timeouts";
 
 export const PROJECT_ENFORCEMENT_SUFFIX = ".project-enforcement.test.ts";
 export const PROJECT_ENFORCEMENT_LABEL = "verify:project-enforcement";
@@ -59,7 +60,7 @@ export function renderWorkspaceBuckTargets(
       `    labels = [${JSON.stringify(PROJECT_ENFORCEMENT_LABEL)}],`,
       `    template_inputs = [${JSON.stringify(runner.sourceLabel)}],`,
       '    viberoots_script_path = "build-tools/tools/project-enforcement/project-enforcement-runner.ts",',
-      "    test_rule_timeout_ms = 30 * 1000,",
+      `    test_rule_timeout_ms = ${PROJECT_ENFORCEMENT_PER_TEST_TIMEOUT_SECS} * 1000,`,
       ")",
     );
   }

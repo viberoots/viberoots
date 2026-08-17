@@ -9,6 +9,7 @@ import {
   ensureProjectEnforcementRegistration,
   PROJECT_ENFORCEMENT_LABEL,
 } from "../../lib/project-enforcement-registration";
+import { PROJECT_ENFORCEMENT_PER_TEST_TIMEOUT_SECS } from "../../lib/project-enforcement-timeouts";
 import { ensureWorkspaceBuckStatePackage } from "../../lib/workspace-buck-state";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
@@ -38,6 +39,10 @@ test("project enforcement registration discovers suffix runners without Nix", as
   assert.match(
     targets,
     /viberoots_script_path = "build-tools\/tools\/project-enforcement\/project-enforcement-runner\.ts"/,
+  );
+  assert.match(
+    targets,
+    new RegExp(`test_rule_timeout_ms = ${PROJECT_ENFORCEMENT_PER_TEST_TIMEOUT_SECS} \\* 1000`),
   );
   assert.doesNotMatch(targets, /ignored\.test\.ts/);
   assert.doesNotMatch(targets, /\bnix\b/);

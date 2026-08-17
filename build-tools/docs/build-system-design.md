@@ -838,9 +838,11 @@ ordinary build-system tests may not. Admitted runners must be deterministic, rea
 30 seconds individually and 60 seconds as a warm pass, and avoid Nix, builds, services, temp
 consumers, dependency caches, and nested Buck daemons.
 
-The 30-second runner and 60-second aggregate timeouts are pass-owned Buck execution policy. Broader
-`VERIFY_TIMEOUT_SECS`, `TEST_NIX_TIMEOUT_SECS`, and ordinary test-lane floors cannot raise them;
-other pass budgets retain their existing behavior. Admission follows the complete static local
+The 30-second runner and 60-second aggregate limits are performance budgets, not the outer
+wall-clock kill budget. The project-enforcement lane owns a larger Buck/Node timeout envelope so
+local-only policy checks can survive temporary host CPU starvation; broader `VERIFY_TIMEOUT_SECS`,
+`TEST_NIX_TIMEOUT_SECS`, and ordinary test-lane floors still cannot raise it. Other pass budgets
+retain their existing behavior. Admission follows the complete static local
 import graph, including compact same-line import/export declarations and direct or transitive
 helper modules, and rejects filesystem mutation capabilities from `node:fs` and
 `node:fs/promises`, including file, directory,
