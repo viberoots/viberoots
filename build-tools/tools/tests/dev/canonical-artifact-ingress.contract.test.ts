@@ -205,7 +205,8 @@ test("direct Node artifact routes declare the Buck target through explicit argv"
 test("artifact worker closure includes canonical lockfile and scaffold tools", () => {
   const closure = read("build-tools/tools/nix/flake/packages/remote-worker-tools.nix");
   assert.match(closure, /workerPaths = \[[\s\S]*pkgs\.yq[\s\S]*\];/);
-  assert.match(closure, /workerPaths = \[[\s\S]*pkgs\.copier[\s\S]*\];/);
+  assert.match(closure, /plumbum = prev\.plumbum\.overridePythonAttrs[\s\S]*doCheck = false;/);
+  assert.match(closure, /workerPaths = \[[\s\S]*copier[\s\S]*\];/);
   assert.match(closure, /workerPaths = \[[\s\S]*pkgs\.prettier[\s\S]*\];/);
 });
 

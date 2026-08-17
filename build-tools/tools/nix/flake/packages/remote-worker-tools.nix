@@ -1,6 +1,12 @@
 { pkgs, zx-wrapper, viberootsRoot, viberootsRuntimeRoot, viberootsSourceIdentity, viberootsNodeModules ? null }:
 let
   pnpm11 = import ../../pnpm-11.nix { inherit pkgs; };
+  pythonPackages = pkgs.python3Packages.overrideScope (final: prev: {
+    plumbum = prev.plumbum.overridePythonAttrs (_old: {
+      doCheck = false;
+    });
+  });
+  copier = pythonPackages.copier;
   workerPaths = [
     pkgs.bash
     pkgs.cacert
@@ -24,7 +30,7 @@ let
     pkgs.python3
     pkgs.uv
     pkgs.viberootsRustToolchain
-    pkgs.copier
+    copier
     pkgs.gomod2nix
     pkgs.nix
     pnpm11

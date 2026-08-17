@@ -7,6 +7,12 @@
 let
   zx-wrapper = import ./lib/zx-wrapper.nix { inherit pkgs; };
   pnpm11 = import ./pnpm-11.nix { inherit pkgs; };
+  pythonPackages = pkgs.python3Packages.overrideScope (final: prev: {
+    plumbum = prev.plumbum.overridePythonAttrs (_old: {
+      doCheck = false;
+    });
+  });
+  copier = pythonPackages.copier;
   viberootsCommand = import ./packages/viberoots-command.nix {
     inherit pkgs zx-wrapper version releaseTag;
     viberootsSrc = viberootsRoot;
@@ -444,7 +450,7 @@ EOF
       # .viberoots/current/prelude; do not recreate a visible root prelude shim.
     '';
     buildInputs = [
-      pkgs.git pkgs.nix pkgs.buck2 pkgs.go pkgs.viberootsRustDeveloperTools pnpm11 pkgs.nodejs_22 pkgs.python3 pkgs.uv zx-wrapper viberootsCommand pkgs.jq pkgs.rsync pkgs.copier pkgs.yq pkgs.prettier
+      pkgs.git pkgs.nix pkgs.buck2 pkgs.go pkgs.viberootsRustDeveloperTools pnpm11 pkgs.nodejs_22 pkgs.python3 pkgs.uv zx-wrapper viberootsCommand pkgs.jq pkgs.rsync copier pkgs.yq pkgs.prettier
       pkgs.jc pkgs.bash pkgs.coreutils pkgs.curl pkgs.gomod2nix pkgs.opentofu pkgs.infisical pkgs.awscli2 pkgs.dnsutils
       pkgs.openssl pkgs.postgresql_16
     ] ++ (if pkgs.stdenv.isDarwin then [ agent-safehouse ] else [])
