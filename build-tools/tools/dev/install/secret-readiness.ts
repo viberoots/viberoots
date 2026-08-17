@@ -284,6 +284,9 @@ function repoBootstrapCredentialRefsForReadiness(
         : [],
     );
   if (configured.length > 0) return uniqueRefPairs(configured);
+  if (activeInfisicalProfiles(config).every(([, profile]) => profile.backend !== "infisical")) {
+    return [];
+  }
   return [repoBootstrapCredentialRefs({ name: args.identityName }, args.bootstrapCredentialScope)];
 }
 
@@ -647,7 +650,9 @@ type PromptStreams = {
 };
 
 function promptStreams(): PromptStreams {
-  return openTtyStreams() || { input: process.stdin, output: process.stderr, close: () => undefined };
+  return (
+    openTtyStreams() || { input: process.stdin, output: process.stderr, close: () => undefined }
+  );
 }
 
 function openTtyStreams(): PromptStreams | undefined {

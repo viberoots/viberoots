@@ -120,6 +120,17 @@ test("install secret readiness reports inaccessible macOS Keychain distinctly fr
   });
 });
 
+test("install secret readiness accepts keychain main backend without Infisical credentials", async () => {
+  await withRepo(async (repoRoot) => {
+    await writeResolver(repoRoot, undefined, {
+      includeDeploymentMetadata: false,
+      mainBackend: "macos-keychain",
+    });
+    const probe = await probeLocalSecretReadiness(repoRoot, { platform: "darwin" });
+    assert.deepEqual(probe, { ready: true, reason: "ready" });
+  });
+});
+
 test("install secret readiness keeps missing-credential path for absent Keychain items", async () => {
   await withRepo(async (repoRoot) => {
     await writeResolver(repoRoot, { backend: "macos-keychain", service: "viberoots-bootstrap" });
@@ -157,14 +168,25 @@ async function writeResolver(
     backend: "local-file",
     file: path.join(repoRoot, ".local/bootstrap.json"),
   },
+  opts: { includeDeploymentMetadata?: boolean; mainBackend?: "local-file" | "macos-keychain" } = {},
 ) {
+  const useKeychainMain = opts.mainBackend === "macos-keychain";
   const config = {
     schemaVersion: "viberoots-project-config@1",
     sprinkleref: {
       defaultCategory: "main",
-      profiles: {},
+      profiles: useKeychainMain
+        ? {
+            "macos-keychain-default": {
+              backend: "macos-keychain",
+              service: "viberoots-bootstrap",
+            },
+          }
+        : {},
       categories: {
-        main: { backend: "local-file", file: ".local/main.json" },
+        main: useKeychainMain
+          ? { profile: "macos-keychain-default" }
+          : { backend: "local-file", file: ".local/main.json" },
         bootstrap: bootstrapBackend,
       },
     },
@@ -174,6 +196,9 @@ async function writeResolver(
     path.join(repoRoot, "projects/config/shared.json"),
     `${JSON.stringify(config, null, 2)}\n`,
   );
+  if (opts.includeDeploymentMetadata === false) {
+    await fsp.rm(path.join(repoRoot, "projects/deployments"), { recursive: true, force: true });
+  }
 }
 
 async function writeFamily(repoRoot: string, source: string) {
