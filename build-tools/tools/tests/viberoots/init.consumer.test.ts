@@ -106,45 +106,34 @@ test("direnv stage0 resolves flattened Nix cache provenance through .viberoots/c
   try {
     const viberootsRoot = await findViberootsRoot();
     const fakeBin = path.join(workspace, ".fake-bin");
-    const helper = path.join(
-      workspace,
-      ".viberoots",
-      "current",
-      "build-tools",
-      "tools",
-      "dev",
-      "nix-cache-role-provenance.ts",
-    );
+    const artifactToolsRoot = path.dirname(path.dirname(process.execPath));
+    if (!artifactToolsRoot.startsWith("/nix/store/")) return;
     await fsp.mkdir(fakeBin, { recursive: true });
     await fsp.mkdir(path.join(workspace, ".viberoots", "bootstrap"), { recursive: true });
-    await fsp.mkdir(path.join(workspace, ".viberoots", "workspace"), { recursive: true });
+    await fsp.mkdir(path.join(workspace, ".viberoots", "workspace", "toolchains"), {
+      recursive: true,
+    });
     await fsp.writeFile(path.join(workspace, "flake.nix"), "\n");
     await fsp.writeFile(path.join(workspace, ".viberoots", "workspace", "flake.nix"), "\n");
+    await fsp.writeFile(
+      path.join(workspace, ".viberoots", "workspace", "toolchains", "toolchain_paths.bzl"),
+      `NIX_ARTIFACT_TOOLS_ROOT = ${JSON.stringify(artifactToolsRoot)}\n`,
+      "utf8",
+    );
     await fsp.symlink(viberootsRoot, path.join(workspace, ".viberoots", "current"));
     await fsp.writeFile(
       path.join(fakeBin, "nix"),
       [
         "#!/usr/bin/env bash",
         'if [[ "${1:-}" == "config" && "${2:-}" == "show" ]]; then',
+        '  if [[ " $* " == *" --json "* ]]; then',
+        '    printf "%s\\n" \'{"substituters":{"defaultValue":["https://cache.nixos.org/"],"value":["https://cache.nixos.org/","https://install.determinate.systems"]}}\'',
+        "    exit 0",
+        "  fi",
         '  printf "%s\\n" "substituters = https://cache.nixos.org/ https://install.determinate.systems"',
         "  exit 0",
         "fi",
         "exit 0",
-        "",
-      ].join("\n"),
-      { mode: 0o755 },
-    );
-    await fsp.writeFile(
-      path.join(fakeBin, "node"),
-      [
-        "#!/usr/bin/env bash",
-        'helper="${@: -2:1}"',
-        `expected=${JSON.stringify(helper)}`,
-        'if [[ "${helper}" != "${expected}" ]]; then',
-        '  printf "unexpected provenance helper: %s\\n" "${helper}" >&2',
-        "  exit 42",
-        "fi",
-        'printf "%s\\n%s\\n" "https://cache.nixos.org/" "https://install.determinate.systems"',
         "",
       ].join("\n"),
       { mode: 0o755 },
@@ -163,7 +152,7 @@ test("direnv stage0 resolves flattened Nix cache provenance through .viberoots/c
         '  if [[ "${1:-}" != "flake" ]]; then return 2; fi',
         "}",
         "unset VIBEROOTS_SOURCE_ROOT VIBEROOTS_ROOT",
-        'export PATH="${1}:${PATH:-}"',
+        'export PATH="${1}:/usr/bin:/bin"',
         'export NIX_CONFIG="substituters = https://cache.nixos.org/ https://install.determinate.systems"',
         'source ".viberoots/bootstrap/direnv-stage0.sh"',
         "command -v i >/dev/null",

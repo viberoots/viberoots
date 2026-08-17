@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "expectedCount": 572,
-  "expectedDigest": "7e17d2a5f0478009339c3ef690af5e1b4d37dd1bdc6d2c20bedaaf8fcef4c7c9",
+  "expectedDigest": "a59443d4aec5b58bb3c1a14ebcc9faa02833526fbefff8170bd7a44c8a69b917",
   "classificationRules": [
     {
       "pathPattern": "^Jenkinsfile$",
