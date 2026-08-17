@@ -473,7 +473,7 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
     assert.match(stdout, /ok\s+workspace initialized/);
     assert.equal(stderr, "");
     const direnvText = await fsp.readFile(direnvLog, "utf8");
-    assert.match(direnvText, /NIX_PNPM_ALLOW_GENERATE=1 allow /);
+    assert.match(direnvText, /NIX_PNPM_ALLOW_GENERATE=1 allow\n/);
     assert.match(direnvText, /NIX_PNPM_ALLOW_GENERATE=1 exec .* i/);
     assert.equal(await fsp.readlink(path.join(workspace, ".viberoots", "current")), "../viberoots");
     assert.equal(
@@ -566,7 +566,7 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
     }
     assert.equal(
       await fsp.readFile(direnvLog, "utf8"),
-      `NIX_PNPM_ALLOW_GENERATE=1 allow ${workspace}\nNIX_PNPM_ALLOW_GENERATE=1 exec ${workspace} i\n`,
+      `NIX_PNPM_ALLOW_GENERATE=1 allow\nNIX_PNPM_ALLOW_GENERATE=1 exec ${workspace} i\n`,
     );
     await fsp.writeFile(direnvLog, "", "utf8");
     await execFileAsync(path.join(workspace, "viberoots", "init"), ["--run-install"], {
@@ -579,7 +579,7 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
     });
     assert.equal(
       await fsp.readFile(direnvLog, "utf8"),
-      `NIX_PNPM_ALLOW_GENERATE= allow ${workspace}\nNIX_PNPM_ALLOW_GENERATE= exec ${workspace} i\n`,
+      `NIX_PNPM_ALLOW_GENERATE= allow\nNIX_PNPM_ALLOW_GENERATE= exec ${workspace} i\n`,
     );
     assert.deepEqual(await visibleRootEntries(workspace), [
       "README.md",

@@ -904,7 +904,7 @@ async function runOptionalDirenvAllow(
 ): Promise<void> {
   const ui = createCommandUi();
   try {
-    await execFileAsync("direnv", ["allow", workspaceRoot], {
+    await execFileAsync("direnv", ["allow"], {
       cwd: workspaceRoot,
       env: maybePnpmGenerateEnv(allowPnpmGenerate),
     });
