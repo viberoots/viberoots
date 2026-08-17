@@ -19,6 +19,7 @@ let
   classification = readJson "classification.json";
   dependencies = readJson "dependency-inputs.json";
   artifactNixRoot = dependencies.artifactNixRoot or "";
+  artifactBashExecutable = dependencies.artifactBashExecutable or "";
   languageOverrides = builtins.mapAttrs (_envName: overrides:
     builtins.mapAttrs (_key: relative: bundleRoot + "/${relative}") overrides
   ) (selection.languageOverrides or { });
@@ -28,9 +29,14 @@ assert builtins.elem classification.classification [ "hermetic" "local-developme
 assert builtins.match "/nix/store/[0-9abcdfghijklmnpqrsvwxyz]{32}-[^/]+" dependencies.artifactToolsRoot != null;
 assert artifactNixRoot == ""
   || builtins.match "/nix/store/[0-9abcdfghijklmnpqrsvwxyz]{32}-[^/]+" artifactNixRoot != null;
+assert artifactBashExecutable == ""
+  || builtins.match "/nix/store/[0-9abcdfghijklmnpqrsvwxyz]{32}-[^/]+(/.*)?" artifactBashExecutable != null;
 {
   inherit bundleRoot classification dependencies languageOverrides selection;
-  artifactToolsRoot = dependencies.artifactToolsRoot;
+  artifactToolsRoot = builtins.storePath dependencies.artifactToolsRoot;
+  artifactBashExecutable =
+    if artifactBashExecutable != "" then builtins.storePath artifactBashExecutable
+    else builtins.storePath (dependencies.artifactToolsRoot + "/bin/bash");
   inherit artifactNixRoot;
   graphPath = bundleRoot + "/graph.json";
   repoRoot = repoRoot;

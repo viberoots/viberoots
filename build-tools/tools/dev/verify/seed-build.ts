@@ -49,6 +49,7 @@ export function verifySeedBuildArgs(opts: {
     "--option",
     "eval-cache",
     "false",
+    "--impure",
     "--no-write-lock-file",
     opts.flakeRef,
     "--accept-flake-config",

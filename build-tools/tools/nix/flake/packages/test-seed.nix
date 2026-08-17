@@ -1,4 +1,4 @@
-{ pkgs, repoRoot, viberootsRoot, evaluationBundle ? null }:
+{ pkgs, repoRoot, viberootsRoot, artifactToolsRoot, artifactBashExecutable, evaluationBundle ? null }:
 let
   lib = pkgs.lib;
   seedSelection =
@@ -95,8 +95,7 @@ let
       "mkdir -p \"$out/${d}\"\ncp -a ${snap}/. \"$out/${d}/\"\n"
     else ""
   ) subDirs);
-in
-pkgs.runCommand "test-seed" { nativeBuildInputs = [ pkgs.git ]; } ''
+  buildScript = ''
 	  set -euo pipefail
 	  mkdir -p "$out"
 	  ${copyRootFileScript}
@@ -188,4 +187,14 @@ pkgs.runCommand "test-seed" { nativeBuildInputs = [ pkgs.git ]; } ''
   git -C "$out" config maintenance.auto false
   git -C "$out" add -A
   git -C "$out" commit -q -m seed --allow-empty
-''
+  '';
+in
+builtins.derivation {
+  name = "test-seed";
+  system = pkgs.system;
+  builder = artifactBashExecutable;
+  args = [ "-c" buildScript ];
+  artifactBashInput = artifactBashExecutable;
+  artifactToolsInput = artifactToolsRoot;
+  PATH = "${artifactToolsRoot}/bin";
+}

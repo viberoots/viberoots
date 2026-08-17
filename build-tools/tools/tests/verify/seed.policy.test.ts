@@ -71,7 +71,7 @@ test("verify seed build args require the caller's immutable bundle authority", (
     "path:/nix/store/00000000000000000000000000000000-viberoots-evaluation-bundle?dir=source/.viberoots/workspace#test-seed";
   const args = verifySeedBuildArgs({ flakeRef, mode: "remote-ready" });
   assert.ok(args.includes(flakeRef));
-  assert.equal(args.includes("--impure"), false);
+  assert.equal(args.includes("--impure"), true);
   assert.throws(
     () =>
       verifySeedBuildArgs({

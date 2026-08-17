@@ -173,14 +173,21 @@ export async function materializeEvaluationBundle(
       : "";
     const artifactToolsRoot = String(artifactEnv.VBR_ARTIFACT_TOOLS_ROOT || "");
     const artifactNixExecutable = await fsp.realpath(path.join(artifactToolsRoot, "bin/nix"));
+    const artifactBashExecutable = await fsp.realpath(path.join(artifactToolsRoot, "bin/bash"));
     const artifactNixRoot = path.dirname(path.dirname(artifactNixExecutable));
     if (!artifactNixRoot.startsWith("/nix/store/")) {
       throw new Error(
         `evaluation bundle Nix authority is not in the Nix store: ${artifactNixRoot}`,
       );
     }
+    if (!artifactBashExecutable.startsWith("/nix/store/")) {
+      throw new Error(
+        `evaluation bundle Bash authority is not in the Nix store: ${artifactBashExecutable}`,
+      );
+    }
     const dependencies = {
       artifactToolsRoot,
+      artifactBashExecutable,
       artifactNixRoot,
       inputs: dependencyInputs(files),
       rootModulesTomlPath,

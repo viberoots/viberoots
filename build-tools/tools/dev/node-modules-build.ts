@@ -308,7 +308,9 @@ async function tryBuild(flakeRef: string, env: NodeJS.ProcessEnv): Promise<strin
     'TS="${NIX_PNPM_FETCH_TIMEOUT:-900}";',
     'JOBS_FLAG=""; if [ -n "$MJ" ] && [ "$MJ" != "0" ]; then JOBS_FLAG="--max-jobs $MJ"; fi;',
     'CORES_FLAG=""; if [ -n "$CR" ] && [ "$CR" != "0" ]; then CORES_FLAG="--option cores $CR"; fi;',
-    `"$TIMEOUT_PATH" -k 10s "\${TS}s" "$NIX_BIN" build "\${FLAKE_REF}" --no-link --accept-flake-config ${nixBuilderPolicyShellArgs("local_only")} --print-out-paths $JOBS_FLAG $CORES_FLAG`,
+    `"$TIMEOUT_PATH" -k 10s "\${TS}s" "$NIX_BIN" build "\${FLAKE_REF}" --no-link --no-write-lock-file --accept-flake-config ${nixBuilderPolicyShellArgs(
+      "local_only",
+    )} --print-out-paths $JOBS_FLAG $CORES_FLAG`,
   ].join(" ");
   const built = await $({
     env,
@@ -324,7 +326,9 @@ if (!outPath) {
   outPath = await withNodeModulesEvaluationBundle(async (flakeRef, env) => {
     try {
       const nixBin = resolveToolPathSync("nix", env);
-      const pi = await $({ env })`${nixBin} path-info ${flakeRef} --accept-flake-config`;
+      const pi = await $({
+        env,
+      })`${nixBin} path-info ${flakeRef} --no-write-lock-file --accept-flake-config`;
       const candidate =
         String(pi.stdout || "")
           .trim()
