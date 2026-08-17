@@ -1176,7 +1176,7 @@ test("viberoots init-consumer refreshes and updates remote flake locks", async (
         path.join(fakeBin, "nix"),
         `#!/usr/bin/env bash
 printf 'nix %s\\n' "$*" >> ${JSON.stringify(log)}
-if [[ "$*" == flake\\ update* ]]; then
+if [[ "$*" == flake\\ lock*--update-input\\ viberoots* ]]; then
   mkdir -p ${JSON.stringify(path.dirname(hiddenLock))}
   cat > ${JSON.stringify(hiddenLock)} <<'JSON'
 {"nodes":{"viberoots":{"locked":{"rev":"new-remote-rev"}}},"root":"root","version":7}
@@ -1210,9 +1210,10 @@ exit 0
       const text = await fsp.readFile(log, "utf8");
       assert.match(
         text,
-        /nix flake update viberoots --refresh --accept-flake-config --flake path:.*\.viberoots\/workspace/,
+        /nix flake lock --update-input viberoots --accept-flake-config path:.*\.viberoots\/workspace/,
       );
-      assert.doesNotMatch(text, /nix flake lock/);
+      assert.doesNotMatch(text, /nix flake update/);
+      assert.doesNotMatch(text, /--refresh/);
       assert.match(
         await fsp.readFile(path.join(workspace, "flake.lock"), "utf8"),
         /new-remote-rev/,

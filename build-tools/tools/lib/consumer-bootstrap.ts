@@ -1076,15 +1076,7 @@ async function runNixFlakeLock(opts: InitConsumerOptions): Promise<void> {
   } else {
     await execFileAsync(
       nixBin,
-      [
-        "flake",
-        "update",
-        "viberoots",
-        "--refresh",
-        "--accept-flake-config",
-        "--flake",
-        workspaceFlake,
-      ],
+      ["flake", "lock", "--update-input", "viberoots", "--accept-flake-config", workspaceFlake],
       { cwd: opts.workspaceRoot, env: nixEnv, maxBuffer: 1024 * 1024 * 16 },
     );
   }
