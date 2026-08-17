@@ -96,11 +96,6 @@ let
 
   zx-wrapper = import ../lib/zx-wrapper.nix { inherit pkgs; };
 
-  devshell = import ../devshell.nix {
-    inherit pkgs viberootsRoot version releaseTag;
-    buck2Input = buck2;
-  };
-
   liveFsRoot = if evaluationBundle != null then repoRoot else
     let
       w = builtins.getEnv "WORKSPACE_ROOT";
@@ -135,6 +130,11 @@ let
       if s != "" then (builtins.toPath s) else null;
   };
   viberootsNodeModules = viberootsNodeMods.node-modules;
+
+  devshell = import ../devshell.nix {
+    inherit pkgs viberootsRoot viberootsNodeModules version releaseTag;
+    buck2Input = buck2;
+  };
 
   prelude = import ../buck-prelude.nix { inherit pkgs; buck2Input = buck2; };
 

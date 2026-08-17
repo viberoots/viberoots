@@ -1,6 +1,7 @@
 { pkgs
 , buck2Input
 , viberootsRoot ? ../../../..
+, viberootsNodeModules ? null
 , version ? "0.0.0-dev"
 , releaseTag ? "v${version}"
 }:
@@ -56,6 +57,9 @@ in {
       export RUSTDOC="${pkgs.viberootsRustToolchain}/bin/rustdoc"
       export CARGO_LLVM_COV="${pkgs.viberootsCargoLlvmCov}/bin/cargo-llvm-cov"
       export RUST_SRC_PATH="${pkgs.viberootsRustToolchain}/lib/rustlib/src/rust/library"
+      ${pkgs.lib.optionalString (viberootsNodeModules != null) ''
+        export VIBEROOTS_NODE_PATH="${viberootsNodeModules}/node_modules"
+      ''}
       rust_editor_dir="$dev_root/.viberoots/workspace/editor"
       mkdir -p "$rust_editor_dir"
       cat > "$rust_editor_dir/rust-tools.json" <<EOF
@@ -106,7 +110,11 @@ EOF
           vbr_node_bin="$PWD/node_modules/.bin"
         elif [ -d "$PWD/.viberoots/current/build-tools/tools/bin" ]; then
           vbr_tools_bin="$PWD/.viberoots/current/build-tools/tools/bin"
-          vbr_node_bin="$PWD/.viberoots/current/node_modules/.bin"
+          if [ -n "''${VIBEROOTS_NODE_PATH:-}" ]; then
+            vbr_node_bin="$VIBEROOTS_NODE_PATH/.bin"
+          else
+            vbr_node_bin="$PWD/.viberoots/current/node_modules/.bin"
+          fi
         fi
         local repo_prefix="$vbr_tools_bin:$PWD/.direnv/bin:$vbr_node_bin"
         local host_tail

@@ -24,7 +24,9 @@ export async function assertViberootsDevshellSourceContract(): Promise<void> {
   );
   assert.doesNotMatch(packaged, /export NIX_BIN="\$\{pkgs\.nix\}\/bin\/nix"/);
   assert.doesNotMatch(packaged, /viberootsNodeModules|VIBEROOTS_NODE_PATH|NODE_PATH/);
-  assert.doesNotMatch(devshell, /viberootsNodeModules|viberootsNodePath|VIBEROOTS_NODE_PATH/);
+  assert.match(devshell, /viberootsNodeModules \? null/);
+  assert.match(devshell, /export VIBEROOTS_NODE_PATH="\$\{viberootsNodeModules\}\/node_modules"/);
+  assert.doesNotMatch(devshell, /\bNODE_PATH\b/);
   for (const pattern of [
     /entry_cwd="\$PWD"/,
     /dev_root="''\$\{WORKSPACE_ROOT:-\$PWD\}"/,
@@ -33,6 +35,7 @@ export async function assertViberootsDevshellSourceContract(): Promise<void> {
     /local vbr_host_nix_bin=""/,
     /\/nix\/var\/nix\/profiles\/default\/bin\/nix/,
     /export PATH="\$repo_prefix:/,
+    /vbr_node_bin="\$VIBEROOTS_NODE_PATH\/\.bin"/,
     /export VIBEROOTS_ROOT="\$PWD"/,
     /viberoots init-workspace --shell-entry --source "\$PWD"/,
     /viberoots init-workspace --shell-entry >\/dev\/null/,

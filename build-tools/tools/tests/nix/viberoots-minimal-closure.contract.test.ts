@@ -4,7 +4,7 @@ import fsp from "node:fs/promises";
 import { test } from "node:test";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
-test("minimal shell closure leaves node_modules on explicit materialization attrs", async () => {
+test("devshell carries managed Codex while packaged command leaves node_modules explicit", async () => {
   const context = await fsp.readFile(
     viberootsSourcePath("viberoots/build-tools/tools/nix/flake/per-system-context.nix"),
     "utf8",
@@ -17,7 +17,7 @@ test("minimal shell closure leaves node_modules on explicit materialization attr
     viberootsSourcePath("viberoots/build-tools/tools/nix/flake/packages/node-mods.nix"),
     "utf8",
   );
-  assert.doesNotMatch(context, /devshell = import[\s\S]*inherit[^;]*viberootsNodeModules/);
+  assert.match(context, /devshell = import[\s\S]*inherit[^;]*viberootsNodeModules/);
   assert.doesNotMatch(packages, /viberootsCommand = import[\s\S]*viberootsNodeModules/);
   assert.match(nodeMods, /node-modules\s*=/);
   assert.match(nodeMods, /nodeMods\.mkNodeModules/);
