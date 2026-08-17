@@ -71,6 +71,20 @@ managed_codex_candidates() {
     printf '%s\n' "$canonical"
     return 0
   fi
+  local root
+  for root in "${VIBEROOTS_ROOT:-}" "${WORKSPACE_ROOT:-}"; do
+    [[ -n "$root" ]] || continue
+    candidate="${root}/.viberoots/current/node_modules/.bin/codex"
+    [[ -n "$candidate" && -f "$candidate" && -x "$candidate" ]] || continue
+    canonical="$(canonical_executable_path "$candidate")"
+    case ":$seen:" in
+      *":$canonical:"*) ;;
+      *)
+        seen="${seen:+$seen:}$canonical"
+        printf '%s\n' "$canonical"
+        ;;
+    esac
+  done
   for candidate in \
     "${VIBEROOTS_NODE_PATH:-}/.bin/codex" \
     "${VIBEROOTS_SOURCE_ROOT}/node_modules/.bin/codex"; do
@@ -89,6 +103,10 @@ managed_codex_candidates() {
 managed_codex_display_path() {
   if [[ -n "${VBR_CODEX_MANAGED_PATH_FOR_TEST:-}" ]]; then
     printf '%s\n' "${VBR_CODEX_MANAGED_PATH_FOR_TEST}"
+  elif [[ -n "${VIBEROOTS_ROOT:-}" ]]; then
+    printf '%s\n' "${VIBEROOTS_ROOT}/.viberoots/current/node_modules/.bin/codex"
+  elif [[ -n "${WORKSPACE_ROOT:-}" ]]; then
+    printf '%s\n' "${WORKSPACE_ROOT}/.viberoots/current/node_modules/.bin/codex"
   elif [[ -n "${VIBEROOTS_NODE_PATH:-}" ]]; then
     printf '%s\n' "${VIBEROOTS_NODE_PATH}/.bin/codex"
   else

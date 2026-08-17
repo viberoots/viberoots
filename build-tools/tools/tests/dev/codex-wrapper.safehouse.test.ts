@@ -70,6 +70,37 @@ test("codex wrapper resolves managed Codex from VIBEROOTS_NODE_PATH", async () =
   });
 });
 
+test("codex wrapper resolves managed Codex from consumer current node_modules", async () => {
+  await withCodexRepoScratch(async ({ tmp, gitRoot }) => {
+    const bin = path.join(gitRoot, ".viberoots", "current", "node_modules", ".bin");
+    const log = path.join(tmp, "calls.log");
+    await fsp.mkdir(bin, { recursive: true });
+    await writeExecutable(
+      path.join(bin, "codex"),
+      `#!/usr/bin/env bash\nprintf 'consumer-current-codex %s\\n' "$*" >> ${JSON.stringify(log)}\n`,
+    );
+
+    const res = await $({
+      cwd: gitRoot,
+      stdio: "pipe",
+      env: {
+        ...(await isolatedCodexAccountEnv(tmp)),
+        CODEX_CLI_PATH: "",
+        VIBEROOTS_NODE_PATH: "",
+        VIBEROOTS_ROOT: gitRoot,
+        PATH: `${path.dirname(wrapper)}:${bin}:/usr/bin:/bin:${process.env.PATH}`,
+      },
+    })`${wrapper} exec consumer-current`;
+
+    assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
+    const calls = await fsp.readFile(log, "utf8");
+    assert.match(
+      calls,
+      /consumer-current-codex --sandbox danger-full-access exec consumer-current/,
+    );
+  });
+});
+
 test("codex wrapper accepts source-root managed Codex when VIBEROOTS_NODE_PATH changed in a stale shell", async () => {
   await withCodexScratch(async ({ tmp }) => {
     const { log, sourceBin, sourceRoot, staleNodeModules, wrapperCopy, wrapperDir } =
