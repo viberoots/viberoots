@@ -7,12 +7,12 @@ let
     then ''find "$out/site" -type f -name '*.so' -print -quit''
     else ''find "$out/lib" -maxdepth 1 -type f -name '*.node' -print -quit'';
   dependencyReferences =
-    if pkgs.stdenv.isDarwin then
+    if pkgs.stdenv.hostPlatform.isDarwin then
       ''references="$(${pkgs.darwin.cctools}/bin/otool -L "$binary" | tail -n +2 | awk '{print $1}')"''
     else
       ''references="$(${pkgs.glibc.bin}/bin/ldd "$binary" 2>/dev/null | awk '/=> \\/nix\\/store\\// {print $3}')"'';
   relocateBinary =
-    if pkgs.stdenv.isDarwin then ''
+    if pkgs.stdenv.hostPlatform.isDarwin then ''
       references="$(${pkgs.darwin.cctools}/bin/otool -L "$binary" | tail -n +2 | awk '{print $1}')"
       while IFS= read -r reference; do
         case "$reference" in

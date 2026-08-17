@@ -24,7 +24,7 @@ let
     else if nodeApiVersion == 9 then version10Symbols
     else [];
   getterLinkArgs =
-    if pkgs.stdenv.isDarwin then
+    if pkgs.stdenv.hostPlatform.isDarwin then
       "-C link-arg=-Wl,-u,_node_api_module_get_api_version_v1 -C link-arg=-Wl,-exported_symbol,_node_api_module_get_api_version_v1"
     else
       "-C link-arg=-Wl,--undefined=node_api_module_get_api_version_v1 -C link-arg=-Wl,--export-dynamic-symbol=node_api_module_get_api_version_v1";
@@ -92,7 +92,7 @@ in {
     }
     VIBEROOTS_NODE_API_PROBE
     ${pkgs.llvmPackages.clang}/bin/clang "$TMPDIR/viberoots-node-api-probe.c" \
-      ${lib.optionalString (!pkgs.stdenv.isDarwin) "-ldl"} -o "$TMPDIR/viberoots-node-api-probe"
+      ${lib.optionalString (!pkgs.stdenv.hostPlatform.isDarwin) "-ldl"} -o "$TMPDIR/viberoots-node-api-probe"
     "$TMPDIR/viberoots-node-api-probe" "$addon_candidate" ${version}
   '';
 }

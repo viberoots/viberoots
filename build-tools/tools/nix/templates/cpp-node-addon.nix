@@ -50,7 +50,7 @@ in {
     ]);
     extraC   = joinExtraC (cflags ++ [ "-ffunction-sections" "-fdata-sections" "-fPIC" ]);
     extraLD  = joinExtraC ldflags;
-    platLDGC = if pkgs.stdenv.isDarwin then "-Wl,-dead_strip" else "-Wl,--gc-sections";
+    platLDGC = if pkgs.stdenv.hostPlatform.isDarwin then "-Wl,-dead_strip" else "-Wl,--gc-sections";
     # On macOS, build a -dynamiclib with undefined symbols resolved at runtime by Node.
     # On Linux, build a -shared .so renamed to .node.
     linkCmdDarwin = ''
@@ -136,7 +136,7 @@ in {
         fi
       done
 
-      ${if pkgs.stdenv.isDarwin then linkCmdDarwin else linkCmdLinux}
+      ${if pkgs.stdenv.hostPlatform.isDarwin then linkCmdDarwin else linkCmdLinux}
 
       for h in "''${HDRS[@]}"; do
         install -Dm644 "$h" "$out/include/''${h#./}"

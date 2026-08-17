@@ -58,7 +58,7 @@ in {
     defFlags = joinDef defines;
     extraC   = joinExtraC (cflags ++ [ "-ffunction-sections" "-fdata-sections" ]);
     extraLD  = joinExtraC ldflags;
-    platLD   = if pkgs.stdenv.isDarwin then "-Wl,-dead_strip" else "-Wl,--gc-sections";
+    platLD   = if pkgs.stdenv.hostPlatform.isDarwin then "-Wl,-dead_strip" else "-Wl,--gc-sections";
     srcsCmd = if srcList != [] then (
       "printf '%s\\n' " + (lib.concatStringsSep " " (map (s: "'" + s + "'") (lib.sort (a: b: a < b) srcList))) + " | sort"
     ) else (

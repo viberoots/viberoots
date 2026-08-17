@@ -123,7 +123,7 @@ in {
         fi
       done
 
-      if ${if pkgs.stdenv.isDarwin then "true" else "false"}; then
+      if ${if pkgs.stdenv.hostPlatform.isDarwin then "true" else "false"}; then
         "$link_driver" ${stlFlag} ${targetFlag} -dynamiclib ${nixLib} ${rpathFlags} ${extraLD} "''${OBJS[@]}" "''${LIBFLAGS[@]}" -o "$outdylib"
         ln -s "lib${H.sanitizeName name}.dylib" "$outso"
       else

@@ -72,7 +72,7 @@ let
             link_flags+=("-l$name")
           done
         done
-        if ${if pkgs.stdenv.isDarwin then "true" else "false"}; then
+        if ${if pkgs.stdenv.hostPlatform.isDarwin then "true" else "false"}; then
           ${compiler} ${stlFlag} ${targetFlag} -dynamiclib bridge.o \
             "''${link_flags[@]}" -o "$out/lib/lib${publicCrate}_rust_bridge.dylib"
         else

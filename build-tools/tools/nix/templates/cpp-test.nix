@@ -48,7 +48,7 @@ in {
     defFlags = joinDef defines;
     extraC   = joinExtraC (cflags ++ [ "-ffunction-sections" "-fdata-sections" ]);
     extraLD  = joinExtraC ldflags;
-    platLD   = if pkgs.stdenv.isDarwin then "-Wl,-dead_strip" else "-Wl,--gc-sections";
+    platLD   = if pkgs.stdenv.hostPlatform.isDarwin then "-Wl,-dead_strip" else "-Wl,--gc-sections";
     # Heuristic: if gtest/googletest is among the original attr names, add test libs.
     hasGTest = hasGTestAttr nixCxxAttrNames;
     gtestLibs = if hasGTest then "-lgtest_main -lgtest" else "";
@@ -59,7 +59,7 @@ in {
     gtestLibPath = if hasGTest && (gtestPkgsAll != []) then (
       lib.concatStringsSep " " (map (p: "-L${toLibBase p}/lib") gtestPkgsAll)
     ) else "";
-    threadLib = if pkgs.stdenv.isDarwin then "" else "-pthread";
+    threadLib = if pkgs.stdenv.hostPlatform.isDarwin then "" else "-pthread";
   in pkgs.stdenv.mkDerivation {
     inherit pname;
     version = "0.1.0";

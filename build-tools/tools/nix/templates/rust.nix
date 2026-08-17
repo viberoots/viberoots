@@ -120,7 +120,7 @@ in {
         ++ lib.optional (pythonWheelhouse != null) pythonWheelhouse)
         ++ pyemscriptenContract.buildInputs ++ lib.optionals (kind == "addon") [ pkgs.nodejs_22 ];
       extensionRustFlags = lib.optionals
-        (pkgs.stdenv.isDarwin && builtins.elem kind [ "pyext" "addon" ])
+        (pkgs.stdenv.hostPlatform.isDarwin && builtins.elem kind [ "pyext" "addon" ])
         [ "-C" "link-arg=-undefined" "-C" "link-arg=dynamic_lookup" ]
         ++ pyemscriptenContract.rustFlags;
       wasmRustFlags = import ./rust-wasm-rustflags.nix { inherit lib kind wasm; };

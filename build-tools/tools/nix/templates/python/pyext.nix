@@ -205,7 +205,7 @@ PY
       fi
     done
 
-    if [ "${if pkgs.stdenv.isDarwin then "1" else "0"}" = "1" ]; then
+    if [ "${if pkgs.stdenv.hostPlatform.isDarwin then "1" else "0"}" = "1" ]; then
       ${compiler} -bundle -undefined dynamic_lookup ${repoLib} ${nixLib} ${lib.concatStringsSep " " (map lib.escapeShellArg ldflags)} $objs "''${REPO_LIBFLAGS[@]}" -o "build/site/$outRel"
     else
       ${compiler} -shared ${repoLib} ${nixLib} ${lib.concatStringsSep " " (map lib.escapeShellArg ldflags)} $objs "''${REPO_LIBFLAGS[@]}" -o "build/site/$outRel"

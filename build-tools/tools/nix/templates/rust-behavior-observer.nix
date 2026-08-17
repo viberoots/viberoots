@@ -40,7 +40,7 @@ let
     C
     ${pkgs.stdenv.cc}/bin/cc "$TMPDIR/viberoots-behavior.c" \
       "$out/lib/lib${publicCrate}.a" \
-      ${lib.optionalString pkgs.stdenv.isLinux "-ldl -lpthread -lm"} \
+      ${lib.optionalString pkgs.stdenv.hostPlatform.isLinux "-ldl -lpthread -lm"} \
       -o "$TMPDIR/viberoots-behavior"
     "$TMPDIR/viberoots-behavior"
   '';
@@ -55,8 +55,8 @@ let
     C
     ${pkgs.stdenv.cc}/bin/cc "$TMPDIR/viberoots-behavior.c" \
       -L"$out/lib" -l${publicCrate} -o "$TMPDIR/viberoots-behavior"
-    ${lib.optionalString pkgs.stdenv.isLinux ''LD_LIBRARY_PATH="$out/lib"''} \
-      ${lib.optionalString pkgs.stdenv.isDarwin ''DYLD_LIBRARY_PATH="$out/lib"''} \
+    ${lib.optionalString pkgs.stdenv.hostPlatform.isLinux ''LD_LIBRARY_PATH="$out/lib"''} \
+      ${lib.optionalString pkgs.stdenv.hostPlatform.isDarwin ''DYLD_LIBRARY_PATH="$out/lib"''} \
       "$TMPDIR/viberoots-behavior"
   '';
   observePythonExtension = ''

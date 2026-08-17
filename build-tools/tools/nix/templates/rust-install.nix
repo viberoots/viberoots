@@ -153,7 +153,7 @@ if kind == "bin" then ''
   install -Dm755 "$candidate" "$out/lib/lib${publicCrate}.$extension"
   ${lib.optionalString (crateType == "cdylib") ''
     install -Dm755 "$candidate" "$out/lib/lib${publicCrate}${dynamicExtension}"
-    ${lib.optionalString pkgs.stdenv.isDarwin ''
+    ${lib.optionalString pkgs.stdenv.hostPlatform.isDarwin ''
       ${pkgs.darwin.cctools}/bin/install_name_tool \
         -id "$out/lib/lib${publicCrate}${dynamicExtension}" \
         "$out/lib/lib${publicCrate}${dynamicExtension}"

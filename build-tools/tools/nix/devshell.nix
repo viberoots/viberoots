@@ -453,7 +453,7 @@ EOF
       pkgs.git pkgs.nix pkgs.buck2 pkgs.go pkgs.viberootsRustDeveloperTools pnpm11 pkgs.nodejs_22 pkgs.python3 pkgs.uv zx-wrapper viberootsCommand pkgs.jq pkgs.rsync copier pkgs.yq pkgs.prettier
       pkgs.jc pkgs.bash pkgs.coreutils pkgs.curl pkgs.gomod2nix pkgs.opentofu pkgs.infisical pkgs.awscli2 pkgs.dnsutils
       pkgs.openssl pkgs.postgresql_16
-    ] ++ (if pkgs.stdenv.isDarwin then [ agent-safehouse ] else [])
-      ++ (if pkgs.stdenv.isLinux then [ pkgs.fuse-overlayfs pkgs.xdg-utils ] else []);
+    ] ++ (if pkgs.stdenv.hostPlatform.isDarwin then [ agent-safehouse ] else [])
+      ++ (if pkgs.stdenv.hostPlatform.isLinux then [ pkgs.fuse-overlayfs pkgs.xdg-utils ] else []);
   };
 }
