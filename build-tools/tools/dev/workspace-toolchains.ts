@@ -5,6 +5,7 @@ import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 import { buildToolsRoot } from "./dev-build/paths";
 
 const BZL_REL = path.join("toolchains", "toolchain_paths.bzl");
+const GENERATED_TOOLCHAIN_PATHS_BZL = "toolchain_paths.bzl";
 
 function activeViberootsRoot(root: string): string {
   return path.dirname(buildToolsRoot(root));
@@ -42,7 +43,7 @@ async function ensureWorkspaceToolchains(root: string): Promise<string> {
 
 async function syncToolchainTree(src: string, dst: string): Promise<void> {
   await mkdirWithMacosMetadataExclusion(dst);
-  const keep = new Set([".metadata_never_index"]);
+  const keep = new Set([".metadata_never_index", GENERATED_TOOLCHAIN_PATHS_BZL]);
   const seen = new Set<string>();
   let entries: import("node:fs").Dirent[] = [];
   try {
@@ -51,6 +52,9 @@ async function syncToolchainTree(src: string, dst: string): Promise<void> {
     return;
   }
   for (const entry of entries) {
+    if (entry.name === GENERATED_TOOLCHAIN_PATHS_BZL) {
+      continue;
+    }
     const srcPath = path.join(src, entry.name);
     const dstPath = path.join(dst, entry.name);
     seen.add(entry.name);

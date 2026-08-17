@@ -41,6 +41,39 @@ test("workspace toolchain sync preserves mtimes for unchanged files", async () =
   }
 });
 
+test("workspace toolchain sync preserves generated toolchain paths", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "workspace-toolchains-generated-"));
+  try {
+    await writeFile(path.join(root, "viberoots", "build-tools", "tools", "dev", "zx-init.mjs"), "");
+    await writeFile(path.join(root, "viberoots", "toolchains", "TARGETS"), "# targets\n");
+    await writeFile(
+      path.join(root, "viberoots", "toolchains", "toolchain_paths.bzl"),
+      "# source generated\n",
+    );
+    await fsp.mkdir(path.join(root, ".viberoots", "workspace"), { recursive: true });
+
+    const generated = path.join(
+      root,
+      ".viberoots",
+      "workspace",
+      "toolchains",
+      "toolchain_paths.bzl",
+    );
+    await writeFile(generated, "# consumer generated\n");
+    const oldTime = new Date(1_000);
+    await fsp.utimes(generated, oldTime, oldTime);
+    const firstGenerated = (await fsp.stat(generated)).mtimeMs;
+
+    const paths = await toolchainBzlPaths(root);
+
+    assert.ok(paths.includes(generated));
+    assert.equal(await fsp.readFile(generated, "utf8"), "# consumer generated\n");
+    assert.equal((await fsp.stat(generated)).mtimeMs, firstGenerated);
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
 test("workspace toolchain sync removes stale generated files", async () => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "workspace-toolchains-stale-"));
   try {
