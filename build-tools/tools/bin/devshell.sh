@@ -53,6 +53,9 @@ env_init_paths() {
 	else
 		export LIVE_ROOT="${REPO_ROOT}"
 	fi
+	if [[ -n "${LIVE_ROOT}" && "$(basename "${LIVE_ROOT}")" == "viberoots" && -f "$(dirname "${LIVE_ROOT}")/.viberoots/workspace/flake.nix" ]]; then
+		export LIVE_ROOT="$(dirname "${LIVE_ROOT}")"
+	fi
 	if [[ -n "${LIVE_ROOT}" ]]; then
 		LIVE_ROOT="$(cd "${LIVE_ROOT}" && pwd)"
 	fi

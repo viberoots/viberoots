@@ -33,10 +33,10 @@ assert artifactBashExecutable == ""
   || builtins.match "/nix/store/[0-9abcdfghijklmnpqrsvwxyz]{32}-[^/]+(/.*)?" artifactBashExecutable != null;
 {
   inherit bundleRoot classification dependencies languageOverrides selection;
-  artifactToolsRoot = builtins.storePath dependencies.artifactToolsRoot;
+  artifactToolsRoot = builtins.toPath dependencies.artifactToolsRoot;
   artifactBashExecutable =
-    if artifactBashExecutable != "" then builtins.storePath artifactBashExecutable
-    else builtins.storePath (dependencies.artifactToolsRoot + "/bin/bash");
+    if artifactBashExecutable != "" then builtins.toPath artifactBashExecutable
+    else builtins.toPath (dependencies.artifactToolsRoot + "/bin/bash");
   inherit artifactNixRoot;
   graphPath = bundleRoot + "/graph.json";
   repoRoot = repoRoot;

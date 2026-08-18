@@ -24,6 +24,14 @@ function literalArtifactToolsRoot(rootValue: string, label: string): string {
 
 function scopedManifestCandidates(workspaceRoot: string): string[] {
   const absolute = path.resolve(workspaceRoot);
+  const parent = path.dirname(absolute);
+  const parentWorkspaceFlake = path.join(parent, ".viberoots", "workspace", "flake.nix");
+  if (path.basename(absolute) === "viberoots" && fs.existsSync(parentWorkspaceFlake)) {
+    return [
+      path.join(parent, ".viberoots", "workspace", "toolchain-paths.json"),
+      path.join(absolute, ".viberoots", "workspace", "toolchain-paths.json"),
+    ];
+  }
   return [path.join(absolute, ".viberoots", "workspace", "toolchain-paths.json")];
 }
 

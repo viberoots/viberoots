@@ -48,8 +48,37 @@ function computePlatformLabel(cwd: string): string {
   return env || platformFromBuckconfig(cwd) || "prelude//platforms:default";
 }
 
+function projectIgnoreEntries(cwd: string): string[] {
+  try {
+    const txt = String(fs.readFileSync(path.join(cwd, ".buckconfig"), "utf8") || "");
+    let inProject = false;
+    for (const line of txt.split(/\r?\n/)) {
+      const section = line.match(/^\s*\[([^\]]+)\]\s*$/);
+      if (section) {
+        inProject = section[1] === "project";
+        continue;
+      }
+      if (!inProject) continue;
+      const ignoreLine = line.match(/^\s*ignore\s*=\s*(.*?)\s*$/)?.[1] || "";
+      if (ignoreLine) return parseCsvish(ignoreLine);
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+function isProjectIgnoredPackage(cwd: string, pkg: string): boolean {
+  const normalized = pkg.replace(/^\/+/, "");
+  return projectIgnoreEntries(cwd).some((entry) => {
+    const ignored = entry.replace(/^\/+/, "").replace(/\/+$/, "");
+    return ignored !== "" && (normalized === ignored || normalized.startsWith(`${ignored}/`));
+  });
+}
+
 export function computeRootsExpr(cwd: string): string {
   const globalInputs = GLOBAL_NIX_INPUT_TARGET_LABELS.filter((label) => {
+    if (isProjectIgnoredPackage(cwd, packagePathFromLabel(label))) return false;
     try {
       return fs
         .readFileSync(path.join(cwd, packagePathFromLabel(label), "TARGETS"), "utf8")

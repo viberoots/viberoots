@@ -5,6 +5,7 @@ import { enterCanonicalArtifactEntrypoint } from "./canonical-artifact-entrypoin
 
 const artifactToolsRoot = enterCanonicalArtifactEntrypoint(process.cwd(), {
   allowDevOverrides: true,
+  stripAmbientArtifactInfluence: true,
 });
 withRegisteredToolState("dev-build", () => runDevBuild(artifactToolsRoot)).catch((e) => {
   console.error(e);

@@ -58,6 +58,16 @@ This reference is a public interface guide for macros used in `TARGETS`. I keep 
   - `rust_python_wasm_extension`
   - `rust_node_addon`
 
+## Planned Route Inventory
+
+These names are reserved route inventory entries, not active public macros in this PR. They must not
+appear in the artifact-producing Index until their builders are reviewed and exported.
+
+- `@viberoots//build-tools/rust:defs.bzl`
+  - `tauri_android_app` (`planned-not-loadable`)
+  - `tauri_ios_app` (`planned-not-loadable`)
+  - `tauri_mobile_suite` (`planned-not-loadable`)
+
 ## Additional public surfaces
 
 These macros are public and loaded from `TARGETS`, but intentionally excluded from the
@@ -1734,6 +1744,10 @@ through a bounded project-relative external runner. Tests are not runnable appli
 Builds a credential-free, platform-ad-hoc Tauri desktop application. The artifact is not
 release-signed or release-admitted. The target stamps `kind:app`, `app:tauri`, and
 `platform:aarch64-darwin`; only that platform currently has reviewed package and launch evidence.
+The Buck graph also carries a typed `tauri_target` record with `platform = "desktop-darwin"`,
+`artifactKind = "macos-app"`, `signingMode = "adhoc-platform"`, and
+`deploymentEligibility = "not-eligible"`. iOS and Android values are planned route metadata only
+until their builders are reviewed.
 
 - `frontend_dist` is required and must name a Buck-built static Node application, normally the
   output of `node_asset_stage`. Tauri `beforeBuildCommand` and `beforeDevCommand` hooks are rejected.

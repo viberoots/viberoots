@@ -124,6 +124,16 @@ let
           if [ -n "$bins" ]; then
             if [ "$first" -eq 0 ]; then echo "," >> $out/manifest.json; fi
             if [ "$rust_kind" = "tauri" ]; then
+              tauri_platform="${rustRunnableMeta.${n}.tauriTarget.platform or ""}"
+              tauri_artifact_kind="${rustRunnableMeta.${n}.tauriTarget.artifactKind or ""}"
+              tauri_bundle_identifier="${rustRunnableMeta.${n}.tauriTarget.bundleIdentifier or ""}"
+              tauri_package_name="${rustRunnableMeta.${n}.tauriTarget.packageName or ""}"
+              tauri_signing_mode="${rustRunnableMeta.${n}.tauriTarget.signingMode or ""}"
+              tauri_deployment_eligibility="${rustRunnableMeta.${n}.tauriTarget.deploymentEligibility or ""}"
+              test "$tauri_platform" = "desktop-darwin" || { echo "rust planner: Tauri target ${n} has unsupported runnable platform $tauri_platform" >&2; exit 1; }
+              test "$tauri_artifact_kind" = "macos-app" || { echo "rust planner: Tauri target ${n} has unsupported runnable artifact kind $tauri_artifact_kind" >&2; exit 1; }
+              test "$tauri_signing_mode" = "adhoc-platform" || { echo "rust planner: Tauri target ${n} has unsupported runnable signing mode $tauri_signing_mode" >&2; exit 1; }
+              test "$tauri_deployment_eligibility" = "not-eligible" || { echo "rust planner: Tauri target ${n} must not be deployment eligible" >&2; exit 1; }
               app_dir="${p}/app"
               artifact_manifest="${p}/share/viberoots-tauri/artifact-manifest.json"
               test -d "$app_dir" || { echo "rust planner: Tauri target ${n} missing app bundle directory $app_dir" >&2; exit 1; }
@@ -134,7 +144,7 @@ let
                 *) echo "rust planner: Tauri target ${n} declared an executable outside its application bundle" >&2; exit 1 ;;
               esac
               test -x "$app_executable" || { echo "rust planner: Tauri target ${n} application executable is not executable" >&2; exit 1; }
-              echo "{ \"label\": \"${n}\", \"kind\": \"app\", \"bins\": [ $bins ], \"aux\": [], \"runnable\": { \"kind\": \"desktop-app\", \"run\": { \"prod\": { \"argv\": [ \"$app_executable\" ] }, \"dev\": { \"argv\": [ \"viberoots-tauri-dev\", \"${n}\" ] } }, \"artifacts\": { \"bins\": [ $bins ], \"applicationBundle\": \"$app_dir\", \"appExecutable\": \"$app_executable\", \"artifactManifest\": \"$artifact_manifest\" } } }" >> $out/manifest.json
+              echo "{ \"label\": \"${n}\", \"kind\": \"app\", \"bins\": [ $bins ], \"aux\": [], \"tauriTarget\": { \"family\": \"tauri\", \"platform\": \"$tauri_platform\", \"artifactKind\": \"$tauri_artifact_kind\", \"bundleIdentifier\": \"$tauri_bundle_identifier\", \"packageName\": \"$tauri_package_name\", \"signingMode\": \"$tauri_signing_mode\", \"deploymentEligibility\": \"$tauri_deployment_eligibility\" }, \"runnable\": { \"kind\": \"desktop-app\", \"run\": { \"prod\": { \"argv\": [ \"$app_executable\" ] }, \"dev\": { \"argv\": [ \"viberoots-tauri-dev\", \"${n}\" ] } }, \"artifacts\": { \"bins\": [ $bins ], \"applicationBundle\": \"$app_dir\", \"appExecutable\": \"$app_executable\", \"artifactManifest\": \"$artifact_manifest\" } } }" >> $out/manifest.json
             else
               echo "{ \"label\": \"${n}\", \"kind\": \"bin\", \"bins\": [ $bins ], \"aux\": [], \"runnable\": { \"kind\": \"native-bin\", \"run\": { \"prod\": { \"argv\": [ \"$first_bin\" ] } }, \"artifacts\": { \"bins\": [ $bins ] } } }" >> $out/manifest.json
             fi

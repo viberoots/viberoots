@@ -66,7 +66,20 @@ test("manifest evaluation emits Tauri desktop metadata only for Rust Tauri outpu
           goOutPaths = {}; nodeOutPaths = {};
           cppOutPaths = { "//cpp:tool" = ${JSON.stringify(cpp)}; };
           rustOutPaths = { "//rust:desktop" = ${JSON.stringify(rust)}; };
-          rustRunnableMeta = { "//rust:desktop" = { kind = "tauri"; }; };
+          rustRunnableMeta = {
+            "//rust:desktop" = {
+              kind = "tauri";
+              tauriTarget = {
+                family = "tauri";
+                platform = "desktop-darwin";
+                artifactKind = "macos-app";
+                bundleIdentifier = "";
+                packageName = "";
+                signingMode = "adhoc-platform";
+                deploymentEligibility = "not-eligible";
+              };
+            };
+          };
           modulesTomlFor = _: "/dev/null"; pkgPathOf = _: "";
           targetNameOf = _: ""; sanitize = value: builtins.replaceStrings [ "/" ":" ] [ "_" "_" ] value;
         };
@@ -81,6 +94,15 @@ test("manifest evaluation emits Tauri desktop metadata only for Rust Tauri outpu
     const entries = JSON.parse(await fsp.readFile(path.join(out, "manifest.json"), "utf8"));
     const byLabel = new Map(entries.map((entry: any) => [entry.label, entry]));
     assert.equal(byLabel.get("//rust:desktop")?.kind, "app");
+    assert.deepEqual(byLabel.get("//rust:desktop")?.tauriTarget, {
+      family: "tauri",
+      platform: "desktop-darwin",
+      artifactKind: "macos-app",
+      bundleIdentifier: "",
+      packageName: "",
+      signingMode: "adhoc-platform",
+      deploymentEligibility: "not-eligible",
+    });
     assert.equal(byLabel.get("//rust:desktop")?.runnable?.kind, "desktop-app");
     assert.equal(byLabel.get("//rust:desktop")?.runnable?.run?.prod?.argv?.[0], appExecutable);
     assert.equal(

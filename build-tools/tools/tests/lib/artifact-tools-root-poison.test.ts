@@ -58,6 +58,37 @@ test("canonicalArtifactToolsRoot rejects a distinct valid active store authority
   }
 });
 
+test("nested viberoots checkout uses the parent workspace artifact authority", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "nested-viberoots-authority-"));
+  const toolsRoot = canonicalArtifactToolsRoot(process.cwd());
+  const nested = path.join(tmp, "viberoots");
+  try {
+    await fsp.mkdir(path.join(tmp, ".viberoots", "workspace"), { recursive: true });
+    await fsp.mkdir(path.join(nested, ".viberoots", "workspace"), { recursive: true });
+    await fsp.writeFile(path.join(tmp, ".viberoots", "workspace", "flake.nix"), "\n");
+    await fsp.writeFile(
+      path.join(tmp, ".viberoots", "workspace", "toolchain-paths.json"),
+      `${JSON.stringify({ artifactTools: { root: toolsRoot } }, null, 2)}\n`,
+    );
+    await fsp.writeFile(
+      path.join(nested, ".viberoots", "workspace", "toolchain-paths.json"),
+      `${JSON.stringify(
+        {
+          artifactTools: {
+            root: "/nix/store/00000000000000000000000000000000-stale-nested-tools",
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    assert.equal(canonicalArtifactToolsRoot(nested), toolsRoot);
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
 test("ordinary ingress does not replace a missing manifest with ambient tool authority", async () => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "artifact-ingress-missing-manifest-"));
   const toolsRoot = canonicalArtifactToolsRoot(process.cwd());

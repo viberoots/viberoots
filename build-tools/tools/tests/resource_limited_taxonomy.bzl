@@ -79,7 +79,6 @@ RESOURCE_LIMITED_TESTS = {
     "build-tools/tools/tests/scaffolding/node-cli.scaffold-and-build.bundle.test.ts": True,
     "build-tools/tools/tests/scaffolding/node-cli.scaffold-and-build.shim-and-bundle.test.ts": True,
     "build-tools/tools/tests/scaffolding/node-cli.scaffold-lockfile.present.test.ts": True,
-    "build-tools/tools/tests/scaffolding/node-go-addon.runtime.e2e.test.ts": True,
     "build-tools/tools/tests/scaffolding/partial-clone.discover-and-build.test.ts": True,
     "build-tools/tools/tests/scaffolding/provider-wiring.scaffold-patch.test.ts": True,
     "build-tools/tools/tests/scaffolding/rust-submodule.scaffold-lifecycle.test.ts": True,

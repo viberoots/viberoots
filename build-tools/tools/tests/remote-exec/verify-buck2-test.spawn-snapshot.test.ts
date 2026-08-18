@@ -7,6 +7,10 @@ import path from "node:path";
 import { test } from "node:test";
 import { spawnVerifyBuck2Tests } from "../../dev/verify/buck2-test";
 import { parseVerifyExecutionPolicy } from "../../dev/verify/remote-policy";
+import {
+  PROJECT_ENFORCEMENT_OVERALL_TIMEOUT_SECS,
+  PROJECT_ENFORCEMENT_PER_TEST_TIMEOUT_SECS,
+} from "../../lib/project-enforcement-timeouts";
 import { canonicalArtifactToolsRoot } from "../../lib/artifact-environment";
 import {
   localArgvSnapshot,
@@ -191,12 +195,28 @@ test("project enforcement keeps its exact timeout under broad verify budgets", (
     { TEST_NIX_TIMEOUT_SECS: "7200", VERIFY_TIMEOUT_SECS: "28800" },
     { passName: "project-enforcement" },
   );
-  assert.ok(call.args.includes("60s"), "Buck overall timeout must remain 60 seconds");
+  assert.ok(
+    call.args.includes(`${PROJECT_ENFORCEMENT_OVERALL_TIMEOUT_SECS}s`),
+    "Buck overall timeout must remain the exact project-enforcement cap",
+  );
   const executorArgs = call.args.slice(call.args.lastIndexOf("--") + 1);
-  assert.deepEqual(executorArgs.slice(0, 2), ["--timeout", "30"]);
-  assert.ok(executorArgs.includes("TEST_NODE_OPTIONS=--test-timeout=30000"));
-  assert.ok(executorArgs.includes("TEST_NIX_TIMEOUT_SECS=30"));
-  assert.ok(executorArgs.includes("VBR_ARTIFACT_COMMAND_TIMEOUT_SECS=30"));
+  assert.deepEqual(executorArgs.slice(0, 2), [
+    "--timeout",
+    String(PROJECT_ENFORCEMENT_PER_TEST_TIMEOUT_SECS),
+  ]);
+  assert.ok(
+    executorArgs.includes(
+      `TEST_NODE_OPTIONS=--test-timeout=${PROJECT_ENFORCEMENT_PER_TEST_TIMEOUT_SECS * 1000}`,
+    ),
+  );
+  assert.ok(
+    executorArgs.includes(`TEST_NIX_TIMEOUT_SECS=${PROJECT_ENFORCEMENT_PER_TEST_TIMEOUT_SECS}`),
+  );
+  assert.ok(
+    executorArgs.includes(
+      `VBR_ARTIFACT_COMMAND_TIMEOUT_SECS=${PROJECT_ENFORCEMENT_PER_TEST_TIMEOUT_SECS}`,
+    ),
+  );
 });
 
 test("spawnVerifyBuck2Tests remote argv/env snapshots cover every mode", () => {

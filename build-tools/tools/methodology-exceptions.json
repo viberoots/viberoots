@@ -157,6 +157,10 @@
       "justification": "Pre-existing oversized Claude wrapper safehouse test pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
     },
     {
+      "path": "tests/dev/codex-wrapper.safehouse.test.ts",
+      "justification": "Pre-existing oversized Codex wrapper safehouse test pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
       "path": "tests/dev/startup-check.extraction-blockers.test.ts",
       "justification": "Pre-existing oversized startup-check test pending focused decomposition outside the remote-consumer final checkpoint."
     },
@@ -195,6 +199,10 @@
     {
       "path": "tests/verify/template-test-scope.policy.test.ts",
       "justification": "Pre-existing oversized verify template scope policy test pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "tests/verify/project-enforcement-freshness.integration.test.ts",
+      "justification": "Pre-existing oversized project-enforcement freshness integration test pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
     },
     {
       "path": "tests/viberoots/init.consumer.test.ts",

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
 const mixedProducer =
   "build-tools/tools/tests/node/node.wasm-stage-inline.mixed-producer-labels.test.ts";
+const goAddonRuntime = "build-tools/tools/tests/scaffolding/node-go-addon.runtime.e2e.test.ts";
 
 test("nested Node WASM artifact builds use safe execution lanes", async () => {
   const resourceTaxonomy = await fsp.readFile(
@@ -28,5 +29,10 @@ test("nested Node WASM artifact builds use safe execution lanes", async () => {
   assert.ok(
     !resourceTaxonomy.includes(`${JSON.stringify(mixedProducer)}: True`),
     `${mixedProducer} must not also run in the concurrent resource-limited lane`,
+  );
+  assert.ok(isolatedTaxonomy.includes(`${JSON.stringify(goAddonRuntime)}: True`), goAddonRuntime);
+  assert.ok(
+    !resourceTaxonomy.includes(`${JSON.stringify(goAddonRuntime)}: True`),
+    `${goAddonRuntime} starts a nested Buck daemon and must not run in the concurrent resource-limited lane`,
   );
 });

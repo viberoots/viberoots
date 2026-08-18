@@ -87,11 +87,11 @@ The graph should carry a typed `tauri_target` record instead of overloading stri
 }
 ```
 
-| Platform | Local artifact kinds | Release artifact kinds |
-| --- | --- | --- |
-| `desktop-darwin` | `macos-app` | future `macos-signed-dmg` |
-| `ios` | `ios-simulator-bundle` | future `ios-unsigned-archive`, `ios-signed-ipa` |
-| `android` | `android-debug-apk` | future `android-unsigned-aab`, `android-signed-aab` |
+| Platform         | Local artifact kinds   | Release artifact kinds                              |
+| ---------------- | ---------------------- | --------------------------------------------------- |
+| `desktop-darwin` | `macos-app`            | future `macos-signed-dmg`                           |
+| `ios`            | `ios-simulator-bundle` | future `ios-unsigned-archive`, `ios-signed-ipa`     |
+| `android`        | `android-debug-apk`    | future `android-unsigned-aab`, `android-signed-aab` |
 
 The first implementation should support local/simulator artifacts only. Release artifact kinds are
 reserved until signing, SBOM, provenance, and store deployment admission are wired.

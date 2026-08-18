@@ -386,6 +386,9 @@ if (dryRun) {
           } else {
             ui.step("node_modules", `${imp} refreshing`);
           }
+          await fsp.mkdir(path.join(repoRoot, ".viberoots", "workspace", "buck", "tmp"), {
+            recursive: true,
+          });
           // Ordinary install materializes ignored local state from committed metadata.
           // Bootstrap/update enables refreshPnpmHashes for the intentional mutation path.
           const updateArgs = refreshPnpmHashes ? [] : ["--read-only"];

@@ -86,12 +86,12 @@ surface. Coverage remains opt-in unless a PR adds a coverage contract.
 
 ## Route-State Lifecycle
 
-| Macro | PR-1 load | PR-2 load | PR-3 load | PR-4 load | PR-7 load | Artifact state | Scaffold state | Deployment |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `tauri_app` | public | public | public | public | public | desktop artifact-producing | enabled | desktop only |
-| `tauri_android_app` | planned-not-loadable | loadable-disabled | public | public | public | Android local artifact-producing from PR-3 | gated until PR-7 | never deployment-eligible |
-| `tauri_ios_app` | planned-not-loadable | loadable-disabled | loadable-disabled | public | public | iOS local artifact-producing from PR-4 | gated until PR-7 | never deployment-eligible |
-| `tauri_mobile_suite` | planned-not-loadable | loadable-disabled | loadable-disabled | loadable-disabled | public | aggregate-only helper | gated until PR-7 | not deployment-eligible |
+| Macro                | PR-1 load            | PR-2 load         | PR-3 load         | PR-4 load         | PR-7 load | Artifact state                             | Scaffold state   | Deployment                |
+| -------------------- | -------------------- | ----------------- | ----------------- | ----------------- | --------- | ------------------------------------------ | ---------------- | ------------------------- |
+| `tauri_app`          | public               | public            | public            | public            | public    | desktop artifact-producing                 | enabled          | desktop only              |
+| `tauri_android_app`  | planned-not-loadable | loadable-disabled | public            | public            | public    | Android local artifact-producing from PR-3 | gated until PR-7 | never deployment-eligible |
+| `tauri_ios_app`      | planned-not-loadable | loadable-disabled | loadable-disabled | public            | public    | iOS local artifact-producing from PR-4     | gated until PR-7 | never deployment-eligible |
+| `tauri_mobile_suite` | planned-not-loadable | loadable-disabled | loadable-disabled | loadable-disabled | public    | aggregate-only helper                      | gated until PR-7 | not deployment-eligible   |
 
 The `load` columns use only the planned-route inventory states: `public`, `loadable-disabled`, and
 `planned-not-loadable`. Local/debug/simulator mobile macros never become deployment-eligible. PR-7
@@ -102,17 +102,17 @@ analysis fails with a platform-not-enabled diagnostic before any artifact route 
 planned-route inventory and `starlark-api.md` must mark those symbols as disabled, not active public
 artifact routes.
 
-| Release artifact | PR-5 | PR-6 | PR-7 |
-| --- | --- | --- | --- |
+| Release artifact    | PR-5         | PR-6                              | PR-7                               |
+| ------------------- | ------------ | --------------------------------- | ---------------------------------- |
 | signed `mobile-app` | not admitted | admitted by release-lane evidence | deployable only as signed artifact |
 
 ## Integration Debt Ledger
 
-| Area | Introduced by | Owner PR | Status | Notes |
-| --- | --- | --- | --- | --- |
-| iOS device archive decision | Design open question | PR-4/PR-6 | Open | Simulator-only is the default until release admission needs archives. |
-| Mobile sidecar semantics | Design open question | PR-5 | Open | Keep sidecars rejected on mobile until a package-specific mapping exists. |
-| Tauri mobile plugin contract | Design open question | Future plan | Open | First slice supports only already-reviewed app commands and capabilities. |
+| Area                         | Introduced by        | Owner PR    | Status | Notes                                                                     |
+| ---------------------------- | -------------------- | ----------- | ------ | ------------------------------------------------------------------------- |
+| iOS device archive decision  | Design open question | PR-4/PR-6   | Open   | Simulator-only is the default until release admission needs archives.     |
+| Mobile sidecar semantics     | Design open question | PR-5        | Open   | Keep sidecars rejected on mobile until a package-specific mapping exists. |
+| Tauri mobile plugin contract | Design open question | Future plan | Open   | First slice supports only already-reviewed app commands and capabilities. |
 
 ## PR-1: Typed Mobile Target Metadata And Route Inventory
 

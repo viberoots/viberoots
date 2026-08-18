@@ -69,6 +69,21 @@ test("cold post-clone lock evaluates offline solely from preserved immutable nod
   const lockFile = path.join(workspace, "flake.lock");
   const derivedText = await fsp.readFile(lockFile, "utf8");
   const derived = JSON.parse(derivedText);
+  const derivedRootInputs = derived.nodes[derived.root].inputs;
+  const canonicalRootInputs = new Set(
+    ["rust-overlay", "wasmtime-nixpkgs"].flatMap((name) => [
+      name,
+      authoritative.nodes[authoritative.root].inputs[name],
+    ]),
+  );
+  assert.equal(
+    derived.nodes[derivedRootInputs["rust-overlay"]].locked.rev,
+    "b479967b8ed7aca40ba52cf12f460484c53928a9",
+  );
+  assert.equal(
+    derived.nodes[derivedRootInputs["wasmtime-nixpkgs"]].locked.rev,
+    "d407951447dcd00442e97087bf374aad70c04cea",
+  );
   for (const [name, node] of Object.entries(authoritative.nodes)) {
     if (name === authoritative.root) {
       assert.deepEqual(derived.nodes[name], {
@@ -79,7 +94,7 @@ test("cold post-clone lock evaluates offline solely from preserved immutable nod
           "wasmtime-nixpkgs": "wasmtime-nixpkgs",
         },
       });
-    } else if (node !== viberootsNode) {
+    } else if (node !== viberootsNode && !canonicalRootInputs.has(name)) {
       assert.deepEqual(derived.nodes[name], node);
     }
   }

@@ -11,15 +11,20 @@ import { parseStarlarkIndexMacrosByModule } from "../../dev/nix-gaps-inventory-c
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 async function routeInputs() {
-  const [rustDefs, starlarkApi, nixGaps] = await Promise.all([
+  const [rustDefs, starlarkApi, nixGaps, langs] = await Promise.all([
     fs.readFile(viberootsSourcePath("viberoots/build-tools/rust/defs.bzl"), "utf8"),
     fs.readFile(viberootsSourcePath("viberoots/docs/handbook/starlark-api.md"), "utf8"),
     fs.readFile(viberootsSourcePath("viberoots/docs/handbook/nix-gaps.md"), "utf8"),
+    fs.readFile(viberootsSourcePath("viberoots/build-tools/tools/nix/langs.json"), "utf8"),
   ]);
+  const rustLang = JSON.parse(langs).languages.find(
+    (language: { id?: string }) => language.id === "rust",
+  );
   return {
     rustDefs,
     publicMacros: parseStarlarkIndexMacrosByModule(starlarkApi)[rustDefsBzlPath] || [],
     nixRouteDetailsByMacro: parseInventoryNixRouteDetails(nixGaps),
+    plannedRoutes: rustLang?.plannedRoutes || [],
   };
 }
 
@@ -46,5 +51,16 @@ test("Rust route drift is rejected when route documentation is missing", async (
   assert.match(
     rustImplementationRouteErrors(inputs).join("\n"),
     /rust_wasm_library do not name rust_nix_build/,
+  );
+});
+
+test("Rust planned mobile routes are rejected when promoted to public macros", async () => {
+  const inputs = await routeInputs();
+  assert.match(
+    rustImplementationRouteErrors({
+      ...inputs,
+      publicMacros: [...inputs.publicMacros, "tauri_ios_app"],
+    }).join("\n"),
+    /tauri_ios_app must stay out of active public macros/,
   );
 });

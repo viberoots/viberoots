@@ -76,12 +76,8 @@ let
   pyWasiToolchain = import ../../toolchains/python-wasi.nix { inherit pkgs; };
   testSeed = import ./test-seed.nix {
     inherit pkgs repoRoot evaluationBundle viberootsRoot;
-    artifactToolsRoot =
-      if evaluationBundle == null then remoteTools.remote-worker-tools
-      else evaluationBundle.artifactToolsRoot;
-    artifactBashExecutable =
-      if evaluationBundle == null then "${remoteTools.remote-worker-tools}/bin/bash"
-      else evaluationBundle.artifactBashExecutable;
+    artifactToolsRoot = remoteTools.remote-worker-tools;
+    artifactBashExecutable = "${remoteTools.remote-worker-tools}/bin/bash";
   };
   controlPlaneImage = import ./deployment-control-plane-image.nix {
     inherit pkgs filterRepo repoRoot repoSnapshot viberootsRoot;

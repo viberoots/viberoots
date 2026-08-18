@@ -92,6 +92,26 @@
     {
       "id": "rust",
       "displayName": "Rust",
+      "plannedRoutes": [
+        {
+          "macro": "tauri_android_app",
+          "state": "planned-not-loadable",
+          "platform": "android",
+          "artifactKinds": ["android-debug-apk", "android-unsigned-aab", "android-signed-aab"]
+        },
+        {
+          "macro": "tauri_ios_app",
+          "state": "planned-not-loadable",
+          "platform": "ios",
+          "artifactKinds": ["ios-simulator-bundle", "ios-unsigned-archive", "ios-signed-ipa"]
+        },
+        {
+          "macro": "tauri_mobile_suite",
+          "state": "planned-not-loadable",
+          "platform": "multi",
+          "artifactKinds": ["macos-app", "ios-simulator-bundle", "android-debug-apk"]
+        }
+      ],
       "requiredPaths": [
         "viberoots/build-tools/rust/defs.bzl",
         "viberoots/build-tools/tools/nix/planner/rust.nix",

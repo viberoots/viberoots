@@ -121,7 +121,10 @@ consumer plus a reachable Rust `kind:pyext_wasm` proof without claiming external
 `tauri_app` uses the shared `kind:app` contract with `app:tauri`, consumes a Buck-built
 `node_asset_stage` frontend with a locked module-based Tauri API, carries explicit resource and
 sidecar destinations plus command/window capabilities, and rejects hidden Tauri build/dev commands. Its current reviewed
-package and launch route is `aarch64-darwin`; Linux is not claimed. Sidecars require reviewed
+package and launch route is `aarch64-darwin`; Linux is not claimed. The graph carries typed
+`tauri_target` metadata for the current `desktop-darwin` `macos-app` route and keeps
+`tauri_ios_app`, `tauri_android_app`, and `tauri_mobile_suite` in the separate
+`planned-not-loadable` route inventory rather than the active public macro inventory. Sidecars require reviewed
 `kind:bin` dependencies, while native libraries remain behind reviewed Rust bridge crates and
 Cargo path dependencies.
 wasm-bindgen, wasm-tools, Binaryen, Wasmtime, and the preview1 adapters come from the selected Nix

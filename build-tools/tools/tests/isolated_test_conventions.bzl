@@ -14,6 +14,8 @@ ISOLATED_TESTS = {
     "build-tools/tools/tests/rust/rust.native-build.rejects-cross-root-deps.test.ts": True,
     "build-tools/tools/tests/rust/rust.tauri-composition.behavior.test.ts": True,
     "build-tools/tools/tests/rust/rust.tauri-scaffold-flake.lifecycle.test.ts": True,
+    "build-tools/tools/tests/scaffolding/node-go-addon.runtime.e2e.test.ts": True,
+    "build-tools/tools/tests/scaffolding/rust-shapes.scaffold-lifecycle.test.ts": True,
     "build-tools/tools/tests/scaffolding/scaf-new.ts.wasm-linking-app.scaffold-and-build.test.ts": True,
     "build-tools/tools/tests/verify/project-enforcement-freshness.integration.test.ts": True,
     "build-tools/tools/tests/viberoots/fresh-clone-post-clone-fail-closed.test.ts": True,

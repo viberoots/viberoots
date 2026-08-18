@@ -64,6 +64,22 @@ export interface Node {
   sidecar_destinations?: string[];
   tauri_config?: string;
   tauri_platform?: string;
+  tauri_target?: {
+    family: "tauri";
+    platform: "desktop-darwin" | "ios" | "android";
+    artifactKind:
+      | "macos-app"
+      | "ios-simulator-bundle"
+      | "ios-unsigned-archive"
+      | "ios-signed-ipa"
+      | "android-debug-apk"
+      | "android-unsigned-aab"
+      | "android-signed-aab";
+    bundleIdentifier: string;
+    packageName: string;
+    signingMode: "adhoc-platform" | "unsigned-local" | "debug-local" | "release-signed";
+    deploymentEligibility: "not-eligible" | "release-admitted";
+  };
   tauri_root?: string;
   resources?: string[];
   resource_sources?: string[];

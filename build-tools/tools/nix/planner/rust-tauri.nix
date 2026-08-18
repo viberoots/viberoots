@@ -61,6 +61,37 @@ let
        then dep
        else builtins.throw
          "Tauri target ${name} sidecar_deps requires kind:bin and sidecar:reviewed: ${dep}";
+  typedTargetFor = name:
+    let
+      value = ctx.get (nodeFor name) "tauri_target";
+      field = key:
+        if builtins.isAttrs value && builtins.hasAttr key value then builtins.getAttr key value else "";
+      expectedKeys = [
+        "artifactKind"
+        "bundleIdentifier"
+        "deploymentEligibility"
+        "family"
+        "packageName"
+        "platform"
+        "signingMode"
+      ];
+      actualKeys = if builtins.isAttrs value then builtins.attrNames value else [];
+      extraKeys = builtins.filter (key: !(builtins.elem key expectedKeys)) actualKeys;
+    in if !(builtins.isAttrs value)
+      then builtins.throw "Tauri target ${name} requires typed tauri_target metadata"
+      else if extraKeys != []
+      then builtins.throw "Tauri target ${name} tauri_target has unknown fields: ${builtins.toString extraKeys}"
+      else if field "family" != "tauri"
+      then builtins.throw "Tauri target ${name} tauri_target.family must be tauri"
+      else if field "platform" != "desktop-darwin"
+      then builtins.throw "Tauri target ${name} has no reviewed mobile builder for ${(field "platform")}"
+      else if field "artifactKind" != "macos-app"
+      then builtins.throw "Tauri target ${name} artifactKind must be macos-app for desktop-darwin"
+      else if field "signingMode" != "adhoc-platform"
+      then builtins.throw "Tauri target ${name} signingMode must be adhoc-platform for desktop-darwin"
+      else if field "deploymentEligibility" != "not-eligible"
+      then builtins.throw "Tauri target ${name} local desktop artifacts are not deployment eligible"
+      else value;
 in {
   contractFor = name: selectedSystem:
     let
@@ -69,6 +100,7 @@ in {
         (normalizeList "sidecar_deps" (ctx.get (nodeFor name) "sidecar_deps"));
       sidecarDestinations = stringList name "sidecar_destinations";
       platform = requiredString name "tauri_platform";
+      tauriTarget = typedTargetFor name;
     in if platform != "aarch64-darwin" then builtins.throw
       "Tauri target ${name} has no reviewed native package/launch evidence for ${platform}"
     else if selectedSystem != platform then builtins.throw
@@ -77,6 +109,7 @@ in {
     then builtins.throw "Tauri target ${name} sidecar mapping fields disagree"
     else {
       inherit platform;
+      target = tauriTarget;
       sourceRoot = tauriSourceRoot;
       root = requiredString name "tauri_root";
       config = tauriSourceRoot

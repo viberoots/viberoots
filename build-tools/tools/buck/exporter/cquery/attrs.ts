@@ -26,6 +26,7 @@ export const attrList = Array.from(
     "sidecar_destinations",
     "tauri_config",
     "tauri_platform",
+    "tauri_target",
     "tauri_root",
     "resources",
     "resource_sources",

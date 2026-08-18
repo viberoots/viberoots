@@ -100,6 +100,37 @@ test("rust macros reject noncanonical Cargo inputs, patch traversal, and unknown
     assert.notEqual(unknown.exitCode, 0);
     assert.match(String(unknown.stderr || unknown.stdout), /unknown arguments: imaginary_fallback/);
 
+    for (const tauriOnlyArg of [
+      "frontend_dist",
+      "tauri_target_platform",
+      "tauri_artifact_kind",
+      "tauri_bundle_identifier",
+      "tauri_signing_mode",
+      "tauri_deployment_eligibility",
+      "app_windows",
+      "app_commands",
+      "capabilities",
+      "icons",
+      "permissions",
+      "resources",
+      "sidecar_deps",
+      "tauri_config",
+      "tauri_package_name",
+      "tauri_platform",
+      "tauri_root",
+    ]) {
+      await fsp.writeFile(
+        targets,
+        `${load}\nrust_binary(name = "app", srcs = ["src/main.rs"], ${tauriOnlyArg} = "invalid")\n`,
+      );
+      const rejectedTauriOnlyArg = await query();
+      assert.notEqual(rejectedTauriOnlyArg.exitCode, 0);
+      assert.match(
+        String(rejectedTauriOnlyArg.stderr || rejectedTauriOnlyArg.stdout),
+        new RegExp(`unknown arguments: ${tauriOnlyArg}`),
+      );
+    }
+
     await fsp.writeFile(
       targets,
       `${load}\nrust_binary(name = "app", srcs = ["src/main.rs"], link_deps = [":native"], link_closure_overrides = {":other": "transitive"})\n`,

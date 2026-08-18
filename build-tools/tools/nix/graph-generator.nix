@@ -603,9 +603,14 @@ let
       let
         matches = builtins.filter (n: ensureFullLabel n == nm) nodesList;
         node = if matches == [] then null else builtins.head matches;
+        tauriTarget = if node == null then {} else
+          let raw = get node "tauri_target"; in if builtins.isAttrs raw then raw else {};
       in {
         name = nm;
-        value = { kind = if node == null then "" else LANGS.rust.kindOf node; };
+        value = {
+          kind = if node == null then "" else LANGS.rust.kindOf node;
+          inherit tauriTarget;
+        };
       }
     ) (builtins.attrNames rustOutPaths)
   );

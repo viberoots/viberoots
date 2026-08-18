@@ -8,7 +8,7 @@ load("@viberoots//build-tools/rust/private:extension_contract.bzl", "prepare_pyt
 load("@viberoots//build-tools/rust/private:interop_contract.bzl", "prepare_interop_kwargs")
 load("@viberoots//build-tools/rust/private:macro_contract.bzl", "RUST_PUBLIC_ARGS", "artifact_out", "crate_type_for", "fixed_artifact_contract", "has_nixpkg_inputs", "public_crate_for", "rust_macro_name", "single_cargo_file", "valid_features", "validate_crate_names", "validate_local_patch_dirs", "validate_public_crate", "with_required_target")
 load("@viberoots//build-tools/rust/private:runtime_contract.bzl", "validate_rust_runtime_args")
-load("@viberoots//build-tools/rust/private:tauri_contract.bzl", "prepare_tauri_contract")
+load("@viberoots//build-tools/rust/private:tauri_contract.bzl", "TAURI_PUBLIC_ARGS", "prepare_tauri_contract")
 load("@viberoots//build-tools/rust/private:wasm_contract.bzl", "is_wasm_kind", "prepare_wasm_contract", "rust_wasm_module_surface")
 def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, interop = False):
     kw = dict(kwargs)
@@ -41,7 +41,8 @@ def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, inte
     kw["link_closure"] = link_closure
     kw["link_closure_overrides"] = link_closure_overrides
     extra = normalize_labels(native.package_name(), kw.pop("extra_module_providers", []))
-    unknown = sorted([key for key in kw.keys() if key not in RUST_PUBLIC_ARGS])
+    allowed_args = RUST_PUBLIC_ARGS + (TAURI_PUBLIC_ARGS if kind == "tauri" else [])
+    unknown = sorted([key for key in kw.keys() if key not in allowed_args])
     if unknown: fail("%s: unknown arguments: %s" % (rust_macro_name(kind), ", ".join(unknown)))
     wasm_attrs = prepare_wasm_contract(kind, kw)
     tauri_attrs = prepare_tauri_contract(kind, kw)
@@ -247,4 +248,3 @@ def rust_python_wasm_extension(name, backend, module, lockfile_label = None, **k
 def rust_node_addon(name, addon_name = None, node_api_version = 8, platform = "selected", **kwargs):
     resolved_name = validate_addon_name(addon_name or name); validate_node_api_version(node_api_version)
     kw = fixed_artifact_contract(kwargs, "rust_node_addon", "cdylib", "target"); kw.update({"addon_name": resolved_name, "node_api_version": node_api_version, "platform": platform}); _rust_nix_target(name = name, kind = "addon", out = resolved_name + ".node", kwargs = kw)
-__all__ = ["rust_binary", "rust_c_ffi_library", "rust_cdylib", "rust_cxx_bridge_library", "rust_library", "rust_node_addon", "rust_proc_macro", "rust_python_extension", "rust_python_wasm_extension", "rust_static_library", "rust_test", "rust_wasi_binary", "rust_wasm_browser_package", "rust_wasm_component", "rust_wasm_library", "rust_wasm_static_library", "tauri_app"]

@@ -180,6 +180,7 @@ test("Tauri planner owns frontend, policy, platform, and local signature contrac
         frontend_dist = "frontend";
         sidecar_deps = [ "sidecar" ];
         tauri_platform = "aarch64-darwin";
+        tauri_target = { family = "tauri"; platform = "desktop-darwin"; artifactKind = "macos-app"; bundleIdentifier = ""; packageName = ""; signingMode = "adhoc-platform"; deploymentEligibility = "not-eligible"; };
         tauri_root = ".";
         tauri_config = "tauri.conf.json";
         resources = [ "help.txt" ];
