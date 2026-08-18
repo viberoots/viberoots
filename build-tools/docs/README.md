@@ -74,6 +74,10 @@ These docs describe active contracts or implementation models:
 - [`abstractions.md`](abstractions.md)
 - [`lang/rust-design.md`](lang/rust-design.md): current experimental native/C/Pyodide/WASM/WASI/scaffold
   baseline and remaining first-class language contract.
+- [`lang/tauri-mobile-design.md`](lang/tauri-mobile-design.md): proposed iOS and Android target
+  contract for Rust Tauri apps.
+- [`lang/tauri-mobile-plan.md`](lang/tauri-mobile-plan.md): implementation plan for the Tauri mobile
+  target contract.
 - [`rust-language-plan.md`](rust-language-plan.md): implementation plan for first-class Rust
   support.
 - [`mapping-design.md`](mapping-design.md)
