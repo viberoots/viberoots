@@ -62,7 +62,7 @@ function parseBuckDaemons(lines: string[]): BuckDaemonProc[] {
 export function isLikelyEphemeralIsolation(iso: string): boolean {
   const s = String(iso || "").trim();
   if (!s) return false;
-  if (/^v-\d+-\d+(?:\.noindex)?$/.test(s)) return true;
+  if (/^v-\d+-\d+(?:-[A-Za-z0-9._-]+)?(?:\.noindex)?$/.test(s)) return true;
   if (/^verify-nested-(?:\d+-)?[a-f0-9]{12}(?:\.noindex)?$/.test(s)) return true;
   if (/^zxtest-[A-Za-z0-9_-]+-[a-f0-9]{10}$/.test(s)) return true;
   if (/^exporter-shared-[a-f0-9]{10}(?:\.noindex)?$/.test(s)) return true;

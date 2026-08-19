@@ -79,6 +79,8 @@ def nix_cache_health_shell():
         + "          case \"$NIX_CACHE_PROBE_STATUS\" in 0|5|6|7|16|28|35|52|55|56|92) ;; *) if [ \"${VBR_NIX_CACHE_POLICY:-auto}\" = \"auto\" ]; then case \" $NIX_CACHE_OPTIONAL \" in *\" $NIX_CACHE_SUB \"*) case \" $NIX_CACHE_REQUIRED \" in *\" $NIX_CACHE_SUB \"*) ;; *) NIX_CACHE_REMOVED=\"$NIX_CACHE_REMOVED ${NIX_CACHE_SUB}\"; NIX_CACHE_REMOVED_IDENTITIES=\"$NIX_CACHE_REMOVED_IDENTITIES ${NIX_CACHE_IDENTITY}\"; continue ;; esac ;; esac; fi; echo \"error: Nix cache probe rejected non-transport failure for $NIX_CACHE_IDENTITY: curl exit $NIX_CACHE_PROBE_STATUS\" >&2; exit 1 ;; esac; "
         + "          if [ \"$NIX_CACHE_PROBE_STATUS\" = \"0\" ]; then "
         + "            NIX_CACHE_AVAILABLE=\"$NIX_CACHE_AVAILABLE ${NIX_CACHE_SUB}\"; "
+        + "          elif [ \"${VBR_NIX_CACHE_POLICY:-auto}\" = \"auto\" ] && case \" $NIX_CACHE_REQUIRED \" in *\" $NIX_CACHE_SUB \"*) true ;; *) false ;; esac; then "
+        + "            NIX_CACHE_AVAILABLE=\"$NIX_CACHE_AVAILABLE ${NIX_CACHE_SUB}\"; "
         + "          else "
         + "            NIX_CACHE_REMOVED=\"$NIX_CACHE_REMOVED ${NIX_CACHE_SUB}\"; NIX_CACHE_REMOVED_IDENTITIES=\"$NIX_CACHE_REMOVED_IDENTITIES ${NIX_CACHE_IDENTITY}\"; "
         + "          fi; "

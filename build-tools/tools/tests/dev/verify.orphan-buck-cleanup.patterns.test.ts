@@ -20,6 +20,8 @@ async function readRepoFile(relativePath: string): Promise<string> {
 test("orphan buck cleanup: matches ephemeral verify/debug/test isolations only", () => {
   const yes = [
     "v-12345-1772235882",
+    "v-12345-1772235882-resource-limited.noindex",
+    "v-12345-1772235882-shared.noindex",
     "verify-nested-12345-deadbeefcafe",
     "verify-nested-deadbeefcafe",
     "zxtest-shared-deadbeef12",
@@ -38,10 +40,13 @@ test("orphan buck cleanup: matches ephemeral verify/debug/test isolations only",
 
 test("orphan buck cleanup: live verify owner isolations are protected", () => {
   const current = `v-${process.pid}-1772235882`;
+  const currentPass = `v-${process.pid}-1772235882-resource-limited.noindex`;
   const currentNested = `verify-nested-${process.pid}-deadbeefcafe`;
   assert.equal(ownerPidFromEphemeralIsolation(current), process.pid);
+  assert.equal(ownerPidFromEphemeralIsolation(currentPass), process.pid);
   assert.equal(ownerPidFromEphemeralIsolation(currentNested), process.pid);
   assert.equal(liveOwnerPidFromEphemeralIsolation(current), process.pid);
+  assert.equal(liveOwnerPidFromEphemeralIsolation(currentPass), process.pid);
   assert.equal(liveOwnerPidFromEphemeralIsolation(currentNested), process.pid);
   assert.equal(liveOwnerPidFromEphemeralIsolation("v-999999999-1772235882"), null);
   assert.equal(liveOwnerPidFromEphemeralIsolation("verify-nested-deadbeefcafe"), null);

@@ -181,12 +181,12 @@ test("Tauri mobile route inventory stays separate from active public macros", as
   assert.deepEqual(
     rustLang.plannedRoutes.map((route: any) => [route.macro, route.state]),
     [
-      ["tauri_android_app", "planned-not-loadable"],
-      ["tauri_ios_app", "planned-not-loadable"],
-      ["tauri_mobile_suite", "planned-not-loadable"],
+      ["tauri_android_app", "loadable-disabled"],
+      ["tauri_ios_app", "loadable-disabled"],
+      ["tauri_mobile_suite", "loadable-disabled"],
     ],
   );
   assert.match(api, /## Planned Route Inventory/);
-  assert.match(api, /tauri_android_app` \(`planned-not-loadable`\)/);
-  assert.match(gaps, /planned-not-loadable` route inventory/);
+  assert.match(api, /tauri_android_app` \(`loadable-disabled`\)/);
+  assert.match(gaps, /loadable-disabled` route inventory/);
 });

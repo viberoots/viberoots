@@ -88,6 +88,10 @@ export interface Node {
   permissions?: string[];
   app_commands?: string[];
   app_windows?: string[];
+  android_config?: string;
+  android_project_srcs?: string[];
+  ios_config?: string;
+  ios_project_srcs?: string[];
   icons?: string[];
   addon_name?: string;
   node_api_version?: number;

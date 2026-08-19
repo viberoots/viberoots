@@ -34,19 +34,19 @@ const expectedRouteHelper: Record<string, string> = {
 const expectedPlannedRoutes: PlannedRustRoute[] = [
   {
     macro: "tauri_android_app",
-    state: "planned-not-loadable",
+    state: "loadable-disabled",
     platform: "android",
     artifactKinds: ["android-debug-apk", "android-unsigned-aab", "android-signed-aab"],
   },
   {
     macro: "tauri_ios_app",
-    state: "planned-not-loadable",
+    state: "loadable-disabled",
     platform: "ios",
     artifactKinds: ["ios-simulator-bundle", "ios-unsigned-archive", "ios-signed-ipa"],
   },
   {
     macro: "tauri_mobile_suite",
-    state: "planned-not-loadable",
+    state: "loadable-disabled",
     platform: "multi",
     artifactKinds: ["macos-app", "ios-simulator-bundle", "android-debug-apk"],
   },
@@ -74,8 +74,16 @@ export function rustImplementationRouteErrors(opts: {
   const expectedMacros = Object.keys(expectedRouteHelper).sort();
   const documentedMacros = [...opts.publicMacros].sort();
   const plannedRoutes = sortedPlannedRoutes(opts.plannedRoutes || []);
-  const plannedMacros = plannedRoutes.map((route) => route.macro).sort();
-  if (actualPublicMacros.sort().join(",") !== documentedMacros.join(",")) {
+  const loadableDisabledMacros = plannedRoutes
+    .filter((route) => route.state === "loadable-disabled")
+    .map((route) => route.macro)
+    .sort();
+  const notLoadablePlannedMacros = plannedRoutes
+    .filter((route) => route.state !== "loadable-disabled")
+    .map((route) => route.macro)
+    .sort();
+  const expectedActualMacros = [...expectedMacros, ...loadableDisabledMacros].sort();
+  if (actualPublicMacros.sort().join(",") !== expectedActualMacros.join(",")) {
     errors.push("Rust public macro inventory does not match build-tools/rust/defs.bzl");
   }
   if (documentedMacros.join(",") !== expectedMacros.join(",")) {
@@ -96,10 +104,12 @@ export function rustImplementationRouteErrors(opts: {
   ) {
     errors.push("Rust planned mobile route inventory does not match the reviewed route set");
   }
-  for (const macro of plannedMacros) {
+  for (const macro of notLoadablePlannedMacros) {
     if (documentedMacros.includes(macro) || actualPublicMacros.includes(macro)) {
       errors.push(`Rust planned mobile route ${macro} must stay out of active public macros`);
     }
+  }
+  for (const macro of plannedRoutes.map((route) => route.macro)) {
     if (opts.nixRouteDetailsByMacro[macro]) {
       errors.push(`Rust planned mobile route ${macro} must stay out of active Nix route docs`);
     }

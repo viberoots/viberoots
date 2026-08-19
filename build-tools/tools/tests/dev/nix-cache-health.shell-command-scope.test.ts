@@ -104,7 +104,7 @@ test("shell cache health publishes exact full config on success and nothing on f
         },
       }),
     ]);
-    assert.equal(requiredTransport.stdout, "0:1:");
+    assert.equal(requiredTransport.stdout, "0:1:https://required.example/cache");
 
     const configRoot = path.join(root, "nix-conf");
     await fsp.mkdir(configRoot);

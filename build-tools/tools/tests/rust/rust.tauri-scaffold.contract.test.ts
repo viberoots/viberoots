@@ -7,6 +7,7 @@ import {
   applyTauriScaffoldAnswers,
   tauriBundleIdentifier,
 } from "../../scaffolding/scaf/commands/tauri-validation";
+import { runInTemp } from "../lib/test-helpers";
 
 const sourceRoot = path.resolve(process.env.VIBEROOTS_ROOT || process.cwd());
 const read = (relative: string) => fsp.readFile(path.join(sourceRoot, relative), "utf8");
@@ -18,6 +19,7 @@ test("Tauri scaffold has managed locks and no hidden frontend command hook", asy
     buildScript,
     cargo,
     cargoLock,
+    copier,
     config,
     frontend,
     icon,
@@ -30,6 +32,7 @@ test("Tauri scaffold has managed locks and no hidden frontend command hook", asy
     read(`${root}/build.rs.jinja`),
     read(`${root}/Cargo.toml.jinja`),
     read(`${root}/Cargo.lock.jinja`),
+    read(`${root}/copier.yaml`),
     read(`${root}/tauri.conf.json.jinja`),
     read(`${root}/frontend/src/main.js.jinja`),
     fsp.readFile(path.join(sourceRoot, root, "icons/icon.png")),
@@ -39,6 +42,15 @@ test("Tauri scaffold has managed locks and no hidden frontend command hook", asy
     read(`${root}/vite.config.mjs.jinja`),
   ]);
   assert.match(targets, /node_asset_stage\(/);
+  assert.match(targets, /enable_mobile_scaffold_targets/);
+  assert.match(targets, /mobile scaffold targets are disabled/);
+  assert.match(targets, /tauri_ios_app\(/);
+  assert.match(targets, /ios_bundle_identifier/);
+  assert.match(targets, /tauri_android_app\(/);
+  assert.match(targets, /android_min_sdk/);
+  assert.match(targets, /android_compile_sdk/);
+  assert.match(copier, /include_mobile_release_placeholders: false/);
+  assert.match(targets, /tauri-mobile:release-placeholder/);
   assert.match(targets, /frontend_dist = ":frontend"/);
   assert.match(targets, /rust_test\(/);
   assert.match(targets, /name = "\{\{ name \}\}-test"/);
@@ -106,6 +118,64 @@ test("Tauri scaffold has managed locks and no hidden frontend command hook", asy
   assert.match(buildScript, /CARGO_FEATURE_DESKTOP/);
   assert.match(viteConfig, /root: "frontend"/);
   assert.doesNotMatch(viteConfig, /process\.env|command|spawn|exec/);
+});
+
+test("Tauri scaffold renders desktop-only TARGETS by default", async () => {
+  await runInTemp("tauri-scaffold-desktop-only", async (tmp, $) => {
+    await $({ cwd: tmp })`scaf new rust tauri-app tauri_demo --yes`;
+    const targets = await fsp.readFile(path.join(tmp, "projects/apps/tauri_demo/TARGETS"), "utf8");
+    const loadLines = targets.split("\n").filter((line) => line.startsWith("load("));
+    assert.deepEqual(loadLines, [
+      'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
+      'load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage", "node_webapp")',
+      'load("@viberoots//build-tools/rust:defs.bzl", "rust_test", "rust_wasm_library", "tauri_app")',
+    ]);
+    assert.match(targets, /tauri_app\(/);
+    assert.match(targets, /name = "tauri_demo"/);
+    assert.doesNotMatch(targets, /load\("@prelude\/\/:rules\.bzl", "filegroup"\)/);
+    assert.doesNotMatch(targets, /tauri_ios_app"/);
+    assert.doesNotMatch(targets, /tauri_android_app"/);
+    assert.doesNotMatch(targets, /tauri_ios_app\(/);
+    assert.doesNotMatch(targets, /tauri_android_app\(/);
+    assert.doesNotMatch(targets, /tauri-mobile:release-placeholder/);
+  });
+});
+
+test("Tauri scaffold mobile opt-in fails with disabled platform diagnostic", async () => {
+  await runInTemp("tauri-scaffold-mobile-disabled", async (tmp, $) => {
+    await $({ cwd: tmp })`
+      scaf new rust tauri-app tauri_demo --yes --targets=ios,android \
+        --enable_mobile_scaffold_targets=true --include_mobile_release_placeholders=true
+    `;
+    const targets = await fsp.readFile(path.join(tmp, "projects/apps/tauri_demo/TARGETS"), "utf8");
+    assert.match(targets, /tauri_ios_app\(/);
+    assert.match(targets, /tauri_android_app\(/);
+    assert.match(targets, /tauri-mobile:release-placeholder/);
+    const result = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 build --target-platforms //:no_cgo //projects/apps/tauri_demo:tauri_demo_ios`;
+    assert.notEqual(result.exitCode, 0);
+    assert.match(String(result.stderr || result.stdout), /platform-not-enabled/);
+  });
+});
+
+test("Tauri scaffold mobile request fails closed when feature gate is off", async () => {
+  await runInTemp("tauri-scaffold-mobile-gate-off", async (tmp, $) => {
+    await $({ cwd: tmp })`scaf new rust tauri-app tauri_demo --yes --targets=ios`;
+    const targets = await fsp.readFile(path.join(tmp, "projects/apps/tauri_demo/TARGETS"), "utf8");
+    assert.match(targets, /mobile scaffold targets are disabled/);
+    const result = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery --target-platforms //:no_cgo //projects/apps/tauri_demo:tauri_demo`;
+    assert.notEqual(result.exitCode, 0);
+    assert.match(String(result.stderr || result.stdout), /mobile scaffold targets are disabled/);
+  });
 });
 
 test("Tauri scaffold owns one valid reverse-DNS bundle identifier", () => {

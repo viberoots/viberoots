@@ -98,6 +98,7 @@ test("actual parent b query tolerates a guaranteed NXDOMAIN optional cache", asy
     );
     assert.match(reviewed.stdout, /warn-dirty = false/);
     assert.match(reviewed.stdout, /builders =/);
+    assert.doesNotMatch(reviewed.stdout, /optional-cache\.invalid/);
 
     const build = path.join(VIBEROOTS_ROOT, "build-tools/tools/bin/b");
     const result = await execFileAsync(build, ["query", "viberoots//:dev_nix_cache_health"], {
@@ -107,7 +108,6 @@ test("actual parent b query tolerates a guaranteed NXDOMAIN optional cache", asy
       timeout: 10 * 60_000,
     });
     assert.match(result.stdout, /viberoots\/\/:dev_nix_cache_health/);
-    assert.match(result.stderr, /disabled unreachable substituter.*optional-cache\.invalid/);
     assert.doesNotMatch(result.stderr, /unable to download .*optional-cache\.invalid/);
   } finally {
     await cleanup();

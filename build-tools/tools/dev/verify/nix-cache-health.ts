@@ -202,7 +202,7 @@ export async function applyNixCacheHealthPolicy(
     } catch (error) {
       if (policy !== "auto" || !optionalOnly) throw error;
     }
-    if (reachable) {
+    if (reachable || (policy === "auto" && required.includes(substituter))) {
       available.push(substituter);
     } else {
       removed.push(substituter);

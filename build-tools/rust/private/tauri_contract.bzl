@@ -1,3 +1,5 @@
+load("@viberoots//build-tools/rust/private:tauri_mobile_contract.bzl", "prepare_mobile_source_attrs")
+
 def _source_list(value, field):
     if not isinstance(value, list):
         fail("tauri_app: %s must be a list of declared source files" % field)
@@ -154,7 +156,7 @@ def prepare_tauri_contract(kind, kwargs):
     app_windows = _declared_identifiers(kwargs.pop("app_windows", ["main"]), "app_windows", "-")
     if not app_windows:
         fail("tauri_app: app_windows must declare at least one window")
-    return {
+    attrs = {
         "tauri_root": root,
         "tauri_config": _rooted(root, config),
         "frontend_dist": frontend,
@@ -171,6 +173,8 @@ def prepare_tauri_contract(kind, kwargs):
         "app_commands": app_commands,
         "app_windows": app_windows,
     }
+    attrs.update(prepare_mobile_source_attrs(kwargs, root))
+    return attrs
 
 def tauri_rule_attrs():
     return {
@@ -189,6 +193,10 @@ def tauri_rule_attrs():
         "sidecar_destinations": attrs.list(attrs.string(), default = []),
         "app_commands": attrs.list(attrs.string(), default = []),
         "app_windows": attrs.list(attrs.string(), default = []),
+        "android_config": attrs.option(attrs.source(), default = None),
+        "ios_config": attrs.option(attrs.source(), default = None),
+        "android_project_srcs": attrs.list(attrs.source(), default = []),
+        "ios_project_srcs": attrs.list(attrs.source(), default = []),
     }
 
 def _dep_outputs(deps):
@@ -202,20 +210,25 @@ def tauri_action_inputs(ctx):
         return []
     if ctx.attrs.tauri_config == None or ctx.attrs.frontend_dist == None:
         fail("tauri_app requires declared configuration and frontend inputs")
+    mobile_configs = [value for value in [ctx.attrs.android_config, ctx.attrs.ios_config] if value != None]
     return [
         ctx.attrs.tauri_config,
-    ] + ctx.attrs.resources + ctx.attrs.capabilities + ctx.attrs.permissions + ctx.attrs.icons + _dep_outputs(
+    ] + ctx.attrs.resources + ctx.attrs.capabilities + ctx.attrs.permissions + ctx.attrs.icons + mobile_configs + ctx.attrs.android_project_srcs + ctx.attrs.ios_project_srcs + _dep_outputs(
         [ctx.attrs.frontend_dist] + ctx.attrs.sidecar_deps,
     )
 
 __all__ = ["TAURI_PUBLIC_ARGS", "prepare_tauri_contract", "tauri_action_inputs", "tauri_rule_attrs"]
 
 TAURI_PUBLIC_ARGS = [
+    "android_config",
+    "android_project_srcs",
     "app_commands",
     "app_windows",
     "capabilities",
     "frontend_dist",
     "icons",
+    "ios_config",
+    "ios_project_srcs",
     "permissions",
     "resources",
     "sidecar_deps",

@@ -386,10 +386,11 @@ trusted-substituters = https://cache.<domain>/<cache-name>?priority=30
 Use `extra-substituters` plus `extra-trusted-public-keys` in daemon config when the cache should be enabled by default. Use `trusted-substituters` plus the trusted public key as an admin allow-list for opt-in user configs. Untrusted users can opt into allow-listed caches with `extra-substituters`; they cannot make a new substituter trusted solely from `NIX_CONFIG`.
 
 Build and verify entrypoints should tolerate a temporarily unreachable cache. The repo wrappers
-discover the effective configured substituters from Nix, issue one bounded request for each
-cache's `nix-cache-info` endpoint using the reviewed `netrc-file` when configured, and, by default, remove unreachable caches from the
-per-process `NIX_CONFIG` while keeping any reachable configured caches and Nix fallback enabled. Set
-`VBR_NIX_CACHE_POLICY=strict` only when cache availability is the behavior under test, or
+discover the effective configured substituters from Nix, issue one bounded request for each cache's
+`nix-cache-info` endpoint using the reviewed `netrc-file` when configured, and, by default, remove
+unreachable optional caches from the per-process `NIX_CONFIG` while keeping required caches, reachable
+configured caches, and Nix fallback enabled. Set `VBR_NIX_CACHE_POLICY=strict` only when cache
+availability is the behavior under test, or
 `VBR_NIX_CACHE_POLICY=off` to skip the dynamic probe for debugging.
 Credential-bearing URL userinfo, query parameters, and fragments are rejected before probing or
 review. Keep non-secret cache options such as `priority` in the URL, and configure authentication

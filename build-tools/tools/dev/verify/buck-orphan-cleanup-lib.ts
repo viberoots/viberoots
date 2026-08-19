@@ -122,7 +122,7 @@ export function parentIsMatchingBuckDaemon(lines: string[], pid: number, iso: st
 export function ownerPidFromEphemeralIsolation(iso: string): number | null {
   const s = String(iso || "").trim();
   const match =
-    s.match(/^v-(\d+)-\d+(?:\.noindex)?$/) ||
+    s.match(/^v-(\d+)-\d+(?:-[A-Za-z0-9._-]+)?(?:\.noindex)?$/) ||
     s.match(/^verify-nested-(\d+)-[a-f0-9]{12}(?:\.noindex)?$/);
   if (!match?.[1]) return null;
   const pid = Number(match[1]);

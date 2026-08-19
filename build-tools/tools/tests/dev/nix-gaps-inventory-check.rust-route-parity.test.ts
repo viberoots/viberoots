@@ -54,12 +54,14 @@ test("Rust route drift is rejected when route documentation is missing", async (
   );
 });
 
-test("Rust planned mobile routes are rejected when promoted to public macros", async () => {
+test("Rust planned-not-loadable mobile routes are rejected when promoted to public macros", async () => {
   const inputs = await routeInputs();
   assert.match(
     rustImplementationRouteErrors({
       ...inputs,
-      publicMacros: [...inputs.publicMacros, "tauri_ios_app"],
+      plannedRoutes: inputs.plannedRoutes.map((route: any) =>
+        route.macro === "tauri_ios_app" ? { ...route, state: "planned-not-loadable" } : route,
+      ),
     }).join("\n"),
     /tauri_ios_app must stay out of active public macros/,
   );

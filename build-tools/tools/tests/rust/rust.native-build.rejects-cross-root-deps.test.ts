@@ -3,7 +3,12 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { killBuckDaemonsForRepo } from "../lib/test-helpers/buck-kill";
 import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
+
+function buckEventBusTransient(output: unknown): boolean {
+  return /Buck daemon event bus|broken pipe|h2 protocol error/i.test(String(output || ""));
+}
 
 async function writeCargoRoot(
   root: string,
@@ -154,18 +159,25 @@ test("rust builds reviewed Cargo path dependencies across Buck roots", async () 
       mode: 0o755,
     });
     await reconcileTempDependencyInputs(tmp, $);
-    const result = await $({
-      cwd: tmp,
-      env: {
-        ...process.env,
-        PATH: `${hostile}${path.delimiter}${String(process.env.PATH || "")}`,
-        CARGO_HOME: path.join(tmp, "hostile-cargo-home"),
-        RUSTUP_HOME: path.join(tmp, "hostile-rustup-home"),
-      },
-      stdio: "pipe",
-      reject: false,
-      nothrow: true,
-    })`buck2 build //projects/apps/app:app //projects/apps/wasi_host:wasi_host`;
+    const buildEnv = {
+      ...process.env,
+      PATH: `${hostile}${path.delimiter}${String(process.env.PATH || "")}`,
+      CARGO_HOME: path.join(tmp, "hostile-cargo-home"),
+      RUSTUP_HOME: path.join(tmp, "hostile-rustup-home"),
+    };
+    const build = async () =>
+      await $({
+        cwd: tmp,
+        env: buildEnv,
+        stdio: "pipe",
+        reject: false,
+        nothrow: true,
+      })`buck2 build //projects/apps/app:app //projects/apps/wasi_host:wasi_host`;
+    let result = await build();
+    if (result.exitCode !== 0 && buckEventBusTransient(`${result.stderr}\n${result.stdout}`)) {
+      await killBuckDaemonsForRepo(tmp, $);
+      result = await build();
+    }
     assert.equal(result.exitCode, 0, String(result.stderr || result.stdout));
     const output = await $({
       cwd: tmp,

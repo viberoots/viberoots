@@ -286,37 +286,66 @@ test("proof-bound cache roles fail closed when config or binding changes", async
   }
 });
 
-test("nix cache health auto mode degrades unreachable required substituters", async () => {
-  await withEnv({ VBR_NIX_CACHE_POLICY: "auto", VBR_NIX_CACHE_HEALTH_APPLIED: "" }, async () => {
-    const logs: string[] = [];
-    const result = await applyNixCacheHealthPolicy("/tmp/repo", {
-      log: (line) => logs.push(line),
-      readEffectiveConfig: async () => "substituters = https://cache.nixos.org/",
-      probeUrl: async () => false,
-    });
-    assert.equal(result.changed, true);
-    assert.deepEqual(result.removed, ["https://cache.nixos.org/"]);
-    assert.deepEqual(result.requiredSubstituters, []);
-    assert.match(String(process.env.NIX_CONFIG), /substituters =\s*(?:\n|$)/);
-    assert.equal(process.env.VBR_NIX_CACHE_HEALTH_APPLIED, "1");
-    assert.match(logs.join("\n"), /disabled unreachable substituter.*cache\.nixos\.org/);
+test("nix cache health auto mode retains unreachable required substituters", async () => {
+  await withEnv(
+    {
+      NIX_CONFIG: "substituters = https://cache.nixos.org/",
+      VBR_NIX_CACHE_POLICY: "auto",
+      VBR_NIX_CACHE_HEALTH_APPLIED: "",
+    },
+    async () => {
+      const logs: string[] = [];
+      const result = await applyNixCacheHealthPolicy("/tmp/repo", {
+        log: (line) => logs.push(line),
+        readEffectiveConfig: async () => "substituters = https://cache.nixos.org/",
+        probeUrl: async () => false,
+      });
+      assert.equal(result.changed, false);
+      assert.deepEqual(result.removed, []);
+      assert.deepEqual(result.requiredSubstituters, ["https://cache.nixos.org/"]);
+      assert.match(String(process.env.NIX_CONFIG), /substituters = https:\/\/cache\.nixos\.org\//);
+      assert.equal(process.env.VBR_NIX_CACHE_HEALTH_APPLIED, "1");
+      assert.equal(logs.join("\n"), "");
+    },
+  );
+});
+
+test("nix cache health strict mode fails unreachable required substituters", async () => {
+  await withEnv({ VBR_NIX_CACHE_POLICY: "strict", VBR_NIX_CACHE_HEALTH_APPLIED: "" }, async () => {
+    await assert.rejects(
+      applyNixCacheHealthPolicy("/tmp/repo", {
+        readEffectiveConfig: async () => "substituters = https://cache.nixos.org/",
+        probeUrl: async () => false,
+      }),
+      /configured Nix substituter\(s\) unavailable: https:\/\/cache\.nixos\.org\//,
+    );
   });
 });
 
-test("nix cache health degrades an unreachable dual-role substituter once", async () => {
-  await withEnv({ VBR_NIX_CACHE_POLICY: "auto", VBR_NIX_CACHE_HEALTH_APPLIED: "" }, async () => {
-    const result = await applyNixCacheHealthPolicy("/tmp/repo", {
-      readEffectiveConfig: async () =>
-        [
-          "substituters = https://dual.example/cache",
-          "extra-substituters = https://dual.example/cache",
-        ].join("\n"),
-      probeUrl: async () => false,
-    });
-    assert.deepEqual(result.removed, ["https://dual.example/cache"]);
-    assert.deepEqual(result.requiredSubstituters, []);
-    assert.deepEqual(result.optionalSubstituters, []);
-  });
+test("nix cache health retains an unreachable dual-role substituter as required", async () => {
+  await withEnv(
+    {
+      NIX_CONFIG: [
+        "substituters = https://dual.example/cache",
+        "extra-substituters = https://dual.example/cache",
+      ].join("\n"),
+      VBR_NIX_CACHE_POLICY: "auto",
+      VBR_NIX_CACHE_HEALTH_APPLIED: "",
+    },
+    async () => {
+      const result = await applyNixCacheHealthPolicy("/tmp/repo", {
+        readEffectiveConfig: async () =>
+          [
+            "substituters = https://dual.example/cache",
+            "extra-substituters = https://dual.example/cache",
+          ].join("\n"),
+        probeUrl: async () => false,
+      });
+      assert.deepEqual(result.removed, []);
+      assert.deepEqual(result.requiredSubstituters, ["https://dual.example/cache"]);
+      assert.deepEqual(result.optionalSubstituters, ["https://dual.example/cache"]);
+    },
+  );
 });
 
 test("nix cache health probes original credential-free query-bearing cache urls", async () => {
@@ -667,7 +696,7 @@ printf "%s = %s\\n" "\${TEST_CACHE_SETTING:-substituters}" "\${TEST_SUBSTITUTER:
       assert.equal(
         (await runRenderer(renderer, readable, 6)).status,
         0,
-        `${renderer.name}: required transport failure must degrade in auto mode`,
+        `${renderer.name}: required transport failure must remain tolerated in auto mode`,
       );
       assert.equal(
         (

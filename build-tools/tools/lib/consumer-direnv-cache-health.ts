@@ -133,7 +133,7 @@ __vbr_stage0_apply_nix_cache_health() {
             return 1
             ;;
         esac
-        if [[ "\${probe_status}" -eq 0 ]]; then
+        if [[ "\${probe_status}" -eq 0 || ( "\${current_policy}" == "auto" && " \${required_substituters} " == *" \${substituter} "* ) ]]; then
           available+=("\${substituter}")
         else
           removed+=("\${substituter}")

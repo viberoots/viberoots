@@ -20,6 +20,15 @@ async function writeMinimalCargo(root: string) {
   await fs.writeFile(path.join(root, "uv.lock"), "# uv lock\n");
 }
 
+async function writeMinimalPyodidePackage(tmp: string, packageRel: string, targets: string) {
+  const root = path.join(tmp, packageRel);
+  await writeMinimalCargo(root);
+  await fs.writeFile(
+    path.join(root, "TARGETS"),
+    `load("@viberoots//build-tools/rust:defs.bzl", "rust_python_wasm_extension")\n${targets}\n`,
+  );
+}
+
 async function buildSelected(tmp: string, $: any, target: string) {
   return await $({
     cwd: tmp,
@@ -141,45 +150,48 @@ rust_python_wasm_extension(
     assert.ok(node.labels.includes("kind:pyext_wasm"));
     assert.ok(node.labels.includes("backend:pyodide"));
 
-    await fs.writeFile(
-      path.join(root, "TARGETS"),
-      'load("@viberoots//build-tools/rust:defs.bzl", "rust_python_wasm_extension")\nrust_python_wasm_extension(name="bad", backend="pyodide", module="demo._native", mystery=True)\n',
+    await writeMinimalPyodidePackage(
+      tmp,
+      "projects/libs/rust_python_wasm_bad_unknown",
+      'rust_python_wasm_extension(name="bad", backend="pyodide", module="demo._native", mystery=True)',
     );
     const bad = await $({
       cwd: tmp,
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery //projects/libs/rust_python_wasm:bad`;
+    })`buck2 cquery //projects/libs/rust_python_wasm_bad_unknown:bad`;
     assert.notEqual(bad.exitCode, 0);
     assert.match(
       `${bad.stdout}\n${bad.stderr}`,
       /rust_python_wasm_extension: unknown arguments: mystery/,
     );
 
-    await fs.writeFile(
-      path.join(root, "TARGETS"),
-      'load("@viberoots//build-tools/rust:defs.bzl", "rust_python_wasm_extension")\nrust_python_wasm_extension(name="bad_backend", backend="browser", module="demo._native")\n',
+    await writeMinimalPyodidePackage(
+      tmp,
+      "projects/libs/rust_python_wasm_bad_backend",
+      'rust_python_wasm_extension(name="bad_backend", backend="browser", module="demo._native")',
     );
     const badBackend = await $({
       cwd: tmp,
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery //projects/libs/rust_python_wasm:bad_backend`;
+    })`buck2 cquery //projects/libs/rust_python_wasm_bad_backend:bad_backend`;
     assert.notEqual(badBackend.exitCode, 0);
     assert.match(`${badBackend.stdout}\n${badBackend.stderr}`, /unsupported backend/);
 
-    await fs.writeFile(
-      path.join(root, "TARGETS"),
-      'load("@viberoots//build-tools/rust:defs.bzl", "rust_python_wasm_extension")\nrust_python_wasm_extension(name="bad_crate_type", backend="pyodide", module="demo._native", crate_type="rlib")\n',
+    await writeMinimalPyodidePackage(
+      tmp,
+      "projects/libs/rust_python_wasm_bad_crate_type",
+      'rust_python_wasm_extension(name="bad_crate_type", backend="pyodide", module="demo._native", crate_type="rlib")',
     );
     const badCrateType = await $({
       cwd: tmp,
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 cquery //projects/libs/rust_python_wasm:bad_crate_type`;
+    })`buck2 cquery //projects/libs/rust_python_wasm_bad_crate_type:bad_crate_type`;
     assert.notEqual(badCrateType.exitCode, 0);
     assert.match(`${badCrateType.stdout}\n${badCrateType.stderr}`, /crate_type must be cdylib/);
   });

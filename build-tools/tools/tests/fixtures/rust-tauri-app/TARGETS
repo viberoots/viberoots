@@ -1,5 +1,6 @@
 load("@prelude//:rules.bzl", "filegroup")
-load("@viberoots//build-tools/rust:defs.bzl", "tauri_app")
+load("@viberoots//build-tools/rust:defs.bzl", "tauri_android_app", "tauri_app", "tauri_ios_app", "tauri_mobile_suite")
+load("@viberoots//build-tools/rust/private:tauri_mobile_contract.bzl", "private_mobile_tauri_contract_fixture")
 
 filegroup(
     name = "frontend",
@@ -18,11 +19,73 @@ tauri_app(
     capabilities = ["capabilities/default.json"],
     crate = "desktop",
     frontend_dist = ":frontend",
+    android_config = "mobile/android.config.json",
+    android_project_srcs = ["gen/mobile/android/project.marker"],
     icons = ["icons/icon.png"],
+    ios_config = "mobile/ios.config.json",
+    ios_project_srcs = ["gen/mobile/ios/project.marker"],
     resources = [{"src": "help.txt", "dest": "help/help.txt"}],
     sidecar_deps = [{"src": ":sidecar", "dest": "bin/sidecar"}],
     srcs = ["src/main.rs"],
     app_windows = ["main"],
+)
+
+tauri_ios_app(
+    name = "private_mobile_ios",
+    capabilities = ["capabilities/default.json"],
+    crate = "desktop",
+    frontend_dist = ":frontend",
+    icons = ["icons/icon.png"],
+    ios_config = "mobile/ios.config.json",
+    ios_project_srcs = ["gen/mobile/ios/project.marker"],
+    ios_bundle_identifier = "dev.viberoots.fixture",
+    resources = [{"src": "help.txt", "dest": "help/help.txt"}],
+    srcs = ["src/main.rs"],
+)
+
+tauri_android_app(
+    name = "private_mobile_android",
+    android_config = "mobile/android.config.json",
+    android_package = "dev.viberoots.fixture",
+    android_project_srcs = ["gen/mobile/android/project.marker"],
+    capabilities = ["capabilities/default.json"],
+    crate = "desktop",
+    frontend_dist = ":frontend",
+    icons = ["icons/icon.png"],
+    resources = [{"src": "help.txt", "dest": "help/help.txt"}],
+    srcs = ["src/main.rs"],
+)
+
+tauri_mobile_suite(
+    name = "private_mobile_suite",
+    capabilities = ["capabilities/default.json"],
+    crate = "desktop",
+    frontend_dist = ":frontend",
+    icons = ["icons/icon.png"],
+    resources = [{"src": "help.txt", "dest": "help/help.txt"}],
+    srcs = ["src/main.rs"],
+    ios_overrides = {"ios_bundle_identifier": "dev.viberoots.fixture"},
+    android_overrides = {"android_package": "dev.viberoots.fixture"},
+)
+
+private_mobile_tauri_contract_fixture(
+    name = "private_mobile_ios_helper",
+    mobile_platform = "ios",
+    frontend_dist = ":frontend",
+    icons = ["icons/icon.png"],
+    ios_config = "mobile/ios.config.json",
+    ios_project_srcs = ["gen/mobile/ios/project.marker"],
+    ios_bundle_identifier = "dev.viberoots.fixture",
+)
+
+private_mobile_tauri_contract_fixture(
+    name = "private_mobile_android_helper",
+    mobile_platform = "android",
+    android_config = "mobile/android.config.json",
+    android_package = "dev.viberoots.fixture",
+    android_project_srcs = ["gen/mobile/android/project.marker"],
+    frontend_dist = ":frontend",
+    icons = ["icons/icon.png"],
 )
 
 tauri_app(

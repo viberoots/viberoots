@@ -15,15 +15,23 @@ const heavyTargets = [
   "viberoots//:dev_nix_gaps_parity_and_hermeticity",
   "viberoots//:dev_runnable_commands_selected_fast_path",
   "viberoots//:dev_update_command_launcher_integration",
+  "viberoots//:node_node_asset_stage_webapp_stages_wasm",
   "viberoots//:node_node_wasm_inline_module_instantiate",
   "viberoots//:rust_rust_extensions_remote_cache_materialization",
+  "viberoots//:rust_rust_extensions_runtime_artifacts",
   "viberoots//:rust_rust_node_consumers_stage_native_addon",
   "viberoots//:rust_rust_source_selection_identity_parity",
   "viberoots//:rust_rust_tauri_dependency_patch_identity",
   "viberoots//:rust_rust_tauri_input_invalidation_behavior",
+  "viberoots//:rust_rust_tauri_scaffold_submodule_lifecycle",
   "viberoots//:rust_rust_wasm_wasi_artifacts",
+  "viberoots//:scaffolding_node_cli_scaffold_and_build_shim_and_bundle",
+  "viberoots//:scaffolding_rust_submodule_scaffold_lifecycle",
+  "viberoots//:scaffolding_webapp_multi_module_manifest_contract",
   "viberoots//:scaffolding_webapp_ssr_vite_runnable_contracts",
   "viberoots//:scaffolding_webapp_wasm_runtime_authority_contract",
+  "viberoots//:scaffolding_webapp_wasm_runtime_authority_ssr_next_contract",
+  "viberoots//:scaffolding_webapp_zero_wasm_default_static_contract",
 ].sort();
 const ordinaryTarget = "viberoots//:verify_verify_progress_line";
 const localPolicy = parseVerifyExecutionPolicy({ env: {} });
@@ -57,7 +65,7 @@ test("heavy-fanout setup exposes one static permit without a broker lifecycle", 
   assert.match(rule, /CAND3=\\"\$VBR_ROOT\/%s\\"/);
 });
 
-test("heavy-fanout taxonomy binds exactly twelve resource-limited tests to one pool", () => {
+test("heavy-fanout taxonomy binds reviewed nested workspace tests to one pool", () => {
   const labels = loadVerifyTargetLabels({
     root: process.cwd(),
     iso: inheritedBuckIsolation("heavy-fanout-labels"),

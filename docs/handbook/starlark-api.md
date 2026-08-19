@@ -60,13 +60,78 @@ This reference is a public interface guide for macros used in `TARGETS`. I keep 
 
 ## Planned Route Inventory
 
-These names are reserved route inventory entries, not active public macros in this PR. They must not
-appear in the artifact-producing Index until their builders are reviewed and exported.
+These names are loadable public symbols that fail during analysis until their reviewed builders
+land. They must not appear in the artifact-producing Index until their builders are reviewed and
+enabled.
 
 - `@viberoots//build-tools/rust:defs.bzl`
-  - `tauri_android_app` (`planned-not-loadable`)
-  - `tauri_ios_app` (`planned-not-loadable`)
-  - `tauri_mobile_suite` (`planned-not-loadable`)
+  - `tauri_android_app` (`loadable-disabled`)
+  - `tauri_ios_app` (`loadable-disabled`)
+  - `tauri_mobile_suite` (`loadable-disabled`; declares stable `:<name>_desktop`,
+    `:<name>_ios`, and `:<name>_android` labels, with mobile labels failing
+    `platform-not-enabled` until builders land)
+
+### Disabled mobile Tauri macros
+
+`tauri_ios_app` and `tauri_android_app` declare the final mobile target shape, validate their
+contract fields, and export typed Tauri metadata for graph tooling. They are not artifact-producing
+routes yet: configured analysis fails with `platform-not-enabled` until the reviewed Android and iOS
+builders land.
+
+Shared direct attrs:
+
+- `name`: target name.
+- `frontend_dist`: one Buck-built frontend target.
+- `crate`: Rust crate name. Defaults to `""` while disabled.
+- `srcs`: Rust source files owned by the Tauri target.
+- `tauri_root`: `.` or `src-tauri`. Defaults to `.`.
+- `tauri_config`: canonical Tauri config path. Defaults to `tauri.conf.json`.
+- `resources`: explicit `{"src": "...", "dest": "..."}` mappings; duplicate destinations are
+  rejected.
+- `capabilities`, `permissions`, `icons`: package-relative source paths. Wildcards and escaping paths
+  are rejected.
+- `app_commands`, `app_windows`: reviewed command and window identifiers. `app_windows` defaults to
+  `["main"]`.
+- `tauri_artifact_kind`, `tauri_signing_mode`, `tauri_deployment_eligibility`: mobile artifact
+  metadata enums. Release-admitted artifacts must be `release-signed`; debug/local and simulator
+  artifacts stay `not-eligible`.
+
+Android-only attrs:
+
+- `android_config`: package-relative Android Tauri config, typically `mobile/android.config.json`.
+- `android_project_srcs`: tracked normalized Android project sources such as `gen/mobile/android/**`.
+- `android_package`: reverse-DNS Android application id. Also accepted through
+  `tauri_package_name`.
+- `android_min_sdk`: positive integer, default `24`.
+- `android_compile_sdk`: positive integer, default `35`.
+- Default metadata: `tauri_artifact_kind = "android-debug-apk"`,
+  `tauri_signing_mode = "debug-local"`, and
+  `tauri_deployment_eligibility = "not-eligible"`.
+
+iOS-only attrs:
+
+- `ios_config`: package-relative iOS Tauri config, typically `mobile/ios.config.json`.
+- `ios_project_srcs`: tracked normalized iOS project sources such as `gen/mobile/ios/**`.
+- `ios_bundle_identifier`: reverse-DNS bundle id. Also accepted through `tauri_bundle_identifier`.
+- `ios_deployment_target`: iOS deployment target string, default `"17.0"`.
+- Default metadata: `tauri_artifact_kind = "ios-simulator-bundle"`,
+  `tauri_signing_mode = "unsigned-local"`, and
+  `tauri_deployment_eligibility = "not-eligible"`.
+
+`tauri_mobile_suite(name, frontend_dist, **kwargs)` declares stable siblings:
+`:<name>_desktop`, `:<name>_ios`, and `:<name>_android`. The desktop sibling is the existing
+`tauri_app` route. Mobile siblings use the disabled public mobile macros above. By default, the
+suite shares `crate`, `frontend_dist`, `tauri_root`, `tauri_config`, `srcs`, `resources`,
+`capabilities`, `permissions`, `icons`, `app_commands`, and `app_windows` across all three
+platforms. Use `desktop_overrides`, `ios_overrides`, and `android_overrides` dicts for explicit
+per-platform differences, including a different `frontend_dist` or platform identity fields.
+
+The scaffold template keeps desktop-only output by default. Mobile scaffold requests are gated by
+the template's mobile opt-in; until later PRs enable that gate, requesting `targets` with `ios` or
+`android` fails closed with the platform-not-enabled diagnostic. The template also accepts the
+planned mobile identity and SDK fields above plus `include_mobile_release_placeholders`; release
+placeholders are an opt-in scaffold surface only and do not make public mobile artifact builds
+available.
 
 ## Additional public surfaces
 
@@ -1747,7 +1812,10 @@ release-signed or release-admitted. The target stamps `kind:app`, `app:tauri`, a
 The Buck graph also carries a typed `tauri_target` record with `platform = "desktop-darwin"`,
 `artifactKind = "macos-app"`, `signingMode = "adhoc-platform"`, and
 `deploymentEligibility = "not-eligible"`. iOS and Android values are planned route metadata only
-until their builders are reviewed.
+until their builders are reviewed. The disabled mobile symbols accept `load()` but fail analysis
+with a platform-not-enabled diagnostic. The shared mobile source contract reserves package-relative
+`android_config`, `ios_config`, `android_project_srcs`, and `ios_project_srcs` fields as declared
+inputs for the builder PRs.
 
 - `frontend_dist` is required and must name a Buck-built static Node application, normally the
   output of `node_asset_stage`. Tauri `beforeBuildCommand` and `beforeDevCommand` hooks are rejected.

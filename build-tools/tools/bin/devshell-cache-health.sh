@@ -172,7 +172,7 @@ env_apply_nix_cache_health() {
 						return 1
 						;;
 				esac
-				if [[ "${probe_status}" -eq 0 ]]; then
+				if [[ "${probe_status}" -eq 0 || ( "${VBR_NIX_CACHE_POLICY:-auto}" == "auto" && " ${required_substituters} " == *" ${substituter} "* ) ]]; then
 					available+=("${substituter}")
 				else
 					removed+=("${substituter}")

@@ -9,6 +9,7 @@ load("@viberoots//build-tools/rust/private:interop_contract.bzl", "prepare_inter
 load("@viberoots//build-tools/rust/private:macro_contract.bzl", "RUST_PUBLIC_ARGS", "artifact_out", "crate_type_for", "fixed_artifact_contract", "has_nixpkg_inputs", "public_crate_for", "rust_macro_name", "single_cargo_file", "valid_features", "validate_crate_names", "validate_local_patch_dirs", "validate_public_crate", "with_required_target")
 load("@viberoots//build-tools/rust/private:runtime_contract.bzl", "validate_rust_runtime_args")
 load("@viberoots//build-tools/rust/private:tauri_contract.bzl", "TAURI_PUBLIC_ARGS", "prepare_tauri_contract")
+load("@viberoots//build-tools/rust/private:tauri_mobile_contract.bzl", "disabled_mobile_tauri_macro", "tauri_mobile_suite_contract")
 load("@viberoots//build-tools/rust/private:wasm_contract.bzl", "is_wasm_kind", "prepare_wasm_contract", "rust_wasm_module_surface")
 def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, interop = False):
     kw = dict(kwargs)
@@ -115,7 +116,9 @@ def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, inte
     )
     prepared = wiring.kwargs
     prepared.update(remote_kwargs)
-    cargo_root_srcs = native.glob([cargo_prefix + "**/*.rs"]); tauri_owner_srcs = ([tauri_attrs["tauri_config"]] + tauri_attrs["resources"] + tauri_attrs["capabilities"] + tauri_attrs["permissions"] + tauri_attrs["icons"]) if kind == "tauri" else []
+    cargo_root_srcs = native.glob([cargo_prefix + "**/*.rs"])
+    tauri_mobile_srcs = [value for value in [tauri_attrs.get("android_config"), tauri_attrs.get("ios_config")] if value != None] + tauri_attrs.get("android_project_srcs", []) + tauri_attrs.get("ios_project_srcs", [])
+    tauri_owner_srcs = ([tauri_attrs["tauri_config"]] + tauri_attrs["resources"] + tauri_attrs["capabilities"] + tauri_attrs["permissions"] + tauri_attrs["icons"] + tauri_mobile_srcs) if kind == "tauri" else []
     owner_srcs = dedupe_preserve((prepared.get("srcs", []) or []) + tauri_owner_srcs + native.glob(
         [cargo_prefix + "src/**/*.rs", cargo_prefix + "build.rs", cargo_prefix + "benches/**/*.rs", cargo_prefix + "examples/**/*.rs", cargo_prefix + "tests/**/*.rs"],
     ))
@@ -210,12 +213,12 @@ def rust_cxx_bridge_library(name, binding_config, artifact = "static", panic_str
     kw = prepare_interop_kwargs(kwargs, "rust_cxx_bridge_library", "cxx", binding_config, artifact, panic_strategy, exception_policy, allocator, thread_safety, cxx_standard, compiler_family, stl); _rust_nix_target(name = name, kind = "lib", out = artifact_out(public_crate_for(name, kw), kw["crate_type"]), kwargs = kw, interop = True)
 def rust_proc_macro(name, **kwargs):
     kw = fixed_artifact_contract(kwargs, "rust_proc_macro", "proc-macro", "host"); _rust_nix_target(name = name, kind = "lib", out = artifact_out(public_crate_for(name, kw), "proc-macro"), kwargs = kw)
-def rust_binary(name, **kwargs):
-    _rust_nix_target(name = name, kind = "bin", out = name, kwargs = kwargs)
-def tauri_app(name, frontend_dist, **kwargs):
-    kw = dict(kwargs); kw["frontend_dist"] = frontend_dist; _rust_nix_target(name = name, kind = "tauri", out = name + ".tauri", kwargs = kw)
-def rust_test(name, **kwargs):
-    _rust_nix_target(name = name, kind = "test", out = name + ".stamp", kwargs = kwargs)
+def rust_binary(name, **kwargs): _rust_nix_target(name = name, kind = "bin", out = name, kwargs = kwargs)
+def tauri_app(name, frontend_dist, **kwargs): kw = dict(kwargs); kw["frontend_dist"] = frontend_dist; _rust_nix_target(name = name, kind = "tauri", out = name + ".tauri", kwargs = kw)
+def tauri_ios_app(name, **kwargs): disabled_mobile_tauri_macro(name, "tauri_ios_app", mobile_platform = "ios", kwargs = kwargs)
+def tauri_android_app(name, **kwargs): disabled_mobile_tauri_macro(name, "tauri_android_app", mobile_platform = "android", kwargs = kwargs)
+def tauri_mobile_suite(name, frontend_dist, **kwargs): tauri_mobile_suite_contract(name, frontend_dist, kwargs, tauri_app)
+def rust_test(name, **kwargs): _rust_nix_target(name = name, kind = "test", out = name + ".stamp", kwargs = kwargs)
 def rust_wasm_library(name, wasm_abi = "bare", **kwargs):
     if wasm_abi not in ["bare", "wasi"]: fail("rust_wasm_library: wasm_abi must be bare or wasi")
     kw = dict(kwargs); kw["wasm_abi"] = wasm_abi
@@ -223,9 +226,7 @@ def rust_wasm_library(name, wasm_abi = "bare", **kwargs):
 def rust_wasi_binary(name, **kwargs):
     kw = with_required_target(kwargs, "rust_wasi_binary", "wasm32-wasip1"); _rust_nix_target(name = name, kind = "wasi", out = name + ".wasm", kwargs = kw); rust_wasm_module_surface(name, "module")
 def rust_wasm_static_library(name, wasm_abi = "bare", **kwargs):
-    kw = dict(kwargs); kw["wasm_abi"] = wasm_abi
-    kind = "wasi_static" if wasm_abi == "wasi" else "wasm_static"
-    _rust_nix_target(name = name, kind = kind, out = "lib" + public_crate_for(name, kw) + ".a", kwargs = kw); rust_wasm_module_surface(name, "static")
+    kw = dict(kwargs); kw["wasm_abi"] = wasm_abi; kind = "wasi_static" if wasm_abi == "wasi" else "wasm_static"; _rust_nix_target(name = name, kind = kind, out = "lib" + public_crate_for(name, kw) + ".a", kwargs = kw); rust_wasm_module_surface(name, "static")
 def rust_wasm_browser_package(name, **kwargs):
     _rust_nix_target(name = name, kind = "wasm_browser", out = name + ".browser", kwargs = kwargs); rust_wasm_module_surface(name, "browser")
 def rust_wasm_component(name, **kwargs):
@@ -246,5 +247,4 @@ def rust_python_wasm_extension(name, backend, module, lockfile_label = None, **k
     kw["labels"] = list(kw.get("labels", []) or []) + ["backend:pyodide"]; kw.update({"module": module, "target": "wasm32-unknown-emscripten"})
     _rust_nix_target(name = name, kind = "pyext_wasm", out = name + ".pyext-wasm", kwargs = kw, python_lockfile_label = lockfile_label)
 def rust_node_addon(name, addon_name = None, node_api_version = 8, platform = "selected", **kwargs):
-    resolved_name = validate_addon_name(addon_name or name); validate_node_api_version(node_api_version)
-    kw = fixed_artifact_contract(kwargs, "rust_node_addon", "cdylib", "target"); kw.update({"addon_name": resolved_name, "node_api_version": node_api_version, "platform": platform}); _rust_nix_target(name = name, kind = "addon", out = resolved_name + ".node", kwargs = kw)
+    resolved_name = validate_addon_name(addon_name or name); validate_node_api_version(node_api_version); kw = fixed_artifact_contract(kwargs, "rust_node_addon", "cdylib", "target"); kw.update({"addon_name": resolved_name, "node_api_version": node_api_version, "platform": platform}); _rust_nix_target(name = name, kind = "addon", out = resolved_name + ".node", kwargs = kw)

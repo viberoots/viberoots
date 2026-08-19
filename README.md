@@ -317,7 +317,7 @@ i && b && v
 i && b && ALL_TESTS=1 v
 ```
 
-Coverage is opt-in (`v --coverage` or `ALL_TESTS=1 v --coverage`). Use `s`, `l --status`, or `tail-log --status` to inspect active pass-group and total suite progress. The local wrappers and Buck Nix actions use `VBR_NIX_CACHE_POLICY=auto` by default, so temporarily unreachable configured HTTP(S) Nix caches are removed from the current process instead of failing unrelated builds. Use `VBR_NIX_CACHE_POLICY=strict` only when cache availability is what you are testing.
+Coverage is opt-in (`v --coverage` or `ALL_TESTS=1 v --coverage`). Use `s`, `l --status`, or `tail-log --status` to inspect active pass-group and total suite progress. The local wrappers and Buck Nix actions use `VBR_NIX_CACHE_POLICY=auto` by default, so temporarily unreachable optional HTTP(S) Nix caches are removed from the current process while required caches stay configured and unrelated builds continue. Use `VBR_NIX_CACHE_POLICY=strict` only when cache availability is what you are testing.
 
 ## Deployment Config
 

@@ -15,6 +15,16 @@ _exclude:
 name: ""
 language: "rust"
 template: "tauri-app"
+targets:
+  type: yaml
+  default: ["desktop-darwin"]
+android_package: ""
+android_min_sdk: 24
+android_compile_sdk: 35
+ios_bundle_identifier: ""
+ios_deployment_target: "17.0"
+include_mobile_release_placeholders: false
+enable_mobile_scaffold_targets: false
 
 _templates_suffix: ".jinja"
 _answers_file: ".copier-answers.yml"

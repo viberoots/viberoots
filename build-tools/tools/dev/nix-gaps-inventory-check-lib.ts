@@ -1,3 +1,6 @@
+import fs from "fs-extra";
+import path from "node:path";
+
 export const macroNamePattern = /^[a-z][a-z0-9_]+$/;
 export const nodeDefsBzlPath = "//build-tools/node:defs.bzl";
 export const publicNodeDefsBzlPath = "@viberoots//build-tools/node:defs.bzl";
@@ -103,6 +106,30 @@ export function parsePublicStarlarkDefs(text: string): string[] {
       .map((match) => String(match[1] || ""))
       .filter((name) => !name.startsWith("_")),
   );
+}
+
+export async function missingPublicDefsFromIndex(opts: {
+  source: string;
+  starlarkByModule: Record<string, string[]>;
+  allowedMissingByModule?: Record<string, Set<string>>;
+}): Promise<string[]> {
+  const errors: string[] = [];
+  for (const [moduleLabel, documented] of Object.entries(opts.starlarkByModule)) {
+    if (!moduleLabel.includes("//build-tools/") || !moduleLabel.endsWith(":defs.bzl")) continue;
+    const rel = moduleLabel
+      .replace(/^@viberoots\/\//, "")
+      .replace(/^\/\//, "")
+      .replace(":", "/");
+    const actual = parsePublicStarlarkDefs(await fs.readFile(path.join(opts.source, rel), "utf8"));
+    const allowed = opts.allowedMissingByModule?.[moduleLabel] || new Set<string>();
+    const missing = actual.filter((name) => !documented.includes(name) && !allowed.has(name));
+    if (missing.length > 0) {
+      errors.push(
+        `Starlark Index is missing public definitions from ${moduleLabel}: ${missing.join(", ")}`,
+      );
+    }
+  }
+  return errors;
 }
 
 export function parseNixGapsInventory(text: string): string[] {
@@ -219,6 +246,5 @@ export function bzlDefBody(text: string, macroName: string): string {
   const start = text.indexOf(needle);
   if (start < 0) return "";
   const next = text.indexOf("\ndef ", start + needle.length);
-  if (next < 0) return text.slice(start);
-  return text.slice(start, next);
+  return next < 0 ? text.slice(start) : text.slice(start, next);
 }

@@ -119,6 +119,10 @@ in {
       capabilities = sourceList name "capabilities";
       permissions = sourceList name "permissions";
       icons = sourceList name "icons";
+      androidConfig = let value = ctx.get (nodeFor name) "android_config"; in if value == null || value == "" then "" else tauriSourceRoot + "/${sourcePath name value}";
+      iosConfig = let value = ctx.get (nodeFor name) "ios_config"; in if value == null || value == "" then "" else tauriSourceRoot + "/${sourcePath name value}";
+      androidProjectSrcs = sourceList name "android_project_srcs";
+      iosProjectSrcs = sourceList name "ios_project_srcs";
       sidecars = lib.imap0 (artifactRecord sidecarDestinations) sidecarDeps;
       appCommands = stringList name "app_commands";
       appWindows = stringList name "app_windows";

@@ -98,6 +98,11 @@ Notes on Nix-backed Python outputs:
 - `rust_node_addon` → Nix build (`rust_nix_build` → stable Node-API `.node` artifact).
 - `tauri_app` → Nix build (`rust_nix_build` → credential-free platform-ad-hoc macOS application
   bundle plus executable; not release-signed or release-admitted).
+- `tauri_android_app` → loadable-disabled planned Tauri mobile route; no active Nix artifact route.
+- `tauri_ios_app` → loadable-disabled planned Tauri mobile route; no active Nix artifact route.
+- `tauri_mobile_suite` → loadable-disabled planned Tauri mobile helper. It declares stable
+  desktop/iOS/Android labels from one shared source contract, but mobile labels have no active Nix
+  artifact route and fail `platform-not-enabled` until reviewed builders land.
 
 All routes require canonical package-local `Cargo.toml` and `Cargo.lock` files, use Nix-store Rust
 tools, and reject placeholder output, stale locks, unsupported dependency sources, and cross-root
@@ -124,7 +129,7 @@ sidecar destinations plus command/window capabilities, and rejects hidden Tauri 
 package and launch route is `aarch64-darwin`; Linux is not claimed. The graph carries typed
 `tauri_target` metadata for the current `desktop-darwin` `macos-app` route and keeps
 `tauri_ios_app`, `tauri_android_app`, and `tauri_mobile_suite` in the separate
-`planned-not-loadable` route inventory rather than the active public macro inventory. Sidecars require reviewed
+`loadable-disabled` route inventory rather than the active public macro inventory. Sidecars require reviewed
 `kind:bin` dependencies, while native libraries remain behind reviewed Rust bridge crates and
 Cargo path dependencies.
 wasm-bindgen, wasm-tools, Binaryen, Wasmtime, and the preview1 adapters come from the selected Nix

@@ -12,7 +12,7 @@ import {
   parseNixGapsInventory,
   parseNodeClassificationTableMacros,
   parseNonBuildInventoryMacros,
-  parsePublicStarlarkDefs,
+  missingPublicDefsFromIndex,
   publicNodeDefsBzlPath,
   parseStarlarkIndexMacros,
   parseStarlarkIndexMacrosByModule,
@@ -64,6 +64,14 @@ async function main() {
 
   const starlarkTxt = await fs.readFile(starlarkPath, "utf8");
   const inventoryTxt = await fs.readFile(inventoryPath, "utf8");
+  const rustLang = (
+    (await fs.readJson(path.join(source, "build-tools/tools/nix/langs.json"))).languages || []
+  ).find((language: { id?: string }) => language.id === "rust");
+  const rustLoadableDisabled = new Set<string>(
+    (rustLang?.plannedRoutes || [])
+      .filter((route: { state?: string }) => route.state === "loadable-disabled")
+      .map((route: { macro?: string }) => String(route.macro || "")),
+  );
   const exceptionsJson = await fs.readJson(exceptionsPath);
   const commandSitePolicy = (await fs.readJson(
     commandSitePolicyPath,
@@ -78,21 +86,12 @@ async function main() {
   const artifactRouteAllowlist = artifactRouteAllowlistRaw as ArtifactRouteAllowlistEntry[];
   const starlarkMacros = parseStarlarkIndexMacros(starlarkTxt);
   const starlarkByModule = parseStarlarkIndexMacrosByModule(starlarkTxt);
-  for (const [moduleLabel, documented] of Object.entries(starlarkByModule)) {
-    if (!moduleLabel.includes("//build-tools/") || !moduleLabel.endsWith(":defs.bzl")) continue;
-    const rel = moduleLabel
-      .replace(/^@viberoots\/\//, "")
-      .replace(/^\/\//, "")
-      .replace(":", "/");
-    const sourceText = await fs.readFile(path.join(source, rel), "utf8");
-    const actual = parsePublicStarlarkDefs(sourceText);
-    const missingFromIndex = actual.filter((name) => !documented.includes(name));
-    if (missingFromIndex.length > 0) {
-      throw new Error(
-        `Starlark Index is missing public definitions from ${moduleLabel}: ${missingFromIndex.join(", ")}`,
-      );
-    }
-  }
+  const missingIndexDefs = await missingPublicDefsFromIndex({
+    source,
+    starlarkByModule,
+    allowedMissingByModule: { "@viberoots//build-tools/rust:defs.bzl": rustLoadableDisabled },
+  });
+  if (missingIndexDefs.length > 0) throw new Error(missingIndexDefs.join("\n"));
   const nodePublicMacros =
     starlarkByModule[publicNodeDefsBzlPath] || starlarkByModule[nodeDefsBzlPath] || [];
   const inventoryMacros = parseNixGapsInventory(inventoryTxt);

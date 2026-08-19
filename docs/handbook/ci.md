@@ -16,8 +16,8 @@ CI runs zx-backed stages and does not commit generated glue.
 Run locally with `CI=true viberoots/build-tools/tools/ci/run-stage.sh --stage <name>`.
 
 CI and local wrappers use the same default Nix cache policy as developer commands:
-`VBR_NIX_CACHE_POLICY=auto` probes configured HTTP(S) substituters, disables unreachable configured
-caches for the current process, keeps Nix fallback enabled, and continues locally. HTTP/authentication
+`VBR_NIX_CACHE_POLICY=auto` probes configured HTTP(S) substituters, disables unreachable optional
+caches for the current process, keeps required caches configured, keeps Nix fallback enabled, and continues locally. HTTP/authentication
 failures disable optional substituters only; required substituters and strict mode fail closed.
 Canonical ingress preserves the required/optional source roles before Nix flattens them and binds
 those exact lists to the reviewed config and policy for action re-review. Missing, forged, or
